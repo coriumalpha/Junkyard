@@ -1,0 +1,124 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<section class="hero dashboard-hero">
+    <div class="dashboard-hero-head">
+        <div>
+            <div class="eyebrow">Inventario local</div>
+            <h1>Buscar</h1>
+        </div>
+        <span class="caption">Laboratorio doméstico</span>
+    </div>
+    <form class="search-hero" asp-page="/Search" method="get">
+        <input name="q" placeholder="Buscar por objeto, caja, código, categoría o nota..." autocomplete="off" autofocus />
+        <button class="btn primary" type="submit">Buscar</button>
+    </form>
+    @if (Model.OrphanCount > 0 || Model.PhotoInboxPendingCount > 0)
+    {
+        <div class="notice dashboard-alert">
+            <a asp-page="/Items/Orphans">Objetos sin clasificar: @Model.OrphanCount</a>
+            <a asp-page="/Photos/Inbox">Fotos pendientes: @Model.PhotoInboxPendingCount</a>
+        </div>
+    }
+    <div class="stats-grid">
+        <div class="stat"><span>Ubicaciones</span><strong>@Model.LocationCount</strong></div>
+        <div class="stat"><span>Cajas</span><strong>@Model.BoxCount</strong></div>
+        <div class="stat"><span>Ítems</span><strong>@Model.ItemCount</strong></div>
+        <div class="stat"><span>Bajo stock</span><strong>@Model.LowStockCount</strong></div>
+    </div>
+</section>
+
+<div class="split dashboard-split">
+    <section>
+        <div class="section-title">
+            <h2>Cajas recientes</h2>
+            <a class="btn" asp-page="/Boxes/Index">Ver cajas</a>
+        </div>
+        <div class="grid cards">
+            @foreach (var box in Model.RecentBoxes)
+            {
+                var itemLabel = box.Items.Count == 1 ? "1 ítem" : $"{box.Items.Count} ítems";
+                <a class="card box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
+                    @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
+                    {
+                        <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@PhotoStorage.PublicUrl(box.CoverPhoto)" alt="@box.Name" />
+                    }
+                    else
+                    {
+                        <div class="box-cover generated-cover">
+                            <div class="cover-code">@box.Code</div>
+                            <div class="cover-meta">
+                                <span>@box.Location?.Name</span>
+                                <span>@itemLabel</span>
+                            </div>
+                        </div>
+                    }
+                    <div class="card-body">
+                        <div class="chips">
+                            <span class="chip good">@box.Code</span>
+                            <span class="chip">@box.Status</span>
+                        </div>
+                        <h3>@box.Name</h3>
+                        <p class="box-card-meta"><span>@box.Location?.Name</span><span>@itemLabel</span></p>
+                    </div>
+                </a>
+            }
+            @if (Model.RecentBoxes.Count == 0)
+            {
+                <div class="empty full">
+                    <strong>Todavía no hay cajas.</strong>
+                    <span>Crea la primera caja para empezar a mapear tu inventario físico.</span>
+                    <div class="actions stack-top"><a class="btn primary" asp-page="/Boxes/Create">Crear primera caja</a></div>
+                </div>
+            }
+        </div>
+    </section>
+
+    <aside>
+        <div class="section-title">
+            <h2>Consumibles bajos</h2>
+            <a class="btn" asp-page="/Consumables">Abrir</a>
+        </div>
+        <div class="panel visual-list">
+            @if (Model.LowStockItems.Count == 0)
+            {
+                <div class="empty"><strong>Todo bajo control.</strong><span>No hay consumibles por debajo del mínimo.</span></div>
+            }
+            @foreach (var item in Model.LowStockItems)
+            {
+                <a class="visual-row" asp-page="/Items/Edit" asp-route-id="@item.Id">
+                    @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
+                    {
+                        <img class="visual-row-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.PublicUrl(item.CoverPhoto)" alt="@item.Name" />
+                    }
+                    else
+                    {
+                        <span class="visual-row-photo generated">@item.Name[..1]</span>
+                    }
+                    <span class="visual-row-body">
+                        <strong>@item.Name</strong>
+                        <small class="muted">@item.Box?.Code · @item.Category</small>
+                        <span class="chip danger">@item.Quantity / @item.MinQuantity @item.Unit</span>
+                    </span>
+                </a>
+            }
+        </div>
+
+        <div class="section-title">
+            <h2>Fotos recientes</h2>
+        </div>
+        <div class="gallery compact">
+            @foreach (var photo in Model.RecentPhotos)
+            {
+                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.PublicUrl(photo.Filename)" alt="@photo.Caption" />
+            }
+            @if (Model.RecentPhotos.Count == 0)
+            {
+                <div class="empty full"><strong>Todavía no hay fotografías.</strong><span>Sube fotos a cajas u objetos para construir tu catálogo visual.</span></div>
+            }
+        </div>
+    </aside>
+</div>

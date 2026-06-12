@@ -1,0 +1,68 @@
+@page
+@model ImportModel
+@{
+    ViewData["Title"] = "Importar CSV";
+}
+
+<div class="section-title">
+    <div>
+        <p class="section-kicker">Entrada masiva</p>
+        <h1>Importar CSV</h1>
+    </div>
+    <a class="btn" asp-page-handler="Template">Descargar plantilla</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="notice danger-note">@Model.Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.Notice))
+{
+    <div class="notice">@Model.Notice</div>
+}
+
+<form class="panel form-grid" method="post" enctype="multipart/form-data" asp-page-handler="Preview">
+    <div class="field full">
+        <label>CSV</label>
+        <input type="file" asp-for="CsvFile" accept=".csv,text/csv" />
+    </div>
+    <div class="actions full">
+        <button class="btn primary" type="submit">Validar y previsualizar</button>
+    </div>
+</form>
+
+@if (Model.PreviewRows.Count > 0)
+{
+    <div class="section-title">
+        <h2>Previsualización</h2>
+        <form method="post" asp-page-handler="Confirm">
+            <input type="hidden" name="key" value="@Model.PendingKey" />
+            <button class="btn primary" type="submit">Confirmar importación</button>
+        </form>
+    </div>
+    <div class="panel table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ubicación</th>
+                    <th>Caja</th>
+                    <th>Ítem</th>
+                    <th>Categoría</th>
+                    <th>Cantidad</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.PreviewRows)
+                {
+                    <tr>
+                        <td>@row.Location</td>
+                        <td>@row.BoxCode · @row.BoxName</td>
+                        <td>@row.ItemName</td>
+                        <td>@row.Category</td>
+                        <td>@row.Quantity @row.Unit</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

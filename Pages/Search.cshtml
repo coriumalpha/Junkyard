@@ -1,0 +1,95 @@
+@page
+@model SearchModel
+@{
+    ViewData["Title"] = "Búsqueda";
+}
+
+<section class="hero compact-hero">
+    <h1>Búsqueda global</h1>
+    <form class="search-hero" method="get">
+        <input name="q" value="@Model.Query" placeholder="Caja, objeto, categoría, nota..." autofocus />
+        <button class="btn primary" type="submit">Buscar</button>
+    </form>
+</section>
+
+@if (Model.Query.Length < 2)
+{
+    <div class="empty stack-top"><strong>Busca cualquier cosa.</strong><span>Escribe al menos 2 caracteres para localizar cajas, objetos, categorías o notas.</span></div>
+}
+else
+{
+    <div class="split">
+        <section>
+            <div class="section-title">
+                <h2>Cajas</h2>
+                <span class="chip">@Model.Boxes.Count</span>
+            </div>
+            <div class="search-card-grid">
+                @foreach (var box in Model.Boxes)
+                {
+                    var itemLabel = box.Items.Count == 1 ? "1 ítem" : $"{box.Items.Count} ítems";
+                    <a class="card box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
+                        @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
+                        {
+                            <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@PhotoStorage.PublicUrl(box.CoverPhoto)" alt="@box.Name" />
+                        }
+                        else
+                        {
+                            <div class="box-cover generated-cover">
+                                <div class="cover-code">@box.Code</div>
+                                <div class="cover-meta">
+                                    <span>@box.Location?.Name</span>
+                                    <span>@itemLabel</span>
+                                </div>
+                            </div>
+                        }
+                        <div class="card-body">
+                            <div class="chips">
+                                <span class="chip good">@box.Code</span>
+                                <span class="chip">@box.Status</span>
+                            </div>
+                            <h3>@box.Name</h3>
+                            <p class="box-card-meta"><span>@box.Location?.Name</span><span>@itemLabel</span></p>
+                        </div>
+                    </a>
+                }
+                @if (Model.Boxes.Count == 0)
+                {
+                    <div class="empty"><strong>No se encontraron cajas.</strong><span>Prueba por código, ubicación o nombre parcial.</span></div>
+                }
+            </div>
+        </section>
+        <section>
+            <div class="section-title">
+                <h2>Ítems</h2>
+                <span class="chip">@Model.Items.Count</span>
+            </div>
+            <div class="search-card-grid">
+                @foreach (var item in Model.Items)
+                {
+                    <a class="box-item-card" asp-page="/Items/Edit" asp-route-id="@item.Id">
+                        @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
+                        {
+                            <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.PublicUrl(item.CoverPhoto)" alt="@item.Name" />
+                        }
+                        else
+                        {
+                            <div class="box-item-photo generated">@item.Name[..1]</div>
+                        }
+                        <span class="box-item-body">
+                            <h3>@item.Name</h3>
+                            <p class="caption">@item.Box?.Code · @item.Box?.Location?.Name · @item.Category</p>
+                            <span class="chips">
+                                <span class="chip">@item.Quantity @item.Unit</span>
+                            </span>
+                        </span>
+                    </a>
+                }
+                @if (Model.Items.Count == 0)
+                {
+                    <div class="empty"><strong>No se encontraron ítems.</strong><span>Prueba por categoría, nota o nombre alternativo.</span></div>
+                }
+            </div>
+        </section>
+    </div>
+}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Junkyard</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+@{
+    var path = Context.Request.Path.Value ?? "/";
+    string Active(string prefix) => path.Equals(prefix, StringComparison.OrdinalIgnoreCase) || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase) ? " active" : "";
+    var boxesNav = "nav-link" + Active("/Boxes") + Active("/boxes");
+    var inventoryNav = "nav-link" + Active("/items");
+    var locationsNav = "nav-link" + Active("/Locations");
+    var consumablesNav = "nav-link" + Active("/Consumables");
+    var photosNav = "nav-link" + Active("/photos");
+    var orphansNav = "nav-link" + Active("/items/orphans");
+    var archiveNav = "nav-link" + Active("/archive");
+    var importNav = "nav-link" + Active("/Import");
+    var exportNav = "nav-link" + Active("/Export");
+}
+    <header class="shell topbar">
+        <a class="brand" asp-page="/Index">
+            <img class="brand-logo" src="~/img/junkyard-logo.png" alt="" />
+            <span>Junkyard</span>
+        </a>
+        <form class="top-search" asp-page="/Search" method="get">
+            <input name="q" value="@Context.Request.Query["q"]" placeholder="Buscar objeto, caja, categoría, nota..." autocomplete="off" />
+        </form>
+        <nav>
+            <a class="@boxesNav" asp-page="/Boxes/Index"><span class="nav-ico">□</span>Cajas</a>
+            <a class="@inventoryNav" asp-page="/Items/Index"><span class="nav-ico">≡</span>Inventario</a>
+            <a class="@locationsNav" asp-page="/Locations"><span class="nav-ico">⌂</span>Ubicaciones</a>
+            <a class="@consumablesNav" asp-page="/Consumables"><span class="nav-ico">↓</span>Consumibles</a>
+            <a class="@photosNav" asp-page="/Photos/Inbox"><span class="nav-ico">◉</span>Fotos</a>
+            <a class="@orphansNav" asp-page="/Items/Orphans"><span class="nav-ico">◇</span>Huérfanos</a>
+            <a class="@archiveNav" asp-page="/Archive"><span class="nav-ico">⌁</span>Archivo</a>
+            <a class="@importNav" asp-page="/Import"><span class="nav-ico">↑</span>Importar</a>
+            <a class="@exportNav" asp-page="/Export"><span class="nav-ico">↓</span>Exportar</a>
+        </nav>
+    </header>
+    <main class="shell page">
+        @RenderBody()
+    </main>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

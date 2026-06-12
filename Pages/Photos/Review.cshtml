@@ -1,0 +1,182 @@
+@page "/photos/review"
+@model Inventario.Pages.Photos.ReviewModel
+@{
+    ViewData["Title"] = "Revisar fotos";
+}
+
+<div class="review-shell">
+    <div class="review-top">
+        <div class="chips">
+            <span class="chip good">Pendientes: @Model.PendingCount</span>
+            <span class="chip">Procesadas: @Model.ProcessedCount</span>
+            @if (Model.Current?.SourceBox is not null)
+            {
+                <span class="chip">Caja origen: @Model.Current.SourceBox.Code</span>
+            }
+        </div>
+        <a class="btn" asp-page="/Photos/Inbox">Bandeja</a>
+    </div>
+
+    @if (TempData.Peek("UndoInboxIds") is string undoIds)
+    {
+        <form class="notice undo-line" method="post" asp-page-handler="Undo">
+            <input type="hidden" name="ids" value="@undoIds" />
+            Guardado. <button class="btn" type="submit">Deshacer</button>
+        </form>
+    }
+
+    @if (Model.Current is null)
+    {
+        <div class="empty">No hay fotografías pendientes.</div>
+    }
+    else
+    {
+        <form id="reviewForm" class="review-form" method="post">
+            <input type="hidden" asp-for="Input.CurrentId" />
+            <input id="selectedIds" type="hidden" asp-for="Input.SelectedIds" />
+            <section class="review-stage">
+                <div class="review-photo-frame">
+                    <img class="review-photo rotatable" style="@PhotoStorage.RotationStyle(Model.Current.RotationDegrees)" src="@PhotoStorage.PublicUrl(Model.Current.Filename)" alt="@Model.Current.OriginalFilename" />
+                </div>
+                <aside class="review-actions panel">
+                    <h2>Acciones rápidas</h2>
+                    <button class="btn primary" type="button" data-open="create">N · Crear objeto</button>
+                    <button class="btn" type="button" data-open="assign">A · Asociar a objeto</button>
+                    <div class="actions">
+                        <button class="btn" type="submit" asp-page-handler="Rotate" name="direction" value="left">Q · Girar -90°</button>
+                        <button class="btn" type="submit" asp-page-handler="Rotate" name="direction" value="right">E · Girar +90°</button>
+                    </div>
+                    <button class="btn" type="submit" asp-page-handler="AssignBox">B · Asociar a caja</button>
+                    <button class="btn danger" type="submit" asp-page-handler="Discard">D · Descartar</button>
+                    @if (Model.NextPendingId is int nextId)
+                    {
+                        <a class="btn" data-next href="@Url.Page("/Photos/Review", new { id = nextId })">S · Saltar</a>
+                    }
+                    else
+                    {
+                        <span class="btn disabled" aria-disabled="true">S · Sin más fotos</span>
+                    }
+                    @if (Model.PreviousPendingId is int previousId)
+                    {
+                        <a class="btn" data-previous href="@Url.Page("/Photos/Review", new { id = previousId })">← Anterior</a>
+                    }
+                    <div class="field">
+                        <label>Caja para B / objeto nuevo</label>
+                        <select asp-for="Input.BoxId" asp-items="Model.Boxes"></select>
+                    </div>
+                    <small class="muted">Atajos: A, N, B, D, S, Q/E, flechas, Enter, Esc, Ctrl+Z.</small>
+                </aside>
+            </section>
+
+            <div class="filmstrip" aria-label="Fotos pendientes cercanas">
+                @foreach (var photo in Model.Pending)
+                {
+                    <label class="film @(photo.Id == Model.Current.Id ? "current" : "")">
+                        <input type="checkbox" value="@photo.Id" checked="@(photo.Id == Model.Current.Id)" />
+                        <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.PublicUrl(photo.Filename)" alt="@photo.OriginalFilename" />
+                    </label>
+                }
+            </div>
+
+            <dialog id="createDialog" class="modal-card">
+                <h2>Crear objeto desde fotos</h2>
+                <div class="form-grid">
+                    <div class="field full">
+                        <label>Nombre</label>
+                        <input asp-for="Input.Name" autocomplete="off" />
+                    </div>
+                    <div class="field">
+                        <label>Categoría</label>
+                        <select asp-for="Input.Category">
+                            @foreach (var category in Model.Categories)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Cantidad</label>
+                        <input asp-for="Input.Quantity" type="number" step="0.001" />
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn primary" type="submit" asp-page-handler="CreateItem">Enter · Guardar</button>
+                    <button class="btn" type="button" data-close>Esc · Cancelar</button>
+                </div>
+            </dialog>
+
+            <dialog id="assignDialog" class="modal-card">
+                <h2>Asociar a objeto existente</h2>
+                <div class="field">
+                    <label>Objeto</label>
+                    <select asp-for="Input.ItemId" asp-items="Model.Items" size="10"></select>
+                </div>
+                <div class="actions">
+                    <button class="btn primary" type="submit" asp-page-handler="AssignItem">Enter · Asociar</button>
+                    <button class="btn" type="button" data-close>Esc · Cancelar</button>
+                </div>
+            </dialog>
+        </form>
+    }
+</div>
+
+<script>
+(() => {
+  const form = document.getElementById('reviewForm');
+  if (!form) return;
+  const selected = document.getElementById('selectedIds');
+  const boxes = [...document.querySelectorAll('.film input')];
+  const sync = () => selected.value = boxes.filter(x => x.checked).map(x => x.value).join(',');
+  boxes.forEach(x => x.addEventListener('change', sync));
+  sync();
+  const createDialog = document.getElementById('createDialog');
+  const assignDialog = document.getElementById('assignDialog');
+  const nameInput = createDialog?.querySelector('[name="Input.Name"]');
+  const createSubmit = createDialog?.querySelector('[formaction*="CreateItem"]');
+  const assignSubmit = assignDialog?.querySelector('[formaction*="AssignItem"]');
+  const openCreate = () => {
+    if (nameInput?.value?.toLowerCase() === 'n') nameInput.value = '';
+    createDialog.showModal();
+    setTimeout(() => nameInput?.focus(), 0);
+  };
+  const openAssign = () => {
+    assignDialog.showModal();
+    setTimeout(() => assignDialog.querySelector('select')?.focus(), 0);
+  };
+  document.querySelector('.film.current')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  document.querySelector('[data-open="create"]').addEventListener('click', openCreate);
+  document.querySelector('[data-open="assign"]').addEventListener('click', openAssign);
+  document.querySelectorAll('[data-close]').forEach(x => x.addEventListener('click', () => x.closest('dialog').close()));
+  createDialog.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      createSubmit?.click();
+    }
+  });
+  assignDialog.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      assignSubmit?.click();
+    }
+  });
+  document.addEventListener('keydown', e => {
+    const key = e.key.toLowerCase();
+    if (e.ctrlKey && key === 'z') {
+      e.preventDefault();
+      document.querySelector('.undo-line button')?.click();
+    }
+    if (document.querySelector('dialog[open]')) {
+      if (e.key === 'Escape') document.querySelector('dialog[open]')?.close();
+      return;
+    }
+    if (key === 'n') { e.preventDefault(); openCreate(); }
+    if (key === 'a') { e.preventDefault(); openAssign(); }
+    if (key === 'q') { e.preventDefault(); form.querySelector('[name="direction"][value="left"]')?.click(); }
+    if (key === 'e') { e.preventDefault(); form.querySelector('[name="direction"][value="right"]')?.click(); }
+    if (key === 'b') { e.preventDefault(); form.querySelector('[formaction*="AssignBox"]')?.click(); }
+    if (key === 'd') { e.preventDefault(); form.querySelector('[formaction*="Discard"]')?.click(); }
+    if (key === 's' || e.key === 'ArrowRight') { e.preventDefault(); document.querySelector('[data-next]')?.click(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); document.querySelector('[data-previous]')?.click(); }
+  });
+})();
+</script>

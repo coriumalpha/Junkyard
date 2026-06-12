@@ -1,0 +1,194 @@
+@page
+@model Inventario.Pages.Items.EditModel
+@{
+    ViewData["Title"] = "Ficha de ítem";
+    var primaryPhoto = Model.Gallery.FirstOrDefault();
+}
+
+<div class="section-title">
+    <div>
+        <h1>@Model.Input.Name</h1>
+        <p class="section-kicker">Ficha de catálogo, ubicación y estado del objeto.</p>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Model.CurrentBoxCode))
+    {
+        <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.CurrentBoxCode">Volver a caja</a>
+    }
+</div>
+
+<div class="split">
+    <form class="item-profile" method="post">
+        <input type="hidden" asp-for="Input.Id" />
+        <section class="item-profile-head">
+            <div class="chips">
+                <span class="chip">@Model.Input.Category</span>
+                @if (Model.Input.Consumable) { <span class="chip good">Consumible</span> }
+                @if (Model.Input.Obsolete) { <span class="chip warn">Legacy</span> }
+                @if (Model.Input.Sentimental) { <span class="chip good">Recuerdo</span> }
+            </div>
+            <div class="form-grid stack-top">
+                <div class="field full">
+                    <label asp-for="Input.Name">Nombre</label>
+                    <input asp-for="Input.Name" />
+                </div>
+                <div class="field">
+                    <label asp-for="Input.BoxId">Caja</label>
+                    <select asp-for="Input.BoxId" asp-items="Model.Boxes"></select>
+                </div>
+                <div class="field">
+                    <label asp-for="Input.Category">Categoría</label>
+                    <select asp-for="Input.Category">
+                        @foreach (var category in Model.Categories)
+                        {
+                            <option value="@category">@category</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel form-grid">
+            <h2 class="full">Inventario</h2>
+            <div class="field">
+                <label asp-for="Input.Quantity">Cantidad</label>
+                <input asp-for="Input.Quantity" type="number" step="0.001" />
+            </div>
+            <div class="field">
+                <label asp-for="Input.Unit">Unidad</label>
+                <input asp-for="Input.Unit" />
+            </div>
+            <div class="field">
+                <label asp-for="Input.MinQuantity">Mínimo</label>
+                <input asp-for="Input.MinQuantity" type="number" step="0.001" />
+            </div>
+            <div class="field">
+                <label asp-for="Input.Condition">Estado</label>
+                <input asp-for="Input.Condition" />
+            </div>
+            <div class="field">
+                <label asp-for="Input.Retention">Retención</label>
+                <input asp-for="Input.Retention" />
+            </div>
+            <div class="toggles full">
+                <label><input asp-for="Input.Consumable" /> Consumible</label>
+                <label><input asp-for="Input.Sentimental" /> Sentimental</label>
+                <label><input asp-for="Input.Obsolete" /> Obsoleto</label>
+            </div>
+            <div class="field full">
+                <label asp-for="Input.Notes">Notas</label>
+                <textarea asp-for="Input.Notes"></textarea>
+            </div>
+            <div class="actions full">
+                <button class="btn primary" type="submit">Guardar cambios</button>
+            </div>
+        </section>
+
+        <section class="panel danger-zone">
+            <h2>Zona peligrosa</h2>
+            <p class="muted">Archiva el ítem. No se elimina físicamente y podrás restaurarlo desde Archivo.</p>
+            <button class="btn danger" type="submit" formaction="?handler=Delete&id=@Model.Input.Id">Archivar ítem</button>
+        </section>
+    </form>
+
+    <aside class="item-media-rail">
+        @if (primaryPhoto is not null)
+        {
+            <section class="item-photo-hero panel">
+                <div class="section-header compact">
+                    <div>
+                        <p class="eyebrow">Imagen principal</p>
+                        <h2>Vista del objeto</h2>
+                    </div>
+                    <span class="badge">@Model.Gallery.Count foto@(Model.Gallery.Count == 1 ? "" : "s")</span>
+                </div>
+                <button class="item-photo-main" type="button" data-lightbox-src="@PhotoStorage.PublicUrl(primaryPhoto.Filename)" data-lightbox-caption="@(primaryPhoto.Caption ?? Model.Input.Name)" aria-label="Ampliar fotografía principal">
+                    <img class="rotatable" style="@PhotoStorage.RotationStyle(primaryPhoto.RotationDegrees)" src="@PhotoStorage.PublicUrl(primaryPhoto.Filename)" alt="@(primaryPhoto.Caption ?? Model.Input.Name)" />
+                </button>
+                <p class="caption">Pulsa la imagen para verla ampliada.</p>
+            </section>
+        }
+        else
+        {
+            <section class="item-photo-empty empty">
+                <strong>Sin fotografía principal</strong>
+                Sube una imagen para convertir esta ficha en una referencia visual.
+            </section>
+        }
+
+        <form class="panel form-grid" method="post" enctype="multipart/form-data" asp-page-handler="Photo">
+            <input type="hidden" asp-for="Input.Id" />
+            <div class="field full">
+                <label>Imagen</label>
+                <input type="file" asp-for="PhotoFile" accept="image/*" />
+            </div>
+            <div class="field full">
+                <label>Pie</label>
+                <input asp-for="Caption" />
+            </div>
+            <button class="btn primary full" type="submit">Subir foto</button>
+        </form>
+        @if (Model.Gallery.Count > 0)
+        {
+            <section class="panel stack-top">
+                <div class="section-header compact">
+                    <h2>Galería</h2>
+                    <span class="caption">@Model.Gallery.Count imagen@(Model.Gallery.Count == 1 ? "" : "es")</span>
+                </div>
+                <div class="gallery object-photo-gallery">
+                    @foreach (var photo in Model.Gallery)
+                    {
+                        var isCover = photo.Filename == Model.CoverPhotoFilename;
+                        <form class="photo-tile @(isCover ? "is-cover" : "")" method="post" asp-page-handler="ArchivePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">
+                            <button class="photo-preview-button" type="button" data-lightbox-src="@PhotoStorage.PublicUrl(photo.Filename)" data-lightbox-caption="@(photo.Caption ?? Model.Input.Name)" aria-label="Ampliar fotografía">
+                                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.PublicUrl(photo.Filename)" alt="@photo.Caption" />
+                            </button>
+                            <div class="photo-tile-actions">
+                                @if (isCover)
+                                {
+                                    <span class="badge good cover-badge">Principal</span>
+                                }
+                                else
+                                {
+                                    <button class="btn" type="submit" asp-page-handler="SetCoverPhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">Usar como principal</button>
+                                }
+                                <button class="btn" type="submit" asp-page-handler="RotatePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id" asp-route-delta="-90">Girar izq.</button>
+                                <button class="btn" type="submit" asp-page-handler="RotatePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id" asp-route-delta="90">Girar der.</button>
+                                <button class="btn" type="submit" asp-page-handler="ReturnPhotoToInbox" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">Devolver a bandeja</button>
+                                <button class="btn danger" type="submit">Archivar</button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            </section>
+        }
+    </aside>
+</div>
+
+<dialog id="photoLightbox" class="lightbox-dialog">
+    <button class="btn lightbox-close" type="button" data-lightbox-close>Esc · Cerrar</button>
+    <figure>
+        <img id="photoLightboxImage" alt="" />
+        <figcaption id="photoLightboxCaption"></figcaption>
+    </figure>
+</dialog>
+
+<script>
+(() => {
+  const dialog = document.getElementById('photoLightbox');
+  const image = document.getElementById('photoLightboxImage');
+  const caption = document.getElementById('photoLightboxCaption');
+  if (!dialog || !image || !caption) return;
+  document.querySelectorAll('[data-lightbox-src]').forEach(button => {
+    button.addEventListener('click', () => {
+      image.src = button.dataset.lightboxSrc;
+      image.alt = button.dataset.lightboxCaption || '';
+      caption.textContent = button.dataset.lightboxCaption || '';
+      dialog.showModal();
+    });
+  });
+  document.querySelector('[data-lightbox-close]')?.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog) dialog.close();
+  });
+})();
+</script>

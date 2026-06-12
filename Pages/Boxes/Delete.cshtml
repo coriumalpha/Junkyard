@@ -1,0 +1,39 @@
+@page
+@model Inventario.Pages.Boxes.DeleteModel
+@{
+    ViewData["Title"] = "Borrado seguro";
+}
+
+<section class="hero compact-hero">
+    <h1>Borrado seguro de @Model.Box.Code</h1>
+    <p class="muted">La caja contiene @Model.Box.Items.Count objetos y @Model.Box.ChildBoxes.Count subcajas. No se eliminarán automáticamente.</p>
+</section>
+
+<div class="split stack-top">
+    <form class="panel form-grid danger-zone" method="post" asp-page-handler="Move" asp-route-id="@Model.Box.Id">
+        <h2 class="full">Mover objetos a otra caja</h2>
+        <div class="field full">
+            <label>Caja destino</label>
+            <select asp-for="TargetBoxId" asp-items="Model.TargetBoxes"></select>
+        </div>
+        <button class="btn primary full" type="submit">Mover y archivar caja</button>
+        @if (Model.Box.ChildBoxes.Count > 0)
+        {
+            <p class="caption full">Las subcajas subirán un nivel para conservar su contenido.</p>
+        }
+    </form>
+
+    <form class="panel danger-zone" method="post" asp-page-handler="Orphan" asp-route-id="@Model.Box.Id">
+        <h2>Convertir en huérfanos</h2>
+        <p class="muted">Los objetos quedarán en <code>/items/orphans</code> para reclasificarlos después.</p>
+        @if (Model.Box.ChildBoxes.Count > 0)
+        {
+            <p class="caption">Las subcajas subirán un nivel para conservar su contenido.</p>
+        }
+        <button class="btn danger" type="submit">Convertir objetos en huérfanos</button>
+    </form>
+</div>
+
+<div class="actions stack-top">
+    <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.Box.Code">Cancelar</a>
+</div>

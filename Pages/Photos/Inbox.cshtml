@@ -1,0 +1,169 @@
+@page "/photos/inbox"
+@model Inventario.Pages.Photos.InboxModel
+@{
+    ViewData["Title"] = "Bandeja de fotos";
+}
+
+<div class="section-title">
+    <div>
+        <p class="section-kicker">Inventariado visual</p>
+        <h1>Bandeja de fotos</h1>
+    </div>
+    <a class="btn primary" asp-page="/Photos/Review">Revisar pendientes</a>
+</div>
+
+@if (TempData["Notice"] is string notice)
+{
+    <div class="notice">@notice</div>
+}
+@if (TempData.Peek("UndoDiscardId") is string undoId)
+{
+    <form class="notice undo-line" method="post" asp-page-handler="UndoDiscard" asp-route-id="@undoId">
+        Foto descartada. <button class="btn" type="submit">Deshacer</button>
+    </form>
+}
+
+<form id="bulkUploadForm" class="panel upload-drop" method="post" enctype="multipart/form-data" asp-page-handler="Upload">
+    <div>
+        <h2>Importar fotografías</h2>
+        <p class="muted">Arrastra aquí imágenes o selecciona muchas a la vez. Entrarán como pendientes.</p>
+    </div>
+    <div class="form-grid">
+        <div class="field">
+            <label>Caja origen opcional</label>
+            <select asp-for="SourceBoxId" asp-items="Model.Boxes">
+                <option value="">Sin caja origen</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Imágenes</label>
+            <input asp-for="Files" type="file" accept="image/*" multiple />
+        </div>
+    </div>
+    <button class="btn primary" type="submit">Subir a bandeja</button>
+    <div id="uploadProgress" class="upload-progress" hidden>
+        <div class="upload-progress-bar"><span></span></div>
+        <p class="muted" data-upload-status>Preparando subida...</p>
+        <p class="caption" data-upload-detail></p>
+    </div>
+</form>
+
+<div class="stats-grid stack-top">
+    <a class="stat" asp-route-status="Pending"><span>Pendientes</span><strong>@Model.PendingCount</strong></a>
+    <a class="stat" asp-route-status="Assigned"><span>Asignadas</span><strong>@Model.AssignedCount</strong></a>
+    <a class="stat" asp-route-status="Discarded"><span>Descartadas</span><strong>@Model.DiscardedCount</strong></a>
+    <a class="stat" asp-route-status="All"><span>Mostrando</span><strong>@Model.Photos.Count</strong></a>
+</div>
+
+<div class="chips stack-top">
+    <a class="chip" asp-route-status="All">Todas</a>
+    <a class="chip good" asp-route-status="Pending">Pendientes</a>
+    <a class="chip" asp-route-status="Assigned">Asignadas</a>
+    <a class="chip danger" asp-route-status="Discarded">Descartadas</a>
+</div>
+
+<div class="inbox-gallery stack-top">
+    @foreach (var photo in Model.Photos)
+    {
+        <article class="card inbox-card">
+            <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.PublicUrl(photo.Filename)" alt="@photo.OriginalFilename" />
+            <div class="card-body">
+                <div class="chips">
+                    <span class="chip @(photo.Status == PhotoInboxStatus.Pending ? "good" : photo.Status == PhotoInboxStatus.Discarded ? "danger" : "")">@photo.Status</span>
+                    @if (photo.SourceBox is not null)
+                    {
+                        <span class="chip">@photo.SourceBox.Code</span>
+                    }
+                </div>
+                <small class="muted">@photo.OriginalFilename</small>
+                @if (photo.Status == PhotoInboxStatus.Pending)
+                {
+                    <form method="post" asp-page-handler="Discard" asp-route-id="@photo.Id">
+                        <button class="btn danger" type="submit">Descartar</button>
+                    </form>
+                }
+            </div>
+        </article>
+    }
+    @if (Model.Photos.Count == 0)
+    {
+        <div class="empty">Todavía no hay fotografías en esta bandeja.</div>
+    }
+</div>
+
+<script>
+(() => {
+  const form = document.getElementById('bulkUploadForm');
+  if (!form) return;
+  const input = form.querySelector('input[type="file"]');
+  const progress = document.getElementById('uploadProgress');
+  const bar = progress?.querySelector('span');
+  const status = progress?.querySelector('[data-upload-status]');
+  const detail = progress?.querySelector('[data-upload-detail]');
+  const button = form.querySelector('button[type="submit"]');
+
+  form.addEventListener('submit', async event => {
+    const files = [...(input?.files ?? [])];
+    if (files.length === 0) return;
+    event.preventDefault();
+    progress.hidden = false;
+    button.disabled = true;
+    input.disabled = true;
+    const endpoint = form.action;
+    const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value;
+    let imported = 0;
+    let failed = 0;
+
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index];
+      status.textContent = `Subiendo ${index + 1} de ${files.length}`;
+      detail.textContent = file.name;
+      if (bar) bar.style.width = `${Math.round((index / files.length) * 100)}%`;
+
+      const body = new FormData();
+      body.append('Files', file, file.name);
+      const box = form.querySelector('[name="SourceBoxId"]')?.value;
+      if (box) body.append('SourceBoxId', box);
+      if (token) body.append('__RequestVerificationToken', token);
+
+      try {
+        const result = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', endpoint);
+          xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+          xhr.upload.addEventListener('progress', progressEvent => {
+            if (!progressEvent.lengthComputable) return;
+            const fileProgress = progressEvent.loaded / progressEvent.total;
+            const totalProgress = ((index + fileProgress) / files.length) * 100;
+            if (bar) bar.style.width = `${Math.round(totalProgress)}%`;
+            detail.textContent = `${file.name} · ${Math.round(fileProgress * 100)}%`;
+          });
+          xhr.addEventListener('load', () => {
+            if (xhr.status < 200 || xhr.status >= 300) {
+              reject(new Error(`HTTP ${xhr.status}`));
+              return;
+            }
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              reject(new Error('Respuesta inválida'));
+            }
+          });
+          xhr.addEventListener('error', () => reject(new Error('Error de red')));
+          xhr.addEventListener('abort', () => reject(new Error('Subida cancelada')));
+          xhr.send(body);
+        });
+        imported += result.imported ?? 0;
+        failed += result.rejected?.length ?? 0;
+      } catch {
+        failed++;
+      }
+    }
+
+    if (bar) bar.style.width = '100%';
+    status.textContent = `Subida completada: ${imported} importadas, ${failed} con error.`;
+    detail.textContent = 'Actualizando bandeja...';
+    window.location = `${location.pathname}?status=Pending`;
+  });
+})();
+</script>

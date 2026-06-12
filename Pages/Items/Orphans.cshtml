@@ -1,0 +1,42 @@
+@page "/items/orphans"
+@model Inventario.Pages.Items.OrphansModel
+@{
+    ViewData["Title"] = "Objetos huérfanos";
+}
+
+<div class="section-title">
+    <div>
+        <p class="section-kicker">Reclasificación pendiente</p>
+        <h1>Objetos sin clasificar</h1>
+    </div>
+    <span class="chip danger">@Model.Items.Count</span>
+</div>
+
+<div class="list">
+    @foreach (var item in Model.Items)
+    {
+        <article class="visual-row orphan-row">
+            @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
+            {
+                <img class="visual-row-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.PublicUrl(item.CoverPhoto)" alt="@item.Name" />
+            }
+            else
+            {
+                <span class="visual-row-photo generated">@item.Name[..1]</span>
+            }
+            <span class="visual-row-body">
+                <strong>@item.Name</strong>
+                <small class="muted">@item.Category · @item.Quantity @item.Unit</small>
+            </span>
+            <form class="actions" method="post" asp-page-handler="Assign" asp-route-id="@item.Id">
+                <select asp-for="BoxId" asp-items="Model.Boxes"></select>
+                <button class="btn primary" type="submit">Asignar</button>
+                <a class="btn" asp-page="/Items/Edit" asp-route-id="@item.Id">Editar</a>
+            </form>
+        </article>
+    }
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty">No hay objetos huérfanos.</div>
+    }
+</div>

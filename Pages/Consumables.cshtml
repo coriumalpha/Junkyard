@@ -1,0 +1,40 @@
+@page
+@model ConsumablesModel
+@{
+    ViewData["Title"] = "Consumibles";
+}
+
+<div class="section-title">
+    <div>
+        <h1>Consumibles</h1>
+        <p class="section-kicker">Control de stock para piezas, tornillería, material fungible y recambios.</p>
+    </div>
+</div>
+
+<div class="box-content-grid">
+    @foreach (var item in Model.Items)
+    {
+        var low = item.MinQuantity != null && item.Quantity <= item.MinQuantity;
+        <a class="box-item-card" asp-page="/Items/Edit" asp-route-id="@item.Id">
+            @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
+            {
+                <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.PublicUrl(item.CoverPhoto)" alt="@item.Name" />
+            }
+            else
+            {
+                <div class="box-item-photo generated">@item.Name[..1]</div>
+            }
+            <span class="box-item-body">
+                <h3>@item.Name</h3>
+                <p class="caption">@item.Box?.Code · @item.Box?.Location?.Name · @item.Category</p>
+                <span class="chips">
+                    <span class="chip @(low ? "danger" : "good")">@item.Quantity / @item.MinQuantity @item.Unit</span>
+                </span>
+            </span>
+        </a>
+    }
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty"><strong>No hay consumibles marcados.</strong><span>Marca un ítem como consumible para que aparezca aquí y active alertas de bajo stock.</span></div>
+    }
+</div>

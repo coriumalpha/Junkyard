@@ -1,0 +1,64 @@
+@page
+@model Inventario.Pages.Items.CreateModel
+@{
+    ViewData["Title"] = "Nuevo ítem";
+}
+
+<div class="section-title">
+    <div>
+        <p class="section-kicker">Catálogo</p>
+        <h1>Nuevo ítem</h1>
+    </div>
+</div>
+
+<form class="panel form-grid" method="post">
+    <div class="field">
+        <label asp-for="Input.BoxId">Caja</label>
+        <select asp-for="Input.BoxId" asp-items="Model.Boxes"></select>
+    </div>
+    <div class="field">
+        <label asp-for="Input.Name">Nombre</label>
+        <input asp-for="Input.Name" placeholder="Raspberry Pi 4, tornillos M3..." />
+    </div>
+    <div class="field">
+        <label asp-for="Input.Category">Categoría</label>
+        <select asp-for="Input.Category">
+            @foreach (var category in Model.Categories)
+            {
+                <option value="@category">@category</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label asp-for="Input.Condition">Estado</label>
+        <input asp-for="Input.Condition" placeholder="Nuevo, usado, reparar..." />
+    </div>
+    <div class="field">
+        <label asp-for="Input.Quantity">Cantidad</label>
+        <input asp-for="Input.Quantity" type="number" step="0.001" />
+    </div>
+    <div class="field">
+        <label asp-for="Input.Unit">Unidad</label>
+        <input asp-for="Input.Unit" placeholder="uds, m, kg..." />
+    </div>
+    <div class="field">
+        <label asp-for="Input.MinQuantity">Mínimo</label>
+        <input asp-for="Input.MinQuantity" type="number" step="0.001" />
+    </div>
+    <div class="field">
+        <label asp-for="Input.Retention">Retención</label>
+        <input asp-for="Input.Retention" placeholder="Conservar, revisar, donar..." />
+    </div>
+    <div class="toggles full">
+        <label><input asp-for="Input.Consumable" /> Consumible</label>
+        <label><input asp-for="Input.Sentimental" /> Sentimental</label>
+        <label><input asp-for="Input.Obsolete" /> Obsoleto</label>
+    </div>
+    <div class="field full">
+        <label asp-for="Input.Notes">Notas</label>
+        <textarea asp-for="Input.Notes"></textarea>
+    </div>
+    <div class="actions full">
+        <button class="btn primary" type="submit">Crear ítem</button>
+    </div>
+</form>

@@ -1,0 +1,44 @@
+@page
+@model Inventario.Pages.Boxes.EditModel
+@{
+    ViewData["Title"] = "Editar caja";
+}
+
+<div class="section-title">
+    <div>
+        <p class="section-kicker">Ficha de caja</p>
+        <h1>Editar caja</h1>
+    </div>
+    <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.Input.Code">Volver</a>
+</div>
+
+<form class="panel form-grid" method="post">
+    <input type="hidden" asp-for="Input.Id" />
+    <div class="field">
+        <label asp-for="Input.Code">Código</label>
+        <input asp-for="Input.Code" />
+    </div>
+    <div class="field">
+        <label asp-for="Input.Name">Nombre</label>
+        <input asp-for="Input.Name" />
+    </div>
+    <div class="field">
+        <label asp-for="Input.LocationId">Ubicación</label>
+        <select asp-for="Input.LocationId" asp-items="Model.Locations"></select>
+    </div>
+    <div class="field">
+        <label asp-for="Input.ParentBoxId">Dentro de otra caja</label>
+        <select asp-for="Input.ParentBoxId" asp-items="Model.ParentBoxes"></select>
+    </div>
+    <div class="field">
+        <label asp-for="Input.Status">Estado</label>
+        <select asp-for="Input.Status" asp-items="Html.GetEnumSelectList<BoxStatus>()"></select>
+    </div>
+    <div class="field full">
+        <label asp-for="Input.Description">Descripción</label>
+        <textarea asp-for="Input.Description"></textarea>
+    </div>
+    <div class="actions full">
+        <button class="btn primary" type="submit">Guardar cambios</button>
+    </div>
+</form>

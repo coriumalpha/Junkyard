@@ -1,0 +1,24 @@
+bin/
+obj/
+App_Data/
+.vs/
+.vscode/
+*.user
+
+# Runtime data: never publish real inventory contents.
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+data/
+uploads/
+imports/
+keys/
+backups/
+wwwroot/uploads/
+
+# Local environment and logs.
+.env
+.env.*
+*.log
+*.tmp

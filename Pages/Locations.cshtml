@@ -1,0 +1,91 @@
+@page
+@model LocationsModel
+@{
+    ViewData["Title"] = "Ubicaciones";
+}
+
+<div class="section-title">
+    <div>
+        <h1>Ubicaciones</h1>
+        <p class="section-kicker">Lugares físicos donde viven cajas, cajones y estanterías.</p>
+    </div>
+</div>
+
+@if (TempData["Notice"] is string notice)
+{
+    <div class="notice">@notice</div>
+}
+
+<div class="split">
+    <section class="panel">
+        <h2>Nueva ubicación</h2>
+        <form class="form-grid stack-top" method="post" asp-page-handler="Save">
+            <input type="hidden" asp-for="Input.Id" />
+            <div class="field full">
+                <label asp-for="Input.Name">Nombre</label>
+                <input asp-for="Input.Name" placeholder="Taller, trastero, estantería A..." />
+                <span asp-validation-for="Input.Name"></span>
+            </div>
+            <div class="field full">
+                <label asp-for="Input.Description">Descripción</label>
+                <textarea asp-for="Input.Description"></textarea>
+            </div>
+            <div class="actions full">
+                <button class="btn primary" type="submit">Crear ubicación</button>
+            </div>
+        </form>
+    </section>
+
+    <section>
+        <div class="list">
+            @foreach (var location in Model.Locations)
+            {
+                var dialogId = $"edit-location-{location.Id}";
+                <article class="row">
+                    <span>
+                        <strong>@location.Name</strong><br />
+                        <small class="muted">@location.Description</small>
+                    </span>
+                    <span class="actions">
+                        <span class="chip">@(location.Boxes.Count == 1 ? "1 caja" : $"{location.Boxes.Count} cajas")</span>
+                        <button class="btn" type="button" onclick="document.getElementById('@dialogId').showModal()">Editar</button>
+                    </span>
+                </article>
+                <dialog id="@dialogId" class="modal-card">
+                    <form class="form-grid" method="post" asp-page-handler="Save">
+                        <input type="hidden" name="Input.Id" value="@location.Id" />
+                        <div class="field">
+                            <label>Nombre</label>
+                            <input name="Input.Name" value="@location.Name" />
+                        </div>
+                        <div class="field">
+                            <label>Cajas</label>
+                            <input value="@location.Boxes.Count" disabled />
+                        </div>
+                        <div class="field full">
+                            <label>Descripción</label>
+                            <textarea name="Input.Description">@location.Description</textarea>
+                        </div>
+                        <div class="actions full">
+                            <button class="btn" type="submit">Actualizar</button>
+                            <button class="btn" type="button" onclick="this.closest('dialog').close()">Cancelar</button>
+                        </div>
+                    </form>
+                    <form class="danger-zone" method="post">
+                        <h2>Zona peligrosa</h2>
+                        <p class="muted">Si contiene cajas, se moverán a Ubicación no asignada antes de archivar esta ubicación.</p>
+                        <button class="btn danger" type="submit" formaction="?handler=Delete&id=@location.Id">Archivar ubicación</button>
+                    </form>
+                </dialog>
+            }
+            @if (Model.Locations.Count == 0)
+            {
+                <div class="empty"><strong>No hay ubicaciones.</strong><span>Crea una ubicación para empezar a organizar tus cajas.</span></div>
+            }
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

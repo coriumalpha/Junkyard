@@ -1,0 +1,69 @@
+@page "/items"
+@model Inventario.Pages.Items.IndexModel
+@{
+    ViewData["Title"] = "Inventario";
+}
+
+<div class="section-title">
+    <div>
+        <h1>Inventario</h1>
+        <p class="section-kicker">Listado completo de objetos, sin agrupar por cajas.</p>
+    </div>
+    <span class="chip">@Model.Items.Count ítems</span>
+</div>
+
+<form class="panel inventory-filters" method="get">
+    <div class="field">
+        <label>Buscar</label>
+        <input name="q" value="@Model.Query" placeholder="Objeto, caja, categoría, nota..." />
+    </div>
+    <div class="field">
+        <label>Categoría</label>
+        <select name="category">
+            <option value="">Todas</option>
+            @foreach (var category in Model.Categories)
+            {
+                <option value="@category" selected="@(category == Model.Category)">@category</option>
+            }
+        </select>
+    </div>
+    <div class="actions inventory-filter-actions">
+        <button class="btn primary" type="submit">Filtrar</button>
+        <a class="btn" asp-page="/Items/Index">Limpiar</a>
+    </div>
+</form>
+
+<div class="inventory-list stack-top">
+    @foreach (var item in Model.Items)
+    {
+        <a class="inventory-row" asp-page="/Items/Edit" asp-route-id="@item.Id">
+            @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
+            {
+                <img class="visual-row-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.PublicUrl(item.CoverPhoto)" alt="@item.Name" />
+            }
+            else
+            {
+                <span class="visual-row-photo generated">@item.Name[..1]</span>
+            }
+            <span class="visual-row-body">
+                <strong>@item.Name</strong>
+                <small class="muted">@item.Category · @item.Quantity @item.Unit</small>
+            </span>
+            <span class="inventory-location">
+                @if (item.Box is null)
+                {
+                    <span class="chip danger">sin caja</span>
+                }
+                else
+                {
+                    <span class="chip good">@item.Box.Code</span>
+                    <small>@item.Box.Name · @item.Box.Location?.Name</small>
+                }
+            </span>
+        </a>
+    }
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty"><strong>No hay objetos con esos filtros.</strong><span>Prueba una búsqueda más amplia o limpia la categoría.</span></div>
+    }
+</div>

@@ -1,0 +1,56 @@
+@page
+@model Inventario.Pages.Boxes.IndexModel
+@{
+    ViewData["Title"] = "Cajas";
+}
+
+<div class="section-title">
+    <div>
+        <h1>Cajas</h1>
+        <p class="section-kicker">Contenedores físicos, estanterías y lotes listos para localizar.</p>
+    </div>
+    <a class="btn primary" asp-page="/Boxes/Create">Nueva caja</a>
+</div>
+
+<div class="grid cards">
+    @foreach (var box in Model.Boxes)
+    {
+        var itemLabel = box.Items.Count == 1 ? "1 ítem" : $"{box.Items.Count} ítems";
+        <a class="card box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
+            @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
+            {
+                <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@PhotoStorage.PublicUrl(box.CoverPhoto)" alt="@box.Name" />
+            }
+            else
+            {
+                <div class="box-cover generated-cover">
+                    <div class="cover-code">@box.Code</div>
+                    <div class="cover-meta">
+                        <span>@box.Location?.Name</span>
+                        <span>@itemLabel</span>
+                    </div>
+                </div>
+            }
+            <div class="card-body">
+                <div class="chips">
+                    <span class="chip good">@box.Code</span>
+                    <span class="chip">@box.Status</span>
+                </div>
+                <h3>@box.Name</h3>
+                <p class="box-card-meta"><span>@(box.ParentBox is null ? box.Location?.Name : $"en {box.ParentBox.Code}")</span><span>@itemLabel</span></p>
+                @if (box.ChildBoxes.Count > 0)
+                {
+                    <span class="chip">@box.ChildBoxes.Count subcajas</span>
+                }
+            </div>
+        </a>
+    }
+    @if (Model.Boxes.Count == 0)
+    {
+        <div class="empty full">
+            <strong>No hay cajas todavía.</strong>
+            <span>Crea una caja para empezar a organizar objetos por contenedores reales.</span>
+            <div class="actions stack-top"><a class="btn primary" asp-page="/Boxes/Create">Crear caja</a></div>
+        </div>
+    }
+</div>

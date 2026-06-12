@@ -1,0 +1,58 @@
+@page "/archive"
+@model ArchiveModel
+@{
+    ViewData["Title"] = "Archivo";
+}
+
+<div class="section-title">
+    <div>
+        <p class="section-kicker">Papelera lógica</p>
+        <h1>Archivo</h1>
+    </div>
+</div>
+
+<div class="split">
+    <section>
+        <h2>Cajas archivadas</h2>
+        <div class="list stack-top">
+            @foreach (var box in Model.Boxes)
+            {
+                <form class="row" method="post" asp-page-handler="RestoreBox" asp-route-id="@box.Id">
+                    <span><strong>@box.Code · @box.Name</strong></span>
+                    <button class="btn" type="submit">Restaurar</button>
+                </form>
+            }
+            @if (Model.Boxes.Count == 0)
+            {
+                <div class="empty">No hay cajas archivadas.</div>
+            }
+        </div>
+        <h2 class="stack-top">Objetos archivados</h2>
+        <div class="list stack-top">
+            @foreach (var item in Model.Items)
+            {
+                <form class="row" method="post" asp-page-handler="RestoreItem" asp-route-id="@item.Id">
+                    <span><strong>@item.Name</strong><br /><small class="muted">@item.Category</small></span>
+                    <button class="btn" type="submit">Restaurar</button>
+                </form>
+            }
+            @if (Model.Items.Count == 0)
+            {
+                <div class="empty">No hay objetos archivados.</div>
+            }
+        </div>
+    </section>
+    <section>
+        <h2>Fotografías archivadas</h2>
+        <div class="gallery stack-top">
+            @foreach (var photo in Model.Photos)
+            {
+                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.PublicUrl(photo.Filename)" alt="@photo.Caption" />
+            }
+            @if (Model.Photos.Count == 0)
+            {
+                <div class="empty">No hay fotografías archivadas.</div>
+            }
+        </div>
+    </section>
+</div>

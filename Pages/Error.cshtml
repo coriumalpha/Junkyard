@@ -1,0 +1,18 @@
+﻿@page
+@model ErrorModel
+@{
+    ViewData["Title"] = "Error";
+}
+
+<section class="panel">
+    <p class="section-kicker">Incidencia</p>
+    <h1>No se pudo completar la operación</h1>
+    <p class="muted">La aplicación ha encontrado un error al procesar la solicitud.</p>
+
+    @if (Model.ShowRequestId)
+    {
+        <p>
+            <strong>ID de solicitud:</strong> <code>@Model.RequestId</code>
+        </p>
+    }
+</section>
