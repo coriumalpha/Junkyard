@@ -91,6 +91,27 @@
     </form>
 
     <aside class="item-media-rail">
+        <section class="panel promotion-zone">
+            <div class="section-header compact">
+                <div>
+                    <p class="eyebrow">Contenedor</p>
+                    <h2>Promocionar a caja</h2>
+                </div>
+            </div>
+            @if (TempData["PromoteMessage"] is string promoteMessage)
+            {
+                <div class="notice stack-top">@promoteMessage</div>
+            }
+            <p class="muted">Crea una caja nueva con este ítem: conserva ubicación, fotos, portada y notas, y deja el ítem archivado.</p>
+            <form class="form-grid" method="post" asp-page-handler="PromoteToBox" asp-route-id="@Model.Input.Id">
+                <div class="field full">
+                    <label for="PromoteCode">Código de la nueva caja</label>
+                    <input id="PromoteCode" name="code" value="@Model.SuggestedBoxCode" maxlength="40" />
+                </div>
+                <button class="btn primary full" type="submit">Promocionar a caja</button>
+            </form>
+        </section>
+
         @if (primaryPhoto is not null)
         {
             <section class="item-photo-hero panel">

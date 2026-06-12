@@ -25,6 +25,7 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
     public string[] Categories => CsvInventoryService.Categories;
     public string? CurrentBoxCode { get; private set; }
     public string? CoverPhotoFilename { get; private set; }
+    public string SuggestedBoxCode { get; private set; } = "";
 
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
@@ -213,6 +214,69 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
         return RedirectToPage("/Photos/Review", new { id = inbox.Id });
     }
 
+    public async Task<IActionResult> OnPostPromoteToBoxAsync(int id, string code, CancellationToken cancellationToken)
+    {
+        var normalizedCode = (code ?? "").Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            TempData["PromoteMessage"] = "Indica un código para la nueva caja.";
+            return RedirectToPage(new { id });
+        }
+
+        if (await db.Boxes.IgnoreQueryFilters().AnyAsync(b => b.Code == normalizedCode, cancellationToken))
+        {
+            TempData["PromoteMessage"] = $"Ya existe una caja con el código {normalizedCode}.";
+            return RedirectToPage(new { id });
+        }
+
+        var item = await db.Items
+            .Include(i => i.Box)
+            .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        var locationId = item.Box?.LocationId ?? await EnsureFallbackLocationIdAsync(cancellationToken);
+        var box = new Box
+        {
+            Code = normalizedCode,
+            Name = item.Name.Trim(),
+            Description = BuildPromotedBoxDescription(item),
+            LocationId = locationId,
+            ParentBoxId = item.BoxId,
+            CoverPhoto = item.CoverPhoto,
+            Status = BoxStatus.Active
+        };
+
+        db.Boxes.Add(box);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var itemPhotos = await db.Photos
+            .Where(p => p.EntityType == PhotoEntityType.Item && p.EntityId == item.Id)
+            .ToListAsync(cancellationToken);
+        foreach (var photo in itemPhotos)
+        {
+            photo.EntityType = PhotoEntityType.Box;
+            photo.EntityId = box.Id;
+
+            if (photo.SourceInboxId is int sourceInboxId)
+            {
+                var inbox = await db.PhotoInboxes.FirstOrDefaultAsync(p => p.Id == sourceInboxId, cancellationToken);
+                if (inbox is not null)
+                {
+                    inbox.SourceBoxId = box.Id;
+                    inbox.RotationDegrees = photo.RotationDegrees;
+                }
+            }
+        }
+
+        item.ArchivedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        TempData["BulkEditMessage"] = $"Ítem promocionado a caja {box.Code}.";
+        return RedirectToPage("/Boxes/Details", new { code = box.Code });
+    }
+
     private async Task<PhotoInbox> RestorePhotoInboxAsync(Photo photo, int? sourceBoxId, CancellationToken cancellationToken)
     {
         var inbox = photo.SourceInboxId is int sourceInboxId
@@ -263,8 +327,68 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
         };
         CurrentBoxCode = item.Box?.Code;
         CoverPhotoFilename = item.CoverPhoto;
+        SuggestedBoxCode = await SuggestBoxCodeAsync(item, cancellationToken);
         await LoadAux(id, cancellationToken);
         return true;
+    }
+
+    private async Task<string> SuggestBoxCodeAsync(Item item, CancellationToken cancellationToken)
+    {
+        var baseCode = $"BOX{item.Id}";
+        if (!await db.Boxes.IgnoreQueryFilters().AnyAsync(b => b.Code == baseCode, cancellationToken))
+        {
+            return baseCode;
+        }
+
+        for (var suffix = 2; suffix < 100; suffix++)
+        {
+            var candidate = $"{baseCode}-{suffix}";
+            if (!await db.Boxes.IgnoreQueryFilters().AnyAsync(b => b.Code == candidate, cancellationToken))
+            {
+                return candidate;
+            }
+        }
+
+        return $"{baseCode}-{DateTime.UtcNow:HHmmss}";
+    }
+
+    private async Task<int> EnsureFallbackLocationIdAsync(CancellationToken cancellationToken)
+    {
+        var locationId = await db.Locations
+            .OrderBy(l => l.Name)
+            .Select(l => (int?)l.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (locationId is int existingId)
+        {
+            return existingId;
+        }
+
+        var location = new Location { Name = "Ubicación no asignada", Description = "Creada automáticamente al promocionar un ítem sin caja." };
+        db.Locations.Add(location);
+        await db.SaveChangesAsync(cancellationToken);
+        return location.Id;
+    }
+
+    private static string? BuildPromotedBoxDescription(Item item)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(item.Notes))
+        {
+            parts.Add(item.Notes.Trim());
+        }
+
+        parts.Add($"Promocionado desde ítem #{item.Id}.");
+        if (!string.IsNullOrWhiteSpace(item.Category))
+        {
+            parts.Add($"Categoría original: {item.Category}.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.Condition))
+        {
+            parts.Add($"Estado original: {item.Condition}.");
+        }
+
+        return string.Join(" ", parts);
     }
 
     private async Task LoadAux(int itemId, CancellationToken cancellationToken)

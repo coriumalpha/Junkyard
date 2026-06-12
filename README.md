@@ -12,6 +12,7 @@ The repository contains only the application code, schema-upgrade logic and safe
 - Locations, boxes and nested boxes that mirror real physical storage.
 - Full inventory view at `/items`, independent from box-by-box browsing.
 - Object records with quantity, category, condition, retention notes, consumable stock thresholds and flags.
+- Promotion flow from object to box/container while preserving location, photos and cover image.
 - Photo inbox for bulk uploads, fast review and assignment to boxes or objects.
 - Persistent photo rotation across review, galleries, covers and listings.
 - Safe archive flows for boxes, objects and photos.
