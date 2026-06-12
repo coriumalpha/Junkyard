@@ -8,6 +8,7 @@ namespace Inventario.Pages.Items;
 public class IndexModel(InventoryDbContext db) : PageModel
 {
     public List<Item> Items { get; private set; } = [];
+    public List<InventoryGroup> Groups { get; private set; } = [];
     public Dictionary<string, int> PhotoRotations { get; private set; } = [];
     public string Query { get; private set; } = "";
     public string Category { get; private set; } = "";
@@ -20,6 +21,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
 
         var query = db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
+            .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(Query))
@@ -37,10 +39,31 @@ public class IndexModel(InventoryDbContext db) : PageModel
         }
 
         Items = await query
-            .OrderBy(i => i.Category)
+            .OrderBy(i => i.Box == null ? "ZZZ" : i.Box.Code)
+            .ThenBy(i => i.Category)
             .ThenBy(i => i.Name)
             .Take(500)
             .ToListAsync(cancellationToken);
+
+        Groups = Items
+            .GroupBy(i => i.BoxId)
+            .Select(g =>
+            {
+                var box = g.First().Box;
+                var items = g.ToList();
+                return new InventoryGroup(
+                    box?.Id,
+                    box?.Code ?? "SIN-CAJA",
+                    box?.Name ?? "Sin caja",
+                    box?.Location?.Name,
+                    BuildBoxPath(box),
+                    box is null,
+                    items);
+            })
+            .OrderBy(g => g.IsOrphanGroup)
+            .ThenBy(g => g.Path)
+            .ThenBy(g => g.Code)
+            .ToList();
 
         Categories = await db.Items.AsNoTracking()
             .Select(i => i.Category)
@@ -62,4 +85,35 @@ public class IndexModel(InventoryDbContext db) : PageModel
 
     public int RotationFor(string? filename) =>
         filename is not null && PhotoRotations.TryGetValue(filename, out var rotation) ? rotation : 0;
+
+    public static string BuildBoxPath(Box? box)
+    {
+        if (box is null)
+        {
+            return "Sin caja";
+        }
+
+        var parts = new Stack<string>();
+        var current = box;
+        var guard = 0;
+        while (current is not null && guard++ < 12)
+        {
+            parts.Push($"{current.Code} · {current.Name}");
+            current = current.ParentBox;
+        }
+
+        return string.Join(" / ", parts);
+    }
+
+    public record InventoryGroup(
+        int? BoxId,
+        string Code,
+        string Name,
+        string? LocationName,
+        string Path,
+        bool IsOrphanGroup,
+        List<Item> Items)
+    {
+        public int PhotoCount => Items.Count(i => !string.IsNullOrWhiteSpace(i.CoverPhoto));
+    }
 }
