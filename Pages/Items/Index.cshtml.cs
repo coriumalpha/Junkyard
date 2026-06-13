@@ -56,6 +56,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
                     box?.Id,
                     box?.Code ?? "SIN-CAJA",
                     box?.Name ?? "Sin caja",
+                    box?.CoverPhoto,
                     box?.Location?.Name,
                     BuildBoxPath(box),
                     box is null,
@@ -73,6 +74,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
             .ToListAsync(cancellationToken);
 
         var filenames = Items.Select(i => i.CoverPhoto)
+            .Concat(Groups.Select(g => g.CoverPhoto))
             .Where(f => !string.IsNullOrWhiteSpace(f))
             .Select(f => f!)
             .Distinct()
@@ -111,6 +113,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
         int? BoxId,
         string Code,
         string Name,
+        string? CoverPhoto,
         string? LocationName,
         string Path,
         bool IsOrphanGroup,
