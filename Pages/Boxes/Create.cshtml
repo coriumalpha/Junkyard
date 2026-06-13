@@ -14,8 +14,9 @@
 
 <form class="panel form-grid" method="post">
     <div class="field">
-        <label asp-for="Input.Code">Código</label>
-        <input asp-for="Input.Code" placeholder="C04" />
+        <label asp-for="Input.Code">CT público</label>
+        <input asp-for="Input.Code" placeholder="@Model.SuggestedCode" autocomplete="off" spellcheck="false" />
+        <small class="caption">Si lo dejas vacío se usará @Model.SuggestedCode. Cambiar CT afecta QR, etiquetas y búsqueda.</small>
         <span asp-validation-for="Input.Code"></span>
     </div>
     <div class="field">

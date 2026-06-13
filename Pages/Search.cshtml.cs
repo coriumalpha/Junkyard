@@ -22,10 +22,14 @@ public class SearchModel(InventoryDbContext db) : PageModel
         }
 
         var term = Query.ToLowerInvariant();
+        var normalizedCode = Box.NormalizePublicCode(Query);
+        var ctDigits = Box.TryParseCtSequence(Query, out var sequence) ? sequence.ToString("000000") : null;
         Boxes = await db.Boxes.AsNoTracking()
             .Include(b => b.Location)
             .Include(b => b.Items)
             .Where(b => b.Code.ToLower().Contains(term)
+                || b.Code == normalizedCode
+                || (ctDigits != null && b.Code.EndsWith(ctDigits))
                 || b.Name.ToLower().Contains(term)
                 || b.ContainerType.ToLower().Contains(term)
                 || (b.Description != null && b.Description.ToLower().Contains(term)))

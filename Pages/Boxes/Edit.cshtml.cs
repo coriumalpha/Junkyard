@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Inventario.Data;
 using Inventario.Models;
+using Inventario.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -42,6 +43,18 @@ public class EditModel(InventoryDbContext db) : PageModel
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
+        var normalizedCode = Box.NormalizePublicCode(Input.Code);
+        Input.Code = normalizedCode;
+
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.Code)}", "El CT es obligatorio.");
+        }
+        else if (await BoxCodeService.IsDuplicateAsync(db, normalizedCode, Input.Id, cancellationToken))
+        {
+            ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.Code)}", "Ese CT ya existe.");
+        }
+
         if (!ModelState.IsValid)
         {
             await LoadSelects(Input.Id, cancellationToken);
@@ -54,14 +67,24 @@ public class EditModel(InventoryDbContext db) : PageModel
             return NotFound();
         }
 
-        box.Code = Input.Code.Trim().ToUpperInvariant();
+        box.Code = normalizedCode;
         box.Name = Input.Name.Trim();
         box.ContainerType = Box.NormalizeContainerType(Input.ContainerType);
         box.Description = Input.Description;
         box.LocationId = Input.LocationId;
         box.ParentBoxId = Input.ParentBoxId == 0 ? null : Input.ParentBoxId;
         box.Status = Input.Status;
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.Code)}", "Ese CT ya existe.");
+            await LoadSelects(Input.Id, cancellationToken);
+            return Page();
+        }
+
         return RedirectToPage("/Boxes/Details", new { code = box.Code });
     }
 

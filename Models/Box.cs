@@ -10,6 +10,7 @@ public enum BoxStatus
 public class Box
 {
     public const string DefaultContainerType = "box";
+    public const string CtPrefix = "CT-";
 
     private static readonly IReadOnlyDictionary<string, string> ContainerTypeLabels =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -59,5 +60,48 @@ public class Box
     {
         var normalized = NormalizeContainerType(value);
         return ContainerTypeLabels[normalized];
+    }
+
+    public static string FormatCtCode(int sequence) => $"{CtPrefix}{sequence:000000}";
+
+    public static bool TryParseCtSequence(string? value, out int sequence)
+    {
+        sequence = 0;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var compact = new string(value.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToUpperInvariant();
+        if (compact.StartsWith(CtPrefix, StringComparison.Ordinal))
+        {
+            compact = compact[CtPrefix.Length..];
+        }
+        else if (compact.StartsWith("CT", StringComparison.Ordinal))
+        {
+            compact = compact[2..];
+            if (compact.StartsWith("-", StringComparison.Ordinal))
+            {
+                compact = compact[1..];
+            }
+        }
+
+        return int.TryParse(compact, out sequence) && sequence > 0;
+    }
+
+    public static string NormalizePublicCode(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        var compact = new string(value.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToUpperInvariant();
+        if (TryParseCtSequence(compact, out var sequence))
+        {
+            return FormatCtCode(sequence);
+        }
+
+        return compact;
     }
 }

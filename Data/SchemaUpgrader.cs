@@ -10,6 +10,7 @@ public static class SchemaUpgrader
         AddColumn(db, "Boxes", "ContainerType", $"TEXT NOT NULL DEFAULT '{Models.Box.DefaultContainerType}'");
         AddColumn(db, "Boxes", "ArchivedAt", "TEXT NULL");
         AddColumn(db, "Boxes", "ParentBoxId", "INTEGER NULL");
+        db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Boxes_Code" ON "Boxes" ("Code");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Boxes_ParentBoxId" ON "Boxes" ("ParentBoxId");""");
         AddColumn(db, "Photos", "Status", "TEXT NOT NULL DEFAULT 'Active'");
         AddColumn(db, "Photos", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");

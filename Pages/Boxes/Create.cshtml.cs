@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Inventario.Data;
 using Inventario.Models;
+using Inventario.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -16,6 +17,7 @@ public class CreateModel(InventoryDbContext db) : PageModel
     public List<SelectListItem> Locations { get; private set; } = [];
     public List<SelectListItem> ParentBoxes { get; private set; } = [];
     public List<SelectListItem> ContainerTypes { get; private set; } = [];
+    public string SuggestedCode { get; private set; } = Box.FormatCtCode(1);
 
     public async Task OnGetAsync(int? parentBoxId, CancellationToken cancellationToken)
     {
@@ -30,19 +32,31 @@ public class CreateModel(InventoryDbContext db) : PageModel
         }
 
         await LoadSelects(cancellationToken);
+        SuggestedCode = await BoxCodeService.GetNextCtCodeAsync(db, cancellationToken);
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
+        var normalizedCode = string.IsNullOrWhiteSpace(Input.Code)
+            ? await BoxCodeService.GetNextCtCodeAsync(db, cancellationToken)
+            : Box.NormalizePublicCode(Input.Code);
+        Input.Code = normalizedCode;
+
+        if (await BoxCodeService.IsDuplicateAsync(db, normalizedCode, null, cancellationToken))
+        {
+            ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.Code)}", "Ese CT ya existe.");
+        }
+
         if (!ModelState.IsValid)
         {
             await LoadSelects(cancellationToken);
+            SuggestedCode = await BoxCodeService.GetNextCtCodeAsync(db, cancellationToken);
             return Page();
         }
 
         var box = new Box
         {
-            Code = Input.Code.Trim().ToUpperInvariant(),
+            Code = normalizedCode,
             Name = Input.Name.Trim(),
             ContainerType = Box.NormalizeContainerType(Input.ContainerType),
             Description = Input.Description,
@@ -51,7 +65,18 @@ public class CreateModel(InventoryDbContext db) : PageModel
             Status = Input.Status
         };
         db.Boxes.Add(box);
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.Code)}", "Ese CT ya existe.");
+            await LoadSelects(cancellationToken);
+            SuggestedCode = await BoxCodeService.GetNextCtCodeAsync(db, cancellationToken);
+            return Page();
+        }
+
         return RedirectToPage("/Boxes/Details", new { code = box.Code });
     }
 
@@ -73,7 +98,7 @@ public class CreateModel(InventoryDbContext db) : PageModel
 
     public class BoxInput
     {
-        [Required, MaxLength(40)]
+        [MaxLength(40)]
         public string Code { get; set; } = "";
 
         [Required, MaxLength(160)]
