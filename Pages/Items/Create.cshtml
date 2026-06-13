@@ -11,7 +11,7 @@
     </div>
 </div>
 
-<form class="panel form-grid" method="post">
+<form class="panel form-grid" method="post" novalidate>
     <div class="field">
         <label asp-for="Input.BoxId">Caja</label>
         <select asp-for="Input.BoxId" asp-items="Model.Boxes"></select>
@@ -35,7 +35,7 @@
     </div>
     <div class="field">
         <label asp-for="Input.Quantity">Cantidad</label>
-        <input asp-for="Input.Quantity" type="number" step="0.001" />
+        <input asp-for="Input.Quantity" type="number" step="1" inputmode="decimal" />
     </div>
     <div class="field">
         <label asp-for="Input.Unit">Unidad</label>
@@ -43,7 +43,7 @@
     </div>
     <div class="field">
         <label asp-for="Input.MinQuantity">Mínimo</label>
-        <input asp-for="Input.MinQuantity" type="number" step="0.001" />
+        <input asp-for="Input.MinQuantity" type="number" step="1" inputmode="decimal" />
     </div>
     <div class="field">
         <label asp-for="Input.Retention">Retención</label>

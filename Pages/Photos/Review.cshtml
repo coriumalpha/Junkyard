@@ -31,7 +31,7 @@
     }
     else
     {
-        <form id="reviewForm" class="review-form" method="post">
+        <form id="reviewForm" class="review-form" method="post" novalidate>
             <input type="hidden" asp-for="Input.CurrentId" />
             <input id="selectedIds" type="hidden" asp-for="Input.SelectedIds" />
             <section class="review-stage">
@@ -92,7 +92,7 @@
                             </div>
                             <div class="field">
                                 <label>Cantidad</label>
-                                <input asp-for="Input.Quantity" type="number" step="1" />
+                                <input asp-for="Input.Quantity" type="number" step="1" inputmode="decimal" />
                             </div>
                         </div>
                         <div class="actions">
