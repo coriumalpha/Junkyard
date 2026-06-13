@@ -47,7 +47,7 @@
         <div class="gallery stack-top">
             @foreach (var photo in Model.Photos)
             {
-                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.PublicUrl(photo.Filename)" alt="@photo.Caption" />
+                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.ThumbUrl(photo.Filename)" alt="@photo.Caption" loading="lazy" decoding="async" />
             }
             @if (Model.Photos.Count == 0)
             {

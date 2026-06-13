@@ -36,35 +36,70 @@
             <input id="selectedIds" type="hidden" asp-for="Input.SelectedIds" />
             <section class="review-stage">
                 <div class="review-photo-frame">
-                    <img class="review-photo rotatable" style="@PhotoStorage.RotationStyle(Model.Current.RotationDegrees)" src="@PhotoStorage.PublicUrl(Model.Current.Filename)" alt="@Model.Current.OriginalFilename" />
+                    <img class="review-photo rotatable" style="@PhotoStorage.RotationStyle(Model.Current.RotationDegrees)" src="@PhotoStorage.PreviewUrl(Model.Current.Filename)" alt="@Model.Current.OriginalFilename" decoding="async" />
                 </div>
-                <aside class="review-actions panel">
-                    <h2>Acciones rápidas</h2>
-                    <button class="btn primary" type="button" data-open="create">N · Crear objeto</button>
-                    <button class="btn" type="button" data-open="assign">A · Asociar a objeto</button>
-                    <div class="actions">
-                        <button class="btn" type="submit" asp-page-handler="Rotate" name="direction" value="left">Q · Girar -90°</button>
-                        <button class="btn" type="submit" asp-page-handler="Rotate" name="direction" value="right">E · Girar +90°</button>
+                <aside class="review-side">
+                    <div class="review-actions panel">
+                        <h2>Acciones rápidas</h2>
+                        <button class="btn primary" type="button" data-open="create">N · Crear objeto</button>
+                        <button class="btn" type="button" data-open="assign">A · Asociar a objeto</button>
+                        <div class="actions">
+                            <button class="btn" type="submit" asp-page-handler="Rotate" name="direction" value="left">Q · Girar -90°</button>
+                            <button class="btn" type="submit" asp-page-handler="Rotate" name="direction" value="right">E · Girar +90°</button>
+                        </div>
+                        <button class="btn" type="submit" asp-page-handler="AssignBox">B · Asociar a caja</button>
+                        <button class="btn danger" type="submit" asp-page-handler="Discard">D · Descartar</button>
+                        @if (Model.NextPendingId is int nextId)
+                        {
+                            <a class="btn" data-next href="@Url.Page("/Photos/Review", new { id = nextId })">S · Saltar</a>
+                        }
+                        else
+                        {
+                            <span class="btn disabled" aria-disabled="true">S · Sin más fotos</span>
+                        }
+                        @if (Model.PreviousPendingId is int previousId)
+                        {
+                            <a class="btn" data-previous href="@Url.Page("/Photos/Review", new { id = previousId })">← Anterior</a>
+                        }
+                        <div class="field">
+                            <label>Caja para B / objeto nuevo</label>
+                            <select asp-for="Input.BoxId" asp-items="Model.Boxes"></select>
+                        </div>
+                        <small class="muted">Atajos: A, N, B, D, S, Q/E, flechas, Enter, Esc, Ctrl+Z.</small>
                     </div>
-                    <button class="btn" type="submit" asp-page-handler="AssignBox">B · Asociar a caja</button>
-                    <button class="btn danger" type="submit" asp-page-handler="Discard">D · Descartar</button>
-                    @if (Model.NextPendingId is int nextId)
-                    {
-                        <a class="btn" data-next href="@Url.Page("/Photos/Review", new { id = nextId })">S · Saltar</a>
-                    }
-                    else
-                    {
-                        <span class="btn disabled" aria-disabled="true">S · Sin más fotos</span>
-                    }
-                    @if (Model.PreviousPendingId is int previousId)
-                    {
-                        <a class="btn" data-previous href="@Url.Page("/Photos/Review", new { id = previousId })">← Anterior</a>
-                    }
-                    <div class="field">
-                        <label>Caja para B / objeto nuevo</label>
-                        <select asp-for="Input.BoxId" asp-items="Model.Boxes"></select>
+                    <div id="createDialog" class="quick-create-panel panel" hidden>
+                        <h2>Crear objeto desde fotos</h2>
+                        <div class="quick-create-photo">
+                            <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.Current.RotationDegrees)" src="@PhotoStorage.PreviewUrl(Model.Current.Filename)" alt="@Model.Current.OriginalFilename" decoding="async" />
+                        </div>
+                        <div class="form-grid">
+                            <div class="field full">
+                                <label>Nombre</label>
+                                <input asp-for="Input.Name" autocomplete="off" />
+                            </div>
+                            <div class="field full">
+                                <label>Notas</label>
+                                <textarea asp-for="Input.Notes" placeholder="Marca, modelo, número de serie, estado visible..."></textarea>
+                            </div>
+                            <div class="field">
+                                <label>Categoría</label>
+                                <select asp-for="Input.Category">
+                                    @foreach (var category in Model.Categories)
+                                    {
+                                        <option value="@category">@category</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Cantidad</label>
+                                <input asp-for="Input.Quantity" type="number" step="0.001" />
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn primary" type="submit" asp-page-handler="CreateItem">Enter · Guardar</button>
+                            <button class="btn" type="button" data-close>Esc · Cancelar</button>
+                        </div>
                     </div>
-                    <small class="muted">Atajos: A, N, B, D, S, Q/E, flechas, Enter, Esc, Ctrl+Z.</small>
                 </aside>
             </section>
 
@@ -73,37 +108,10 @@
                 {
                     <label class="film @(photo.Id == Model.Current.Id ? "current" : "")">
                         <input type="checkbox" value="@photo.Id" checked="@(photo.Id == Model.Current.Id)" />
-                        <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.PublicUrl(photo.Filename)" alt="@photo.OriginalFilename" />
+                        <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.ThumbUrl(photo.Filename)" alt="@photo.OriginalFilename" loading="lazy" decoding="async" />
                     </label>
                 }
             </div>
-
-            <dialog id="createDialog" class="modal-card">
-                <h2>Crear objeto desde fotos</h2>
-                <div class="form-grid">
-                    <div class="field full">
-                        <label>Nombre</label>
-                        <input asp-for="Input.Name" autocomplete="off" />
-                    </div>
-                    <div class="field">
-                        <label>Categoría</label>
-                        <select asp-for="Input.Category">
-                            @foreach (var category in Model.Categories)
-                            {
-                                <option value="@category">@category</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Cantidad</label>
-                        <input asp-for="Input.Quantity" type="number" step="0.001" />
-                    </div>
-                </div>
-                <div class="actions">
-                    <button class="btn primary" type="submit" asp-page-handler="CreateItem">Enter · Guardar</button>
-                    <button class="btn" type="button" data-close>Esc · Cancelar</button>
-                </div>
-            </dialog>
 
             <dialog id="assignDialog" class="modal-card">
                 <h2>Asociar a objeto existente</h2>
@@ -132,11 +140,30 @@
   const createDialog = document.getElementById('createDialog');
   const assignDialog = document.getElementById('assignDialog');
   const nameInput = createDialog?.querySelector('[name="Input.Name"]');
+  const notesInput = createDialog?.querySelector('[name="Input.Notes"]');
   const createSubmit = createDialog?.querySelector('[formaction*="CreateItem"]');
   const assignSubmit = assignDialog?.querySelector('[formaction*="AssignItem"]');
+  const rotateLeftButton = form.querySelector('[name="direction"][value="left"]');
+  const rotateRightButton = form.querySelector('[name="direction"][value="right"]');
+  const submitWithButton = button => {
+    if (!(button instanceof HTMLElement)) return;
+    if (typeof form.requestSubmit === 'function') {
+      form.requestSubmit(button);
+      return;
+    }
+    button.click();
+  };
+  const isInteractiveTarget = target => {
+    if (!(target instanceof Element)) return false;
+    if (target.isContentEditable || target.closest('[contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]')) {
+      return true;
+    }
+    return Boolean(target.closest('input, textarea, select, button'));
+  };
   const openCreate = () => {
     if (nameInput?.value?.toLowerCase() === 'n') nameInput.value = '';
-    createDialog.showModal();
+    createDialog.hidden = false;
+    createDialog.scrollIntoView({ block: 'nearest' });
     setTimeout(() => nameInput?.focus(), 0);
   };
   const openAssign = () => {
@@ -146,37 +173,59 @@
   document.querySelector('.film.current')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   document.querySelector('[data-open="create"]').addEventListener('click', openCreate);
   document.querySelector('[data-open="assign"]').addEventListener('click', openAssign);
-  document.querySelectorAll('[data-close]').forEach(x => x.addEventListener('click', () => x.closest('dialog').close()));
+  document.querySelectorAll('[data-close]').forEach(x => x.addEventListener('click', () => {
+    const panel = x.closest('.quick-create-panel');
+    if (panel) {
+      panel.hidden = true;
+      return;
+    }
+    x.closest('dialog')?.close();
+  }));
   createDialog.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    if (e.key === 'Escape') {
       e.preventDefault();
-      createSubmit?.click();
+      createDialog.hidden = true;
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target !== notesInput) {
+      e.preventDefault();
+      submitWithButton(createSubmit);
     }
   });
   assignDialog.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
-      assignSubmit?.click();
+      submitWithButton(assignSubmit);
     }
   });
-  document.addEventListener('keydown', e => {
+  const keyboardController = new AbortController();
+  const handleKeydown = e => {
     const key = e.key.toLowerCase();
-    if (e.ctrlKey && key === 'z') {
-      e.preventDefault();
-      document.querySelector('.undo-line button')?.click();
-    }
     if (document.querySelector('dialog[open]')) {
       if (e.key === 'Escape') document.querySelector('dialog[open]')?.close();
       return;
     }
+    if (!createDialog.hidden) {
+      if (e.key === 'Escape') createDialog.hidden = true;
+      return;
+    }
+    if (isInteractiveTarget(e.target) || isInteractiveTarget(document.activeElement)) {
+      return;
+    }
+    if (e.ctrlKey && key === 'z') {
+      e.preventDefault();
+      document.querySelector('.undo-line button')?.click();
+    }
     if (key === 'n') { e.preventDefault(); openCreate(); }
     if (key === 'a') { e.preventDefault(); openAssign(); }
-    if (key === 'q') { e.preventDefault(); form.querySelector('[name="direction"][value="left"]')?.click(); }
-    if (key === 'e') { e.preventDefault(); form.querySelector('[name="direction"][value="right"]')?.click(); }
-    if (key === 'b') { e.preventDefault(); form.querySelector('[formaction*="AssignBox"]')?.click(); }
-    if (key === 'd') { e.preventDefault(); form.querySelector('[formaction*="Discard"]')?.click(); }
+    if (key === 'q') { e.preventDefault(); submitWithButton(rotateLeftButton); }
+    if (key === 'e') { e.preventDefault(); submitWithButton(rotateRightButton); }
+    if (key === 'b') { e.preventDefault(); submitWithButton(form.querySelector('[formaction*="AssignBox"]')); }
+    if (key === 'd') { e.preventDefault(); submitWithButton(form.querySelector('[formaction*="Discard"]')); }
     if (key === 's' || e.key === 'ArrowRight') { e.preventDefault(); document.querySelector('[data-next]')?.click(); }
     if (e.key === 'ArrowLeft') { e.preventDefault(); document.querySelector('[data-previous]')?.click(); }
-  });
+  };
+  document.addEventListener('keydown', handleKeydown, { signal: keyboardController.signal });
+  window.addEventListener('pagehide', () => keyboardController.abort(), { once: true });
 })();
 </script>

@@ -123,7 +123,7 @@
                     <span class="badge">@Model.Gallery.Count foto@(Model.Gallery.Count == 1 ? "" : "s")</span>
                 </div>
                 <button class="item-photo-main" type="button" data-lightbox-src="@PhotoStorage.PublicUrl(primaryPhoto.Filename)" data-lightbox-caption="@(primaryPhoto.Caption ?? Model.Input.Name)" aria-label="Ampliar fotografía principal">
-                    <img class="rotatable" style="@PhotoStorage.RotationStyle(primaryPhoto.RotationDegrees)" src="@PhotoStorage.PublicUrl(primaryPhoto.Filename)" alt="@(primaryPhoto.Caption ?? Model.Input.Name)" />
+                    <img class="rotatable" style="@PhotoStorage.RotationStyle(primaryPhoto.RotationDegrees)" src="@PhotoStorage.PreviewUrl(primaryPhoto.Filename)" alt="@(primaryPhoto.Caption ?? Model.Input.Name)" decoding="async" />
                 </button>
                 <p class="caption">Pulsa la imagen para verla ampliada.</p>
             </section>
@@ -161,7 +161,7 @@
                         var isCover = photo.Filename == Model.CoverPhotoFilename;
                         <form class="photo-tile @(isCover ? "is-cover" : "")" method="post" asp-page-handler="ArchivePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">
                             <button class="photo-preview-button" type="button" data-lightbox-src="@PhotoStorage.PublicUrl(photo.Filename)" data-lightbox-caption="@(photo.Caption ?? Model.Input.Name)" aria-label="Ampliar fotografía">
-                                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.PublicUrl(photo.Filename)" alt="@photo.Caption" />
+                                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.ThumbUrl(photo.Filename)" alt="@photo.Caption" loading="lazy" decoding="async" />
                             </button>
                             <div class="photo-tile-actions">
                                 @if (isCover)

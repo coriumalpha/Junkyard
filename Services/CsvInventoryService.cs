@@ -30,6 +30,7 @@ public class CsvInventoryService(InventoryDbContext db)
         "Tecnología / adaptadores",
         "Tecnología / almacenamiento",
         "Tecnología / electrónica",
+        "Electrónica / componentes",
         "Herramientas",
         "Consumibles",
         "Tornillería y piezas",

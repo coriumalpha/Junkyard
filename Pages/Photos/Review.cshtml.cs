@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Inventario.Pages.Photos;
 
-public class ReviewModel(InventoryDbContext db) : PageModel
+public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageModel
 {
     public List<PhotoInbox> Pending { get; private set; } = [];
     public PhotoInbox? Current { get; private set; }
@@ -111,7 +111,8 @@ public class ReviewModel(InventoryDbContext db) : PageModel
             Name = Input.Name.Trim(),
             Category = Input.Category,
             Quantity = Input.Quantity <= 0 ? 1 : Input.Quantity,
-            Unit = "uds"
+            Unit = "uds",
+            Notes = string.IsNullOrWhiteSpace(Input.Notes) ? null : Input.Notes.Trim()
         };
         db.Items.Add(item);
         await db.SaveChangesAsync(cancellationToken);
@@ -138,7 +139,8 @@ public class ReviewModel(InventoryDbContext db) : PageModel
         var photos = await db.PhotoInboxes.Where(p => ids.Contains(p.Id)).ToListAsync(cancellationToken);
         foreach (var photo in photos)
         {
-            photo.RotationDegrees = PhotoStorage.NormalizeRotation(photo.RotationDegrees + delta);
+            await storage.RotateStoredPhotoAsync(photo.Filename, delta, cancellationToken);
+            await PhotoStorage.ResetRotationMetadataAsync(db, photo.Filename, cancellationToken);
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -290,6 +292,8 @@ public class ReviewModel(InventoryDbContext db) : PageModel
 
         [MaxLength(180)]
         public string Name { get; set; } = "";
+
+        public string? Notes { get; set; }
 
         public string Category { get; set; } = "Otros";
         public decimal Quantity { get; set; } = 1;

@@ -170,15 +170,8 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
             return NotFound();
         }
 
-        photo.RotationDegrees = PhotoStorage.NormalizeRotation(photo.RotationDegrees + delta);
-        if (photo.SourceInboxId is int sourceInboxId)
-        {
-            var inbox = await db.PhotoInboxes.FirstOrDefaultAsync(p => p.Id == sourceInboxId, cancellationToken);
-            if (inbox is not null)
-            {
-                inbox.RotationDegrees = photo.RotationDegrees;
-            }
-        }
+        await photos.RotateStoredPhotoAsync(photo.Filename, delta, cancellationToken);
+        await PhotoStorage.ResetRotationMetadataAsync(db, photo.Filename, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
         return RedirectToPage(new { id });

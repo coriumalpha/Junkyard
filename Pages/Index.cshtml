@@ -44,7 +44,7 @@
                 <a class="card box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
                     @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
                     {
-                        <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@PhotoStorage.PublicUrl(box.CoverPhoto)" alt="@box.Name" />
+                        <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@PhotoStorage.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
                     }
                     else
                     {
@@ -92,7 +92,7 @@
                 <a class="visual-row" asp-page="/Items/Edit" asp-route-id="@item.Id">
                     @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
                     {
-                        <img class="visual-row-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.PublicUrl(item.CoverPhoto)" alt="@item.Name" />
+                        <img class="visual-row-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
                     }
                     else
                     {
@@ -113,7 +113,7 @@
         <div class="gallery compact">
             @foreach (var photo in Model.RecentPhotos)
             {
-                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.PublicUrl(photo.Filename)" alt="@photo.Caption" />
+                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.ThumbUrl(photo.Filename)" alt="@photo.Caption" loading="lazy" decoding="async" />
             }
             @if (Model.RecentPhotos.Count == 0)
             {

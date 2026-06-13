@@ -118,7 +118,7 @@
                         <a class="box-item-card subbox-card" asp-page="/Boxes/Details" asp-route-code="@child.Code">
                             @if (!string.IsNullOrWhiteSpace(child.CoverPhoto))
                             {
-                                <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(child.CoverPhoto))" src="@PhotoStorage.PublicUrl(child.CoverPhoto)" alt="@child.Name" />
+                                <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(child.CoverPhoto))" src="@PhotoStorage.ThumbUrl(child.CoverPhoto)" alt="@child.Name" loading="lazy" decoding="async" />
                             }
                             else
                             {
@@ -145,7 +145,7 @@
                         <a class="box-item-link" asp-page="/Items/Edit" asp-route-id="@item.Id">
                         @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
                         {
-                            <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.PublicUrl(item.CoverPhoto)" alt="@item.Name" />
+                            <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
                         }
                         else
                         {
@@ -204,7 +204,7 @@
             {
                 var isCover = photo.Filename == Model.Box.CoverPhoto;
                 <form class="photo-tile @(isCover ? "is-cover" : "")" method="post" asp-page-handler="ArchivePhoto" asp-route-code="@Model.Box.Code" asp-route-photoId="@photo.Id">
-                    <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.PublicUrl(photo.Filename)" alt="@photo.Caption" />
+                    <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.ThumbUrl(photo.Filename)" alt="@photo.Caption" loading="lazy" decoding="async" />
                     <div class="photo-tile-actions">
                         @if (isCover)
                         {

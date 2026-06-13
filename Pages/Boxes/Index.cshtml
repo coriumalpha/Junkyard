@@ -19,7 +19,7 @@
         <a class="card box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
             @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
             {
-                <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@PhotoStorage.PublicUrl(box.CoverPhoto)" alt="@box.Name" />
+                <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@PhotoStorage.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
             }
             else
             {

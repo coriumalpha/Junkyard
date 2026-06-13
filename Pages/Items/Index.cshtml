@@ -45,7 +45,7 @@
                 <div class="inventory-group-cover">
                     @if (hero?.CoverPhoto is string cover)
                     {
-                        <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(cover))" src="@PhotoStorage.PublicUrl(cover)" alt="@hero.Name" />
+                        <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(cover))" src="@PhotoStorage.ThumbUrl(cover)" alt="@hero.Name" loading="lazy" decoding="async" />
                     }
                     else
                     {
@@ -80,7 +80,7 @@
                     <a class="inventory-photo-card" asp-page="/Items/Edit" asp-route-id="@item.Id">
                         @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
                         {
-                            <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.PublicUrl(item.CoverPhoto)" alt="@item.Name" />
+                            <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
                         }
                         else
                         {

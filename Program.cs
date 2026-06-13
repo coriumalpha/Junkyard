@@ -48,6 +48,18 @@ using (var scope = app.Services.CreateScope())
     SeedData.EnsureSeeded(db);
 }
 
+if (args.Contains("--normalize-photo-rotations", StringComparer.OrdinalIgnoreCase))
+{
+    await NormalizePhotoRotationsAsync(app.Services);
+    return;
+}
+
+if (args.Contains("--generate-photo-derivatives", StringComparer.OrdinalIgnoreCase))
+{
+    await GeneratePhotoDerivativesAsync(app.Services);
+    return;
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -64,6 +76,87 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", app = "Inventario" }));
+app.MapGet("/photo-derivatives/{variant}/{**filename}", async (
+    string variant,
+    string filename,
+    PhotoStorage storage,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var path = await storage.GetOrCreateDerivativeAsync(variant, filename, cancellationToken);
+        return Results.File(path, "image/jpeg", enableRangeProcessing: true);
+    }
+    catch (FileNotFoundException)
+    {
+        return Results.NotFound();
+    }
+    catch (InvalidOperationException)
+    {
+        return Results.BadRequest();
+    }
+});
 app.MapRazorPages();
 
 app.Run();
+
+static async Task NormalizePhotoRotationsAsync(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+    var storage = scope.ServiceProvider.GetRequiredService<PhotoStorage>();
+
+    var rotations = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    var photoRotations = await db.Photos
+        .IgnoreQueryFilters()
+        .Where(photo => photo.RotationDegrees != 0)
+        .Select(photo => new { photo.Filename, photo.RotationDegrees })
+        .ToListAsync();
+    foreach (var photo in photoRotations)
+    {
+        rotations[photo.Filename] = PhotoStorage.NormalizeRotation(photo.RotationDegrees);
+    }
+
+    var inboxRotations = await db.PhotoInboxes
+        .Where(photo => photo.RotationDegrees != 0)
+        .Select(photo => new { photo.Filename, photo.RotationDegrees })
+        .ToListAsync();
+    foreach (var photo in inboxRotations)
+    {
+        rotations[photo.Filename] = PhotoStorage.NormalizeRotation(photo.RotationDegrees);
+    }
+
+    foreach (var (filename, rotation) in rotations.Where(entry => entry.Value != 0))
+    {
+        await storage.RotateStoredPhotoAsync(filename, rotation, CancellationToken.None);
+        await PhotoStorage.ResetRotationMetadataAsync(db, filename, CancellationToken.None);
+        Console.WriteLine($"normalized {filename} ({rotation}deg)");
+    }
+
+    await db.SaveChangesAsync();
+    Console.WriteLine($"normalized {rotations.Count} photo files");
+}
+
+static async Task GeneratePhotoDerivativesAsync(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+    var storage = scope.ServiceProvider.GetRequiredService<PhotoStorage>();
+
+    var filenames = await db.Photos
+        .IgnoreQueryFilters()
+        .Select(photo => photo.Filename)
+        .Concat(db.PhotoInboxes.Select(photo => photo.Filename))
+        .Distinct()
+        .ToListAsync();
+
+    var generated = 0;
+    foreach (var filename in filenames)
+    {
+        await storage.EnsureDerivativesAsync(filename, CancellationToken.None);
+        generated++;
+        Console.WriteLine($"generated derivatives for {filename}");
+    }
+
+    Console.WriteLine($"generated derivatives for {generated} photo files");
+}
