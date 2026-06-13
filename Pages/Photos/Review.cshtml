@@ -36,7 +36,7 @@
             <input id="selectedIds" type="hidden" asp-for="Input.SelectedIds" />
             <section class="review-stage">
                 <div class="review-photo-frame">
-                    <img class="review-photo rotatable" style="@PhotoStorage.RotationStyle(Model.Current.RotationDegrees)" src="@PhotoStorage.PreviewUrl(Model.Current.Filename)" alt="@Model.Current.OriginalFilename" decoding="async" />
+                    <img class="review-photo rotatable" data-photo-id="@Model.Current.Id" data-photo-variant="preview" style="@PhotoStorage.RotationStyle(Model.Current.RotationDegrees)" src="@Model.PreviewUrl(Model.Current)" alt="@Model.Current.OriginalFilename" decoding="async" />
                 </div>
                 <aside class="review-side">
                     <div class="review-actions panel">
@@ -44,8 +44,8 @@
                         <button class="btn primary" type="button" data-open="create">N · Crear objeto</button>
                         <button class="btn" type="button" data-open="assign">A · Asociar a objeto</button>
                         <div class="actions">
-                            <button class="btn" type="submit" asp-page-handler="Rotate" name="direction" value="left">Q · Girar -90°</button>
-                            <button class="btn" type="submit" asp-page-handler="Rotate" name="direction" value="right">E · Girar +90°</button>
+                            <button class="btn" type="submit" asp-page-handler="Rotate" name="direction" value="left" data-rotate="left">Q · Girar -90°</button>
+                            <button class="btn" type="submit" asp-page-handler="Rotate" name="direction" value="right" data-rotate="right">E · Girar +90°</button>
                         </div>
                         <button class="btn" type="submit" asp-page-handler="AssignBox">B · Asociar a caja</button>
                         <button class="btn danger" type="submit" asp-page-handler="Discard">D · Descartar</button>
@@ -70,7 +70,7 @@
                     <div id="createDialog" class="quick-create-panel panel" hidden>
                         <h2>Crear objeto desde fotos</h2>
                         <div class="quick-create-photo">
-                            <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.Current.RotationDegrees)" src="@PhotoStorage.PreviewUrl(Model.Current.Filename)" alt="@Model.Current.OriginalFilename" decoding="async" />
+                            <img class="rotatable" data-photo-id="@Model.Current.Id" data-photo-variant="preview" style="@PhotoStorage.RotationStyle(Model.Current.RotationDegrees)" src="@Model.PreviewUrl(Model.Current)" alt="@Model.Current.OriginalFilename" decoding="async" />
                         </div>
                         <div class="form-grid">
                             <div class="field full">
@@ -108,7 +108,7 @@
                 {
                     <label class="film @(photo.Id == Model.Current.Id ? "current" : "")">
                         <input type="checkbox" value="@photo.Id" checked="@(photo.Id == Model.Current.Id)" />
-                        <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.ThumbUrl(photo.Filename)" alt="@photo.OriginalFilename" loading="lazy" decoding="async" />
+                        <img class="rotatable" data-photo-id="@photo.Id" data-photo-variant="thumb" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@Model.ThumbUrl(photo)" alt="@photo.OriginalFilename" loading="lazy" decoding="async" />
                     </label>
                 }
             </div>
@@ -145,6 +145,8 @@
   const assignSubmit = assignDialog?.querySelector('[formaction*="AssignItem"]');
   const rotateLeftButton = form.querySelector('[name="direction"][value="left"]');
   const rotateRightButton = form.querySelector('[name="direction"][value="right"]');
+  const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value;
+  let rotating = false;
   const submitWithButton = button => {
     if (!(button instanceof HTMLElement)) return;
     if (typeof form.requestSubmit === 'function') {
@@ -160,6 +162,52 @@
     }
     return Boolean(target.closest('input, textarea, select, button'));
   };
+  const setImageSource = (image, src) => {
+    image.src = src;
+    image.removeAttribute('srcset');
+    image.closest('.photo-fit')?.style.setProperty('--photo-bg', `url("${src}")`);
+  };
+  const applyRotationPayload = payload => {
+    payload?.rotated?.forEach(photo => {
+      document.querySelectorAll(`img[data-photo-id="${photo.id}"]`).forEach(image => {
+        const nextSrc = image.dataset.photoVariant === 'thumb' ? photo.thumbUrl : photo.previewUrl;
+        setImageSource(image, nextSrc);
+      });
+    });
+  };
+  const rotatePhotos = async direction => {
+    if (rotating) return;
+    const button = direction === 'left' ? rotateLeftButton : rotateRightButton;
+    if (!(button instanceof HTMLButtonElement)) return;
+    sync();
+    const body = new FormData(form);
+    body.set('direction', direction);
+    if (token && !body.has('__RequestVerificationToken')) {
+      body.append('__RequestVerificationToken', token);
+    }
+
+    rotating = true;
+    rotateLeftButton?.setAttribute('disabled', 'disabled');
+    rotateRightButton?.setAttribute('disabled', 'disabled');
+    form.setAttribute('aria-busy', 'true');
+    try {
+      const response = await fetch(button.formAction, {
+        method: 'POST',
+        body,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      applyRotationPayload(await response.json());
+    } catch {
+      submitWithButton(button);
+      return;
+    } finally {
+      rotating = false;
+      rotateLeftButton?.removeAttribute('disabled');
+      rotateRightButton?.removeAttribute('disabled');
+      form.removeAttribute('aria-busy');
+    }
+  };
   const openCreate = () => {
     if (nameInput?.value?.toLowerCase() === 'n') nameInput.value = '';
     createDialog.hidden = false;
@@ -173,6 +221,10 @@
   document.querySelector('.film.current')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   document.querySelector('[data-open="create"]').addEventListener('click', openCreate);
   document.querySelector('[data-open="assign"]').addEventListener('click', openAssign);
+  document.querySelectorAll('[data-rotate]').forEach(button => button.addEventListener('click', event => {
+    event.preventDefault();
+    rotatePhotos(button.dataset.rotate);
+  }));
   document.querySelectorAll('[data-close]').forEach(x => x.addEventListener('click', () => {
     const panel = x.closest('.quick-create-panel');
     if (panel) {
@@ -218,8 +270,8 @@
     }
     if (key === 'n') { e.preventDefault(); openCreate(); }
     if (key === 'a') { e.preventDefault(); openAssign(); }
-    if (key === 'q') { e.preventDefault(); submitWithButton(rotateLeftButton); }
-    if (key === 'e') { e.preventDefault(); submitWithButton(rotateRightButton); }
+    if (key === 'q') { e.preventDefault(); rotatePhotos('left'); }
+    if (key === 'e') { e.preventDefault(); rotatePhotos('right'); }
     if (key === 'b') { e.preventDefault(); submitWithButton(form.querySelector('[formaction*="AssignBox"]')); }
     if (key === 'd') { e.preventDefault(); submitWithButton(form.querySelector('[formaction*="Discard"]')); }
     if (key === 's' || e.key === 'ArrowRight') { e.preventDefault(); document.querySelector('[data-next]')?.click(); }

@@ -95,11 +95,20 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
     }
 
     public static string PublicUrl(string filename) => $"/uploads/{filename.Replace("\\", "/")}";
+    public static string PublicUrl(string filename, DateTime updatedAt) => Versioned(PublicUrl(filename), updatedAt);
     public static string ThumbUrl(string filename) => DerivativeUrl(ThumbVariant, filename);
+    public static string ThumbUrl(string filename, DateTime updatedAt) => Versioned(ThumbUrl(filename), updatedAt);
     public static string PreviewUrl(string filename) => DerivativeUrl(PreviewVariant, filename);
+    public static string PreviewUrl(string filename, DateTime updatedAt) => Versioned(PreviewUrl(filename), updatedAt);
 
     public static string DerivativeUrl(string variant, string filename)
         => $"/photo-derivatives/{variant}/{filename.Replace("\\", "/")}";
+
+    public static string Versioned(string url, DateTime updatedAt)
+    {
+        var separator = url.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        return $"{url}{separator}v={updatedAt.ToUniversalTime().Ticks}";
+    }
 
     public static string RotationStyle(int rotationDegrees)
     {
@@ -169,6 +178,7 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
 
     public static async Task ResetRotationMetadataAsync(InventoryDbContext db, string filename, CancellationToken cancellationToken)
     {
+        var now = DateTime.UtcNow;
         var photos = await db.Photos
             .IgnoreQueryFilters()
             .Where(photo => photo.Filename == filename)
@@ -176,6 +186,7 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
         foreach (var photo in photos)
         {
             photo.RotationDegrees = 0;
+            photo.UpdatedAt = now;
         }
 
         var inboxPhotos = await db.PhotoInboxes
@@ -184,7 +195,44 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
         foreach (var photo in inboxPhotos)
         {
             photo.RotationDegrees = 0;
+            photo.UpdatedAt = now;
         }
+    }
+
+    public static async Task<Dictionary<string, PhotoViewState>> LoadViewStatesAsync(
+        InventoryDbContext db,
+        IEnumerable<string?> filenames,
+        CancellationToken cancellationToken)
+    {
+        var normalized = filenames
+            .Where(filename => !string.IsNullOrWhiteSpace(filename))
+            .Select(filename => filename!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (normalized.Count == 0)
+        {
+            return new Dictionary<string, PhotoViewState>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return await db.Photos.AsNoTracking()
+            .Where(photo => normalized.Contains(photo.Filename))
+            .GroupBy(photo => photo.Filename)
+            .Select(group => group
+                .OrderByDescending(photo => photo.UpdatedAt)
+                .ThenByDescending(photo => photo.CreatedAt)
+                .Select(photo => new
+                {
+                    photo.Filename,
+                    photo.RotationDegrees,
+                    photo.UpdatedAt
+                })
+                .First())
+            .ToDictionaryAsync(
+                photo => photo.Filename,
+                photo => new PhotoViewState(photo.RotationDegrees, photo.UpdatedAt),
+                StringComparer.OrdinalIgnoreCase,
+                cancellationToken);
     }
 
     private async Task NormalizeImageAsync(string fullPath, CancellationToken cancellationToken)
@@ -287,3 +335,5 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
         File.Move(tempPath, fullPath, overwrite: true);
     }
 }
+
+public sealed record PhotoViewState(int RotationDegrees, DateTime UpdatedAt);

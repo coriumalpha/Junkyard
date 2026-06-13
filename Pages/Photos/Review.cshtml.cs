@@ -21,6 +21,9 @@ public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageMode
     public int? PreviousPendingId { get; private set; }
     public int? NextPendingId { get; private set; }
 
+    public string PreviewUrl(PhotoInbox photo) => Versioned(PhotoStorage.PreviewUrl(photo.Filename), photo.UpdatedAt);
+    public string ThumbUrl(PhotoInbox photo) => Versioned(PhotoStorage.ThumbUrl(photo.Filename), photo.UpdatedAt);
+
     [BindProperty]
     public ReviewInput Input { get; set; } = new();
 
@@ -144,6 +147,20 @@ public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageMode
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        if (Request.Headers.XRequestedWith == "XMLHttpRequest")
+        {
+            return new JsonResult(new
+            {
+                rotated = photos.Select(photo => new
+                {
+                    id = photo.Id,
+                    previewUrl = PreviewUrl(photo),
+                    thumbUrl = ThumbUrl(photo)
+                })
+            });
+        }
+
         return RedirectToPage(new { id = Input.CurrentId });
     }
 
@@ -282,6 +299,9 @@ public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageMode
         PreviousPendingId = index > 0 ? orderedIds[index - 1] : null;
         NextPendingId = index < orderedIds.Count - 1 ? orderedIds[index + 1] : null;
     }
+
+    private static string Versioned(string url, DateTime updatedAt)
+        => $"{url}{(url.Contains('?') ? '&' : '?')}v={updatedAt.Ticks}";
 
     public class ReviewInput
     {

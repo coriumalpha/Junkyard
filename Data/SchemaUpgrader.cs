@@ -7,6 +7,7 @@ public static class SchemaUpgrader
 {
     public static void Apply(InventoryDbContext db)
     {
+        AddColumn(db, "Boxes", "ContainerType", $"TEXT NOT NULL DEFAULT '{Models.Box.DefaultContainerType}'");
         AddColumn(db, "Boxes", "ArchivedAt", "TEXT NULL");
         AddColumn(db, "Boxes", "ParentBoxId", "INTEGER NULL");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Boxes_ParentBoxId" ON "Boxes" ("ParentBoxId");""");
@@ -21,6 +22,7 @@ public static class SchemaUpgrader
         AddColumn(db, "PhotoInboxes", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");
         AddColumn(db, "PhotoInboxes", "UpdatedAt", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'");
         AddColumn(db, "PhotoInboxes", "ProcessedAt", "TEXT NULL");
+        NormalizeContainerTypes(db);
         BackfillTimestamps(db);
     }
 
@@ -127,6 +129,15 @@ public static class SchemaUpgrader
                   FROM "PhotoInboxes"
                   WHERE "PhotoInboxes"."Filename" = "Photos"."Filename"
               );
+            """);
+    }
+
+    private static void NormalizeContainerTypes(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw($"""
+            UPDATE "Boxes"
+            SET "ContainerType" = '{Models.Box.DefaultContainerType}'
+            WHERE "ContainerType" IS NULL OR trim("ContainerType") = '';
             """);
     }
 }

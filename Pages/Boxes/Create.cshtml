@@ -1,13 +1,13 @@
 @page
 @model Inventario.Pages.Boxes.CreateModel
 @{
-    ViewData["Title"] = "Nueva caja";
+    ViewData["Title"] = "Nuevo contenedor";
 }
 
 <div class="section-title">
     <div>
         <p class="section-kicker">Contenedor físico</p>
-        <h1>Nueva caja</h1>
+        <h1>Nuevo contenedor</h1>
     </div>
     <a class="btn" asp-page="/Boxes/Index">Volver</a>
 </div>
@@ -24,11 +24,16 @@
         <span asp-validation-for="Input.Name"></span>
     </div>
     <div class="field">
+        <label asp-for="Input.ContainerType">Tipo</label>
+        <select asp-for="Input.ContainerType" asp-items="Model.ContainerTypes"></select>
+        <span asp-validation-for="Input.ContainerType"></span>
+    </div>
+    <div class="field">
         <label asp-for="Input.LocationId">Ubicación</label>
         <select asp-for="Input.LocationId" asp-items="Model.Locations"></select>
     </div>
     <div class="field">
-        <label asp-for="Input.ParentBoxId">Dentro de otra caja</label>
+        <label asp-for="Input.ParentBoxId">Dentro de otro contenedor</label>
         <select asp-for="Input.ParentBoxId" asp-items="Model.ParentBoxes"></select>
     </div>
     <div class="field">
@@ -40,7 +45,7 @@
         <textarea asp-for="Input.Description"></textarea>
     </div>
     <div class="actions full">
-        <button class="btn primary" type="submit">Crear caja</button>
+        <button class="btn primary" type="submit">Crear contenedor</button>
     </div>
 </form>
 

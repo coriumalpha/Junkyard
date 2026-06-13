@@ -9,9 +9,28 @@ public enum BoxStatus
 
 public class Box
 {
+    public const string DefaultContainerType = "box";
+
+    private static readonly IReadOnlyDictionary<string, string> ContainerTypeLabels =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["box"] = "Caja",
+            ["subbox"] = "Subcaja",
+            ["shelf"] = "Balda",
+            ["drawer"] = "Cajón",
+            ["rack"] = "Estantería",
+            ["bag"] = "Bolsa",
+            ["case"] = "Maletín",
+            ["binder"] = "Archivador",
+            ["lot"] = "Lote temporal",
+            ["zone"] = "Zona física",
+            ["other"] = "Otro soporte"
+        };
+
     public int Id { get; set; }
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
+    public string ContainerType { get; set; } = DefaultContainerType;
     public string? Description { get; set; }
     public int LocationId { get; set; }
     public Location? Location { get; set; }
@@ -24,4 +43,21 @@ public class Box
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public List<Item> Items { get; set; } = [];
     public List<Box> ChildBoxes { get; set; } = [];
+
+    public string ContainerTypeLabel => ContainerTypeLabelFor(ContainerType);
+
+    public static IReadOnlyList<KeyValuePair<string, string>> AvailableContainerTypes() =>
+        ContainerTypeLabels.ToList();
+
+    public static string NormalizeContainerType(string? value)
+    {
+        var normalized = (value ?? "").Trim().ToLowerInvariant();
+        return ContainerTypeLabels.ContainsKey(normalized) ? normalized : DefaultContainerType;
+    }
+
+    public static string ContainerTypeLabelFor(string? value)
+    {
+        var normalized = NormalizeContainerType(value);
+        return ContainerTypeLabels[normalized];
+    }
 }

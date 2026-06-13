@@ -15,6 +15,7 @@ public class EditModel(InventoryDbContext db) : PageModel
 
     public List<SelectListItem> Locations { get; private set; } = [];
     public List<SelectListItem> ParentBoxes { get; private set; } = [];
+    public List<SelectListItem> ContainerTypes { get; private set; } = [];
 
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
@@ -29,6 +30,7 @@ public class EditModel(InventoryDbContext db) : PageModel
             Id = box.Id,
             Code = box.Code,
             Name = box.Name,
+            ContainerType = box.ContainerType,
             Description = box.Description,
             LocationId = box.LocationId,
             ParentBoxId = box.ParentBoxId ?? 0,
@@ -54,6 +56,7 @@ public class EditModel(InventoryDbContext db) : PageModel
 
         box.Code = Input.Code.Trim().ToUpperInvariant();
         box.Name = Input.Name.Trim();
+        box.ContainerType = Box.NormalizeContainerType(Input.ContainerType);
         box.Description = Input.Description;
         box.LocationId = Input.LocationId;
         box.ParentBoxId = Input.ParentBoxId == 0 ? null : Input.ParentBoxId;
@@ -64,6 +67,10 @@ public class EditModel(InventoryDbContext db) : PageModel
 
     private async Task LoadSelects(int currentBoxId, CancellationToken cancellationToken)
     {
+        ContainerTypes = Box.AvailableContainerTypes()
+            .Select(option => new SelectListItem(option.Value, option.Key))
+            .ToList();
+
         Locations = await db.Locations.AsNoTracking().OrderBy(l => l.Name)
             .Select(l => new SelectListItem(l.Name, l.Id.ToString()))
             .ToListAsync(cancellationToken);
@@ -73,9 +80,9 @@ public class EditModel(InventoryDbContext db) : PageModel
         ParentBoxes = await db.Boxes.AsNoTracking()
             .Where(b => !excluded.Contains(b.Id))
             .OrderBy(b => b.Code)
-            .Select(b => new SelectListItem($"{b.Code} · {b.Name}", b.Id.ToString()))
+            .Select(b => new SelectListItem($"{b.Code} · {Box.ContainerTypeLabelFor(b.ContainerType)} · {b.Name}", b.Id.ToString()))
             .ToListAsync(cancellationToken);
-        ParentBoxes.Insert(0, new SelectListItem("Ninguna: caja de primer nivel", "0"));
+        ParentBoxes.Insert(0, new SelectListItem("Ninguno: contenedor de primer nivel", "0"));
     }
 
     private async Task<HashSet<int>> GetDescendantIdsAsync(int boxId, CancellationToken cancellationToken)
@@ -111,6 +118,9 @@ public class EditModel(InventoryDbContext db) : PageModel
 
         [Required, MaxLength(160)]
         public string Name { get; set; } = "";
+
+        [Required, MaxLength(24)]
+        public string ContainerType { get; set; } = Box.DefaultContainerType;
 
         public string? Description { get; set; }
         public int LocationId { get; set; }

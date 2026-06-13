@@ -23,6 +23,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
         {
             entity.Property(x => x.Code).HasMaxLength(40).IsRequired();
             entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.ContainerType).HasMaxLength(24).HasDefaultValue(Box.DefaultContainerType).IsRequired();
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
             entity.HasIndex(x => x.Code).IsUnique();
             entity.HasQueryFilter(x => x.ArchivedAt == null);

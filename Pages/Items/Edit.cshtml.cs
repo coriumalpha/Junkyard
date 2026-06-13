@@ -22,6 +22,7 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
 
     public List<SelectListItem> Boxes { get; private set; } = [];
     public List<Photo> Gallery { get; private set; } = [];
+    public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
     public string[] Categories => CsvInventoryService.Categories;
     public string? CurrentBoxCode { get; private set; }
     public string? CoverPhotoFilename { get; private set; }
@@ -387,9 +388,9 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
     private async Task LoadAux(int itemId, CancellationToken cancellationToken)
     {
         Boxes = await db.Boxes.AsNoTracking().OrderBy(b => b.Code)
-            .Select(b => new SelectListItem($"{b.Code} · {b.Name}", b.Id.ToString()))
+            .Select(b => new SelectListItem($"{b.Code} · {Box.ContainerTypeLabelFor(b.ContainerType)} · {b.Name}", b.Id.ToString()))
             .ToListAsync(cancellationToken);
-        Boxes.Insert(0, new SelectListItem("Sin caja / huérfano", "0"));
+        Boxes.Insert(0, new SelectListItem("Sin contenedor / huérfano", "0"));
         CoverPhotoFilename ??= await db.Items.AsNoTracking()
             .Where(i => i.Id == itemId)
             .Select(i => i.CoverPhoto)
@@ -399,7 +400,12 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
             .OrderByDescending(p => CoverPhotoFilename != null && p.Filename == CoverPhotoFilename)
             .ThenByDescending(p => p.CreatedAt)
             .ToListAsync(cancellationToken);
+        PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, new[] { CoverPhotoFilename }, cancellationToken);
     }
+
+    public string PreviewUrl(Photo photo) => PhotoStorage.PreviewUrl(photo.Filename, photo.UpdatedAt);
+    public string ThumbUrl(Photo photo) => PhotoStorage.ThumbUrl(photo.Filename, photo.UpdatedAt);
+    public string PublicUrl(Photo photo) => PhotoStorage.PublicUrl(photo.Filename, photo.UpdatedAt);
 
     public class ItemInput
     {

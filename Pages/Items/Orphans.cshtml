@@ -18,7 +18,7 @@
         <article class="visual-row orphan-row">
             @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
             {
-                <img class="visual-row-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
+                <img class="visual-row-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
             }
             else
             {

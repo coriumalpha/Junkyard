@@ -21,7 +21,7 @@ else
     <div class="split">
         <section>
             <div class="section-title">
-                <h2>Cajas</h2>
+                <h2>Contenedores</h2>
                 <span class="chip">@Model.Boxes.Count</span>
             </div>
             <div class="search-card-grid">
@@ -31,7 +31,7 @@ else
                     <a class="card box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
                         @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
                         {
-                            <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@PhotoStorage.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
+                            <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@Model.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
                         }
                         else
                         {
@@ -46,6 +46,7 @@ else
                         <div class="card-body">
                             <div class="chips">
                                 <span class="chip good">@box.Code</span>
+                                <span class="chip">@box.ContainerTypeLabel</span>
                                 <span class="chip">@box.Status</span>
                             </div>
                             <h3>@box.Name</h3>
@@ -55,7 +56,7 @@ else
                 }
                 @if (Model.Boxes.Count == 0)
                 {
-                    <div class="empty"><strong>No se encontraron cajas.</strong><span>Prueba por código, ubicación o nombre parcial.</span></div>
+                    <div class="empty"><strong>No se encontraron contenedores.</strong><span>Prueba por código, tipo, ubicación o nombre parcial.</span></div>
                 }
             </div>
         </section>
@@ -70,7 +71,7 @@ else
                     <a class="box-item-card" asp-page="/Items/Edit" asp-route-id="@item.Id">
                         @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
                         {
-                            <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
+                            <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
                         }
                         else
                         {

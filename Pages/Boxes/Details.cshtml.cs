@@ -13,7 +13,7 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
     public Box Box { get; private set; } = null!;
     public List<Photo> Gallery { get; private set; } = [];
     public List<SelectListItem> Boxes { get; private set; } = [];
-    public Dictionary<string, int> PhotoRotations { get; private set; } = [];
+    public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
     public string[] Categories => CsvInventoryService.Categories;
     public string QrSvg { get; private set; } = "";
 
@@ -288,25 +288,28 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
             .ToListAsync(cancellationToken);
         Boxes = await db.Boxes.AsNoTracking()
             .OrderBy(b => b.Code)
-            .Select(b => new SelectListItem($"{b.Code} · {b.Name}", b.Id.ToString(), b.Id == Box.Id))
+            .Select(b => new SelectListItem($"{b.Code} · {Box.ContainerTypeLabelFor(b.ContainerType)} · {b.Name}", b.Id.ToString(), b.Id == Box.Id))
             .ToListAsync(cancellationToken);
-        Boxes.Insert(0, new SelectListItem("Sin caja / huérfano", "0"));
+        Boxes.Insert(0, new SelectListItem("Sin contenedor / huérfano", "0"));
         var filenames = Box.Items.Select(i => i.CoverPhoto)
             .Concat(Box.ChildBoxes.Select(b => b.CoverPhoto))
             .Where(f => !string.IsNullOrWhiteSpace(f))
             .Select(f => f!)
             .Distinct()
             .ToList();
-        PhotoRotations = await db.Photos.AsNoTracking()
-            .Where(p => filenames.Contains(p.Filename))
-            .GroupBy(p => p.Filename)
-            .Select(g => new { Filename = g.Key, RotationDegrees = g.OrderByDescending(p => p.CreatedAt).Select(p => p.RotationDegrees).First() })
-            .ToDictionaryAsync(x => x.Filename, x => x.RotationDegrees, cancellationToken);
+        PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
         return true;
     }
 
     public int RotationFor(string? filename) =>
-        filename is not null && PhotoRotations.TryGetValue(filename, out var rotation) ? rotation : 0;
+        filename is not null && PhotoStates.TryGetValue(filename, out var state) ? state.RotationDegrees : 0;
+
+    public string ThumbUrl(string? filename) =>
+        filename is not null && PhotoStates.TryGetValue(filename, out var state)
+            ? PhotoStorage.ThumbUrl(filename, state.UpdatedAt)
+            : "";
+
+    public string ThumbUrl(Photo photo) => PhotoStorage.ThumbUrl(photo.Filename, photo.UpdatedAt);
 
     public class BulkEditInput
     {

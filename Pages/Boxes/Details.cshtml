@@ -8,6 +8,7 @@
     <div>
         <div class="chips">
             <span class="chip good">@Model.Box.Code</span>
+            <span class="chip">@Model.Box.ContainerTypeLabel</span>
             <span class="chip">@Model.Box.Status</span>
             <span class="chip">@Model.Box.Location?.Name</span>
             @if (Model.Box.ParentBox is not null)
@@ -19,8 +20,8 @@
         <p class="muted">@Model.Box.Description</p>
         <div class="actions">
             <a class="btn primary" asp-page="/Items/Create" asp-route-boxId="@Model.Box.Id">Añadir ítem</a>
-            <a class="btn" asp-page="/Boxes/Create" asp-route-parentBoxId="@Model.Box.Id">Añadir subcaja</a>
-            <a class="btn" asp-page="/Boxes/Edit" asp-route-id="@Model.Box.Id">Editar caja</a>
+            <a class="btn" asp-page="/Boxes/Create" asp-route-parentBoxId="@Model.Box.Id">Añadir contenedor hijo</a>
+            <a class="btn" asp-page="/Boxes/Edit" asp-route-id="@Model.Box.Id">Editar contenedor</a>
         </div>
     </div>
     <div class="qr-panel">
@@ -108,7 +109,7 @@
             @if (Model.Box.ChildBoxes.Count > 0)
             {
                 <div class="section-title">
-                    <h2>Subcajas</h2>
+                    <h2>Contenedores dentro</h2>
                     <span class="chip">@Model.Box.ChildBoxes.Count</span>
                 </div>
                 <div class="box-content-grid">
@@ -118,14 +119,14 @@
                         <a class="box-item-card subbox-card" asp-page="/Boxes/Details" asp-route-code="@child.Code">
                             @if (!string.IsNullOrWhiteSpace(child.CoverPhoto))
                             {
-                                <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(child.CoverPhoto))" src="@PhotoStorage.ThumbUrl(child.CoverPhoto)" alt="@child.Name" loading="lazy" decoding="async" />
+                                <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(child.CoverPhoto))" src="@Model.ThumbUrl(child.CoverPhoto)" alt="@child.Name" loading="lazy" decoding="async" />
                             }
                             else
                             {
                                 <div class="box-item-photo generated">@child.Code[..1]</div>
                             }
                             <span class="box-item-body">
-                                <span class="chips"><span class="chip good">@child.Code</span><span class="chip">subcaja</span></span>
+                                <span class="chips"><span class="chip good">@child.Code</span><span class="chip">@child.ContainerTypeLabel</span></span>
                                 <h3>@child.Name</h3>
                                 <p class="caption">@itemLabel</p>
                             </span>
@@ -145,7 +146,7 @@
                         <a class="box-item-link" asp-page="/Items/Edit" asp-route-id="@item.Id">
                         @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
                         {
-                            <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
+                            <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
                         }
                         else
                         {
@@ -175,7 +176,7 @@
                 @if (Model.Box.Items.Count == 0)
                 {
                     <div class="empty">
-                        <strong>Caja vacía.</strong>
+                        <strong>Contenedor vacío.</strong>
                         <span>Añade el primer ítem o importa fotos para clasificar objetos visualmente.</span>
                         <div class="actions stack-top"><a class="btn primary" asp-page="/Items/Create" asp-route-boxId="@Model.Box.Id">Añadir ítem</a></div>
                     </div>
@@ -204,7 +205,7 @@
             {
                 var isCover = photo.Filename == Model.Box.CoverPhoto;
                 <form class="photo-tile @(isCover ? "is-cover" : "")" method="post" asp-page-handler="ArchivePhoto" asp-route-code="@Model.Box.Code" asp-route-photoId="@photo.Id">
-                    <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.ThumbUrl(photo.Filename)" alt="@photo.Caption" loading="lazy" decoding="async" />
+                    <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@Model.ThumbUrl(photo)" alt="@photo.Caption" loading="lazy" decoding="async" />
                     <div class="photo-tile-actions">
                         @if (isCover)
                         {
@@ -225,10 +226,10 @@
         <section class="panel danger-zone">
             <div>
                 <h2>Zona peligrosa</h2>
-                <p class="muted">Archiva la caja sin perder objetos. Si contiene ítems, podrás moverlos o dejarlos como huérfanos.</p>
+                <p class="muted">Archiva el contenedor sin perder objetos. Si contiene ítems, podrás moverlos o dejarlos como huérfanos.</p>
             </div>
             <form method="post" asp-page-handler="Delete" asp-route-code="@Model.Box.Code">
-                <button class="btn danger" type="submit">Archivar caja</button>
+                <button class="btn danger" type="submit">Archivar contenedor</button>
             </form>
         </section>
     </aside>

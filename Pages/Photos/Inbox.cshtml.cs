@@ -112,4 +112,6 @@ public class InboxModel(InventoryDbContext db, PhotoStorage storage) : PageModel
 
         Photos = await query.OrderByDescending(p => p.ImportedAt).Take(300).ToListAsync(cancellationToken);
     }
+
+    public string ThumbUrl(PhotoInbox photo) => PhotoStorage.ThumbUrl(photo.Filename, photo.UpdatedAt);
 }

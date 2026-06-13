@@ -69,7 +69,13 @@ app.UseStaticFiles();
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(DataPaths.UploadRoot(app.Environment, app.Configuration)),
-    RequestPath = "/uploads"
+    RequestPath = "/uploads",
+    OnPrepareResponse = context =>
+    {
+        context.Context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+        context.Context.Response.Headers.Pragma = "no-cache";
+        context.Context.Response.Headers.Expires = "0";
+    }
 });
 
 app.UseRouting();
@@ -79,12 +85,16 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok", app = "Inventario" }
 app.MapGet("/photo-derivatives/{variant}/{**filename}", async (
     string variant,
     string filename,
+    HttpContext httpContext,
     PhotoStorage storage,
     CancellationToken cancellationToken) =>
 {
     try
     {
         var path = await storage.GetOrCreateDerivativeAsync(variant, filename, cancellationToken);
+        httpContext.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+        httpContext.Response.Headers.Pragma = "no-cache";
+        httpContext.Response.Headers.Expires = "0";
         return Results.File(path, "image/jpeg", enableRangeProcessing: true);
     }
     catch (FileNotFoundException)

@@ -1,5 +1,6 @@
 using Inventario.Data;
 using Inventario.Models;
+using Inventario.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -47,4 +48,6 @@ public class ArchiveModel(InventoryDbContext db) : PageModel
         await db.SaveChangesAsync(cancellationToken);
         return RedirectToPage();
     }
+
+    public string ThumbUrl(Photo photo) => PhotoStorage.ThumbUrl(photo.Filename, photo.UpdatedAt);
 }

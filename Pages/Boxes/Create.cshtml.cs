@@ -15,6 +15,7 @@ public class CreateModel(InventoryDbContext db) : PageModel
 
     public List<SelectListItem> Locations { get; private set; } = [];
     public List<SelectListItem> ParentBoxes { get; private set; } = [];
+    public List<SelectListItem> ContainerTypes { get; private set; } = [];
 
     public async Task OnGetAsync(int? parentBoxId, CancellationToken cancellationToken)
     {
@@ -43,6 +44,7 @@ public class CreateModel(InventoryDbContext db) : PageModel
         {
             Code = Input.Code.Trim().ToUpperInvariant(),
             Name = Input.Name.Trim(),
+            ContainerType = Box.NormalizeContainerType(Input.ContainerType),
             Description = Input.Description,
             LocationId = Input.LocationId,
             ParentBoxId = Input.ParentBoxId == 0 ? null : Input.ParentBoxId,
@@ -55,14 +57,18 @@ public class CreateModel(InventoryDbContext db) : PageModel
 
     private async Task LoadSelects(CancellationToken cancellationToken)
     {
+        ContainerTypes = Box.AvailableContainerTypes()
+            .Select(option => new SelectListItem(option.Value, option.Key))
+            .ToList();
+
         Locations = await db.Locations.AsNoTracking().OrderBy(l => l.Name)
             .Select(l => new SelectListItem(l.Name, l.Id.ToString()))
             .ToListAsync(cancellationToken);
 
         ParentBoxes = await db.Boxes.AsNoTracking().OrderBy(b => b.Code)
-            .Select(b => new SelectListItem($"{b.Code} · {b.Name}", b.Id.ToString()))
+            .Select(b => new SelectListItem($"{b.Code} · {Box.ContainerTypeLabelFor(b.ContainerType)} · {b.Name}", b.Id.ToString()))
             .ToListAsync(cancellationToken);
-        ParentBoxes.Insert(0, new SelectListItem("Ninguna: caja de primer nivel", "0"));
+        ParentBoxes.Insert(0, new SelectListItem("Ninguno: contenedor de primer nivel", "0"));
     }
 
     public class BoxInput
@@ -72,6 +78,9 @@ public class CreateModel(InventoryDbContext db) : PageModel
 
         [Required, MaxLength(160)]
         public string Name { get; set; } = "";
+
+        [Required, MaxLength(24)]
+        public string ContainerType { get; set; } = Box.DefaultContainerType;
 
         public string? Description { get; set; }
         public int LocationId { get; set; }

@@ -18,7 +18,7 @@
         <a class="box-item-card" asp-page="/Items/Edit" asp-route-id="@item.Id">
             @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
             {
-                <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
+                <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
             }
             else
             {

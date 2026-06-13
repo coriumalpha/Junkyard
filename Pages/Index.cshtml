@@ -25,7 +25,7 @@
     }
     <div class="stats-grid">
         <div class="stat"><span>Ubicaciones</span><strong>@Model.LocationCount</strong></div>
-        <div class="stat"><span>Cajas</span><strong>@Model.BoxCount</strong></div>
+        <div class="stat"><span>Contenedores</span><strong>@Model.BoxCount</strong></div>
         <div class="stat"><span>Ítems</span><strong>@Model.ItemCount</strong></div>
         <div class="stat"><span>Bajo stock</span><strong>@Model.LowStockCount</strong></div>
     </div>
@@ -34,8 +34,8 @@
 <div class="split dashboard-split">
     <section>
         <div class="section-title">
-            <h2>Cajas recientes</h2>
-            <a class="btn" asp-page="/Boxes/Index">Ver cajas</a>
+            <h2>Contenedores recientes</h2>
+            <a class="btn" asp-page="/Boxes/Index">Ver contenedores</a>
         </div>
         <div class="grid cards">
             @foreach (var box in Model.RecentBoxes)
@@ -44,7 +44,7 @@
                 <a class="card box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
                     @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
                     {
-                        <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@PhotoStorage.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
+                        <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@Model.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
                     }
                     else
                     {
@@ -59,6 +59,7 @@
                     <div class="card-body">
                         <div class="chips">
                             <span class="chip good">@box.Code</span>
+                            <span class="chip">@box.ContainerTypeLabel</span>
                             <span class="chip">@box.Status</span>
                         </div>
                         <h3>@box.Name</h3>
@@ -69,9 +70,9 @@
             @if (Model.RecentBoxes.Count == 0)
             {
                 <div class="empty full">
-                    <strong>Todavía no hay cajas.</strong>
-                    <span>Crea la primera caja para empezar a mapear tu inventario físico.</span>
-                    <div class="actions stack-top"><a class="btn primary" asp-page="/Boxes/Create">Crear primera caja</a></div>
+                    <strong>Todavía no hay contenedores.</strong>
+                    <span>Crea el primero para empezar a mapear tu inventario físico.</span>
+                    <div class="actions stack-top"><a class="btn primary" asp-page="/Boxes/Create">Crear primer contenedor</a></div>
                 </div>
             }
         </div>
@@ -92,7 +93,7 @@
                 <a class="visual-row" asp-page="/Items/Edit" asp-route-id="@item.Id">
                     @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
                     {
-                        <img class="visual-row-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@PhotoStorage.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
+                        <img class="visual-row-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
                     }
                     else
                     {
@@ -113,7 +114,7 @@
         <div class="gallery compact">
             @foreach (var photo in Model.RecentPhotos)
             {
-                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.ThumbUrl(photo.Filename)" alt="@photo.Caption" loading="lazy" decoding="async" />
+                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@PhotoStorage.ThumbUrl(photo.Filename, photo.UpdatedAt)" alt="@photo.Caption" loading="lazy" decoding="async" />
             }
             @if (Model.RecentPhotos.Count == 0)
             {

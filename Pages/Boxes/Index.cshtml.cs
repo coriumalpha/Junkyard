@@ -1,5 +1,6 @@
 using Inventario.Data;
 using Inventario.Models;
+using Inventario.Services;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +9,7 @@ namespace Inventario.Pages.Boxes;
 public class IndexModel(InventoryDbContext db) : PageModel
 {
     public List<Box> Boxes { get; private set; } = [];
-    public Dictionary<string, int> PhotoRotations { get; private set; } = [];
+    public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
 
     public async Task OnGetAsync(string? status, CancellationToken cancellationToken)
     {
@@ -25,13 +26,14 @@ public class IndexModel(InventoryDbContext db) : PageModel
 
         Boxes = await query.OrderBy(b => b.Code).ToListAsync(cancellationToken);
         var filenames = Boxes.Select(b => b.CoverPhoto).Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => f!).Distinct().ToList();
-        PhotoRotations = await db.Photos.AsNoTracking()
-            .Where(p => filenames.Contains(p.Filename))
-            .GroupBy(p => p.Filename)
-            .Select(g => new { Filename = g.Key, RotationDegrees = g.OrderByDescending(p => p.CreatedAt).Select(p => p.RotationDegrees).First() })
-            .ToDictionaryAsync(x => x.Filename, x => x.RotationDegrees, cancellationToken);
+        PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
     }
 
     public int RotationFor(string? filename) =>
-        filename is not null && PhotoRotations.TryGetValue(filename, out var rotation) ? rotation : 0;
+        filename is not null && PhotoStates.TryGetValue(filename, out var state) ? state.RotationDegrees : 0;
+
+    public string ThumbUrl(string? filename) =>
+        filename is not null && PhotoStates.TryGetValue(filename, out var state)
+            ? PhotoStorage.ThumbUrl(filename, state.UpdatedAt)
+            : "";
 }
