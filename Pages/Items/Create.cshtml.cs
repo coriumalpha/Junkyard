@@ -15,6 +15,7 @@ public class CreateModel(InventoryDbContext db) : PageModel
     public ItemInput Input { get; set; } = new();
 
     public List<SelectListItem> Boxes { get; private set; } = [];
+    public SearchPickerModel BoxPicker { get; private set; } = new();
     public string[] Categories => CsvInventoryService.Categories;
 
     public async Task OnGetAsync(int? boxId, CancellationToken cancellationToken)
@@ -62,6 +63,23 @@ public class CreateModel(InventoryDbContext db) : PageModel
             .Select(b => new SelectListItem($"{b.Code} · {b.Name}", b.Id.ToString()))
             .ToListAsync(cancellationToken);
         Boxes.Insert(0, new SelectListItem("Sin caja / huérfano", "0"));
+
+        BoxPicker = new SearchPickerModel
+        {
+            InputName = "Input.BoxId",
+            InputId = "Input_BoxId",
+            Label = "Caja",
+            Placeholder = "Buscar por CT, nombre, tipo, ubicación o padre...",
+            SelectedValue = Input.BoxId.ToString(),
+            EmptyLabel = "Sin caja / huérfano",
+            EmptyHint = "El ítem quedará fuera de contenedor.",
+            ClearValue = "0",
+            NoneOptionLabel = "Sin caja / huérfano",
+            NoneOptionHint = "Guarda el ítem sin contenedor asignado.",
+            NoneOptionValue = "0",
+            NoneOptionIcon = "—",
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)
+        };
     }
 
     public class ItemInput

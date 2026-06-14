@@ -13,6 +13,7 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
     public Box Box { get; private set; } = null!;
     public List<Photo> Gallery { get; private set; } = [];
     public List<SelectListItem> Boxes { get; private set; } = [];
+    public SearchPickerModel BulkBoxPicker { get; private set; } = new();
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
     public string[] Categories => CsvInventoryService.Categories;
     public string QrSvg { get; private set; } = "";
@@ -291,6 +292,22 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
             .Select(b => new SelectListItem($"{b.Code} · {Box.ContainerTypeLabelFor(b.ContainerType)} · {b.Name}", b.Id.ToString(), b.Id == Box.Id))
             .ToListAsync(cancellationToken);
         Boxes.Insert(0, new SelectListItem("Sin contenedor / huérfano", "0"));
+        BulkBoxPicker = new SearchPickerModel
+        {
+            InputName = "BulkEdit.BoxId",
+            InputId = "BulkEdit_BoxId",
+            Label = "Caja",
+            Placeholder = "Buscar por CT, nombre, tipo, ubicación o padre...",
+            SelectedValue = BulkEdit.BoxId.ToString(),
+            EmptyLabel = "Sin contenedor / huérfano",
+            EmptyHint = "Mueve los ítems seleccionados fuera de cualquier contenedor.",
+            ClearValue = "0",
+            NoneOptionLabel = "Sin contenedor / huérfano",
+            NoneOptionHint = "Quita el contenedor a los ítems seleccionados.",
+            NoneOptionValue = "0",
+            NoneOptionIcon = "—",
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)
+        };
         var filenames = Box.Items.Select(i => i.CoverPhoto)
             .Concat(Box.ChildBoxes.Select(b => b.CoverPhoto))
             .Where(f => !string.IsNullOrWhiteSpace(f))

@@ -91,10 +91,10 @@
                             }
                         </select>
                     </label>
-                    <label class="bulk-field">
+                    <div class="bulk-field">
                         <span><input asp-for="BulkEdit.ApplyBox" /> Caja</span>
-                        <select asp-for="BulkEdit.BoxId" asp-items="Model.Boxes"></select>
-                    </label>
+                        <partial name="_SearchPicker" model="Model.BulkBoxPicker" />
+                    </div>
                     <label class="bulk-field">
                         <span><input asp-for="BulkEdit.ApplyCondition" /> Estado</span>
                         <input asp-for="BulkEdit.Condition" placeholder="Sin cambios si no marcas la casilla" />

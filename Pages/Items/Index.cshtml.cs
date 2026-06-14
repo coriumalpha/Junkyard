@@ -11,6 +11,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
     public List<Item> Items { get; private set; } = [];
     public List<InventoryGroup> Groups { get; private set; } = [];
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
+    public Dictionary<int, int> ItemPhotoCounts { get; private set; } = [];
     public string Query { get; private set; } = "";
     public string Category { get; private set; } = "";
     public List<string> Categories { get; private set; } = [];
@@ -46,6 +47,15 @@ public class IndexModel(InventoryDbContext db) : PageModel
             .Take(500)
             .ToListAsync(cancellationToken);
 
+        var itemIds = Items.Select(i => i.Id).ToList();
+        ItemPhotoCounts = itemIds.Count == 0
+            ? []
+            : await db.Photos.AsNoTracking()
+                .Where(p => p.EntityType == PhotoEntityType.Item && itemIds.Contains(p.EntityId))
+                .GroupBy(p => p.EntityId)
+                .Select(g => new { ItemId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.ItemId, x => x.Count, cancellationToken);
+
         Groups = Items
             .GroupBy(i => i.BoxId)
             .Select(g =>
@@ -60,6 +70,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
                     box?.Location?.Name,
                     BuildBoxPath(box),
                     box is null,
+                    items.Sum(i => ItemPhotoCounts.GetValueOrDefault(i.Id)),
                     items);
             })
             .OrderBy(g => g.IsOrphanGroup)
@@ -117,8 +128,8 @@ public class IndexModel(InventoryDbContext db) : PageModel
         string? LocationName,
         string Path,
         bool IsOrphanGroup,
+        int PhotoCount,
         List<Item> Items)
     {
-        public int PhotoCount => Items.Count(i => !string.IsNullOrWhiteSpace(i.CoverPhoto));
     }
 }

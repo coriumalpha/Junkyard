@@ -34,8 +34,7 @@
         <select asp-for="Input.LocationId" asp-items="Model.Locations"></select>
     </div>
     <div class="field">
-        <label asp-for="Input.ParentBoxId">Dentro de otro contenedor</label>
-        <select asp-for="Input.ParentBoxId" asp-items="Model.ParentBoxes"></select>
+        <partial name="_SearchPicker" model="Model.ParentBoxPicker" />
     </div>
     <div class="field">
         <label asp-for="Input.Status">Estado</label>

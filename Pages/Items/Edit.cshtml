@@ -32,8 +32,7 @@
                     <input asp-for="Input.Name" />
                 </div>
                 <div class="field">
-                    <label asp-for="Input.BoxId">Contenedor</label>
-                    <select asp-for="Input.BoxId" asp-items="Model.Boxes"></select>
+                    <partial name="_SearchPicker" model="Model.BoxPicker" />
                 </div>
                 <div class="field">
                     <label asp-for="Input.Category">Categoría</label>

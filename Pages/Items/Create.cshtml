@@ -13,8 +13,7 @@
 
 <form class="panel form-grid" method="post" novalidate>
     <div class="field">
-        <label asp-for="Input.BoxId">Caja</label>
-        <select asp-for="Input.BoxId" asp-items="Model.Boxes"></select>
+        <partial name="_SearchPicker" model="Model.BoxPicker" />
     </div>
     <div class="field">
         <label asp-for="Input.Name">Nombre</label>

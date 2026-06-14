@@ -62,8 +62,7 @@
                             <a class="btn" data-previous href="@Url.Page("/Photos/Review", new { id = previousId })">← Anterior</a>
                         }
                         <div class="field">
-                            <label>Caja para B / objeto nuevo</label>
-                            <select asp-for="Input.BoxId" asp-items="Model.Boxes"></select>
+                            <partial name="_SearchPicker" model="Model.BoxPicker" />
                         </div>
                         <small class="muted">Atajos: A, N, B, D, S, Q/E, flechas, Enter, Esc, Ctrl+Z.</small>
                     </div>
@@ -116,8 +115,7 @@
             <dialog id="assignDialog" class="modal-card">
                 <h2>Asociar a objeto existente</h2>
                 <div class="field">
-                    <label>Objeto</label>
-                    <select asp-for="Input.ItemId" asp-items="Model.Items" size="10"></select>
+                    <partial name="_SearchPicker" model="Model.ItemPicker" />
                 </div>
                 <div class="actions">
                     <button class="btn primary" type="submit" asp-page-handler="AssignItem">Enter · Asociar</button>
@@ -216,7 +214,7 @@
   };
   const openAssign = () => {
     assignDialog.showModal();
-    setTimeout(() => assignDialog.querySelector('select')?.focus(), 0);
+    setTimeout(() => assignDialog.querySelector('[data-picker-search]')?.focus(), 0);
   };
   document.querySelector('.film.current')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   document.querySelector('[data-open="create"]').addEventListener('click', openCreate);

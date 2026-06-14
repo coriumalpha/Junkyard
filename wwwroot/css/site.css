@@ -463,6 +463,69 @@ h3 { font-size: var(--font-card); letter-spacing: 0; }
 }
 .inventory-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, .35fr) auto; gap: 12px; align-items: end; }
 .inventory-filter-actions { align-self: end; }
+.search-picker { display: grid; gap: 10px; min-width: 0; }
+.search-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.search-picker-label { margin: 0; font-size: 13px; color: var(--text-muted); }
+.search-picker-current {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,.04);
+}
+.search-picker-current strong, .search-picker-copy strong { overflow-wrap: anywhere; }
+.search-picker-current small, .search-picker-copy small, .search-picker-empty { color: var(--text-muted); }
+.search-picker-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 4px;
+}
+.search-picker-option {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  transition: transform var(--motion-fast), border-color var(--motion-fast), background var(--motion-fast), box-shadow var(--motion-fast);
+}
+.search-picker-option:hover {
+  transform: translateY(-1px);
+  border-color: rgba(143,225,255,.36);
+  background: var(--surface-hover);
+  box-shadow: 0 12px 30px rgba(0,0,0,.18);
+}
+.search-picker-option.is-selected {
+  border-color: rgba(143,225,255,.58);
+  background: rgba(143,225,255,.12);
+  box-shadow: 0 0 0 1px rgba(143,225,255,.16) inset;
+}
+.search-picker-thumb {
+  width: 62px;
+  height: 62px;
+  border-radius: var(--radius-xs);
+  object-fit: cover;
+  display: block;
+  border: 1px solid rgba(255,255,255,.08);
+}
+.search-picker-thumb.fallback {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-weight: 800;
+  letter-spacing: .04em;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(143,225,255,.20), transparent 34%),
+    linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+}
+.search-picker-copy { min-width: 0; display: grid; gap: 4px; }
 .inventory-board { display: grid; gap: 18px; }
 .inventory-group {
   display: grid;

@@ -17,6 +17,7 @@ public class EditModel(InventoryDbContext db) : PageModel
     public List<SelectListItem> Locations { get; private set; } = [];
     public List<SelectListItem> ParentBoxes { get; private set; } = [];
     public List<SelectListItem> ContainerTypes { get; private set; } = [];
+    public SearchPickerModel ParentBoxPicker { get; private set; } = new();
 
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
@@ -106,6 +107,22 @@ public class EditModel(InventoryDbContext db) : PageModel
             .Select(b => new SelectListItem($"{b.Code} · {Box.ContainerTypeLabelFor(b.ContainerType)} · {b.Name}", b.Id.ToString()))
             .ToListAsync(cancellationToken);
         ParentBoxes.Insert(0, new SelectListItem("Ninguno: contenedor de primer nivel", "0"));
+        ParentBoxPicker = new SearchPickerModel
+        {
+            InputName = "Input.ParentBoxId",
+            InputId = "Input_ParentBoxId",
+            Label = "Dentro de otro contenedor",
+            Placeholder = "Buscar por CT, nombre, tipo, ubicación o padre...",
+            SelectedValue = Input.ParentBoxId.ToString(),
+            EmptyLabel = "Primer nivel",
+            EmptyHint = "Este contenedor no estará dentro de otro.",
+            ClearValue = "0",
+            NoneOptionLabel = "Ninguno: contenedor de primer nivel",
+            NoneOptionHint = "Mueve el contenedor al nivel raíz.",
+            NoneOptionValue = "0",
+            NoneOptionIcon = "—",
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken, excluded)
+        };
     }
 
     private async Task<HashSet<int>> GetDescendantIdsAsync(int boxId, CancellationToken cancellationToken)

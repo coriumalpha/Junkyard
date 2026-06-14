@@ -17,6 +17,7 @@ public class CreateModel(InventoryDbContext db) : PageModel
     public List<SelectListItem> Locations { get; private set; } = [];
     public List<SelectListItem> ParentBoxes { get; private set; } = [];
     public List<SelectListItem> ContainerTypes { get; private set; } = [];
+    public SearchPickerModel ParentBoxPicker { get; private set; } = new();
     public string SuggestedCode { get; private set; } = Box.FormatCtCode(1);
 
     public async Task OnGetAsync(int? parentBoxId, CancellationToken cancellationToken)
@@ -94,6 +95,22 @@ public class CreateModel(InventoryDbContext db) : PageModel
             .Select(b => new SelectListItem($"{b.Code} · {Box.ContainerTypeLabelFor(b.ContainerType)} · {b.Name}", b.Id.ToString()))
             .ToListAsync(cancellationToken);
         ParentBoxes.Insert(0, new SelectListItem("Ninguno: contenedor de primer nivel", "0"));
+        ParentBoxPicker = new SearchPickerModel
+        {
+            InputName = "Input.ParentBoxId",
+            InputId = "Input_ParentBoxId",
+            Label = "Dentro de otro contenedor",
+            Placeholder = "Buscar por CT, nombre, tipo, ubicación o padre...",
+            SelectedValue = Input.ParentBoxId.ToString(),
+            EmptyLabel = "Primer nivel",
+            EmptyHint = "Este contenedor no estará dentro de otro.",
+            ClearValue = "0",
+            NoneOptionLabel = "Ninguno: contenedor de primer nivel",
+            NoneOptionHint = "Crea el contenedor en el nivel raíz.",
+            NoneOptionValue = "0",
+            NoneOptionIcon = "—",
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)
+        };
     }
 
     public class BoxInput

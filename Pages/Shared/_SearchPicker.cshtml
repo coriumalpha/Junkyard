@@ -1,0 +1,91 @@
+@model SearchPickerModel
+@{
+    var selected = Model.Options.FirstOrDefault(option => option.Value == (Model.SelectedValue ?? ""));
+}
+
+<div class="search-picker" data-search-picker data-empty-label="@Model.EmptyLabel" data-empty-hint="@Model.EmptyHint" data-clear-value="@Model.ClearValue">
+    <input type="hidden" id="@Model.InputId" name="@Model.InputName" value="@Model.SelectedValue" />
+    <div class="search-picker-head">
+        <label class="search-picker-label" for="@($"{Model.InputId}__search")">@Model.Label</label>
+        <button class="btn" type="button" data-picker-clear>Limpiar</button>
+    </div>
+    <div class="search-picker-current" data-picker-current>
+        @if (selected is not null)
+        {
+            <strong>@selected.Title</strong>
+            @if (!string.IsNullOrWhiteSpace(selected.Meta))
+            {
+                <small>@selected.Meta</small>
+            }
+            @if (!string.IsNullOrWhiteSpace(selected.Detail))
+            {
+                <small>@selected.Detail</small>
+            }
+        }
+        else
+        {
+            <strong>@Model.EmptyLabel</strong>
+            @if (!string.IsNullOrWhiteSpace(Model.EmptyHint))
+            {
+                <small>@Model.EmptyHint</small>
+            }
+        }
+    </div>
+    <div class="field">
+        <input id="@($"{Model.InputId}__search")" type="search" placeholder="@Model.Placeholder" autocomplete="off" data-picker-search />
+    </div>
+    <div class="search-picker-list" data-picker-list>
+        @if (!string.IsNullOrWhiteSpace(Model.NoneOptionLabel))
+        {
+            var isEmptySelected = (Model.SelectedValue ?? "") == Model.NoneOptionValue;
+            <button class="search-picker-option @(isEmptySelected ? "is-selected" : "")" type="button"
+                    data-picker-option
+                    data-value="@Model.NoneOptionValue"
+                    data-title="@Model.NoneOptionLabel"
+                    data-meta=""
+                    data-detail="@Model.NoneOptionHint"
+                    data-search="@Model.NoneOptionLabel @Model.NoneOptionHint">
+                <span class="search-picker-thumb fallback">@Model.NoneOptionIcon</span>
+                <span class="search-picker-copy">
+                    <strong>@Model.NoneOptionLabel</strong>
+                    @if (!string.IsNullOrWhiteSpace(Model.NoneOptionHint))
+                    {
+                        <small>@Model.NoneOptionHint</small>
+                    }
+                </span>
+            </button>
+        }
+        @foreach (var option in Model.Options)
+        {
+            var isSelected = option.Value == (Model.SelectedValue ?? "");
+            <button class="search-picker-option @(isSelected ? "is-selected" : "")" type="button"
+                    data-picker-option
+                    data-value="@option.Value"
+                    data-title="@option.Title"
+                    data-meta="@option.Meta"
+                    data-detail="@option.Detail"
+                    data-search="@option.SearchText">
+                @if (!string.IsNullOrWhiteSpace(option.ThumbnailUrl))
+                {
+                    <img class="search-picker-thumb" src="@option.ThumbnailUrl" alt="@option.Title" loading="lazy" decoding="async" />
+                }
+                else
+                {
+                    <span class="search-picker-thumb fallback">@option.Icon</span>
+                }
+                <span class="search-picker-copy">
+                    <strong>@option.Title</strong>
+                    @if (!string.IsNullOrWhiteSpace(option.Meta))
+                    {
+                        <small>@option.Meta</small>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(option.Detail))
+                    {
+                        <small>@option.Detail</small>
+                    }
+                </span>
+            </button>
+        }
+        <div class="search-picker-empty" data-picker-empty hidden>Sin resultados para ese filtro.</div>
+    </div>
+</div>

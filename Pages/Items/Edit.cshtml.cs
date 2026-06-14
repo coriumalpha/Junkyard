@@ -21,6 +21,7 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
     public string? Caption { get; set; }
 
     public List<SelectListItem> Boxes { get; private set; } = [];
+    public SearchPickerModel BoxPicker { get; private set; } = new();
     public List<Photo> Gallery { get; private set; } = [];
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
     public string[] Categories => CsvInventoryService.Categories;
@@ -391,6 +392,22 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
             .Select(b => new SelectListItem($"{b.Code} · {Box.ContainerTypeLabelFor(b.ContainerType)} · {b.Name}", b.Id.ToString()))
             .ToListAsync(cancellationToken);
         Boxes.Insert(0, new SelectListItem("Sin contenedor / huérfano", "0"));
+        BoxPicker = new SearchPickerModel
+        {
+            InputName = "Input.BoxId",
+            InputId = "Input_BoxId",
+            Label = "Contenedor",
+            Placeholder = "Buscar por CT, nombre, tipo, ubicación o padre...",
+            SelectedValue = Input.BoxId.ToString(),
+            EmptyLabel = "Sin contenedor / huérfano",
+            EmptyHint = "El ítem quedará fuera de contenedor.",
+            ClearValue = "0",
+            NoneOptionLabel = "Sin contenedor / huérfano",
+            NoneOptionHint = "Mueve el ítem fuera de cualquier contenedor.",
+            NoneOptionValue = "0",
+            NoneOptionIcon = "—",
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)
+        };
         CoverPhotoFilename ??= await db.Items.AsNoTracking()
             .Where(i => i.Id == itemId)
             .Select(i => i.CoverPhoto)

@@ -15,6 +15,8 @@ public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageMode
     public PhotoInbox? Current { get; private set; }
     public List<SelectListItem> Boxes { get; private set; } = [];
     public List<SelectListItem> Items { get; private set; } = [];
+    public SearchPickerModel BoxPicker { get; private set; } = new();
+    public SearchPickerModel ItemPicker { get; private set; } = new();
     public string[] Categories => CsvInventoryService.Categories;
     public int PendingCount { get; private set; }
     public int ProcessedCount { get; private set; }
@@ -243,24 +245,56 @@ public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageMode
         Pending = await LoadFilmstripAsync(orderedIds, currentId, cancellationToken);
         PendingCount = await db.PhotoInboxes.CountAsync(p => p.Status == PhotoInboxStatus.Pending, cancellationToken);
         ProcessedCount = await db.PhotoInboxes.CountAsync(p => p.Status != PhotoInboxStatus.Pending, cancellationToken);
+
+        if (Current is not null)
+        {
+            Input.CurrentId = Current.Id;
+            Input.BoxId ??= Current.SourceBoxId;
+            if (Input.Quantity <= 0)
+            {
+                Input.Quantity = 1;
+            }
+
+            if (string.IsNullOrWhiteSpace(Input.Category))
+            {
+                Input.Category = "Otros";
+            }
+
+            Input.SelectedIds = string.IsNullOrWhiteSpace(Input.SelectedIds) ? Current.Id.ToString() : Input.SelectedIds;
+        }
+
         Boxes = await db.Boxes.AsNoTracking().OrderBy(b => b.Code)
             .Select(b => new SelectListItem($"{b.Code} · {b.Name}", b.Id.ToString()))
             .ToListAsync(cancellationToken);
         Items = await db.Items.AsNoTracking().Include(i => i.Box)
             .OrderByDescending(i => Current != null && i.BoxId == Current.SourceBoxId)
             .ThenBy(i => i.Name)
-            .Take(80)
             .Select(i => new SelectListItem($"{(i.Box != null ? i.Box.Code : "SIN CAJA")} · {i.Name}", i.Id.ToString()))
             .ToListAsync(cancellationToken);
-
-        if (Current is not null)
+        BoxPicker = new SearchPickerModel
         {
-            Input.CurrentId = Current.Id;
-            Input.BoxId = Current.SourceBoxId;
-            Input.Quantity = 1;
-            Input.Category = "Otros";
-            Input.SelectedIds = Current.Id.ToString();
-        }
+            InputName = "Input.BoxId",
+            InputId = "Input_BoxId",
+            Label = "Caja para B / objeto nuevo",
+            Placeholder = "Buscar por CT, nombre, tipo, ubicación o padre...",
+            SelectedValue = Input.BoxId?.ToString(),
+            EmptyLabel = "Sin caja seleccionada",
+            EmptyHint = "Elige un contenedor antes de asociar o crear.",
+            ClearValue = "",
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)
+        };
+        ItemPicker = new SearchPickerModel
+        {
+            InputName = "Input.ItemId",
+            InputId = "Input_ItemId",
+            Label = "Objeto",
+            Placeholder = "Buscar por nombre, categoría o contenedor...",
+            SelectedValue = Input.ItemId?.ToString(),
+            EmptyLabel = "Sin objeto seleccionado",
+            EmptyHint = "Filtra y elige el objeto al que asociar la foto.",
+            ClearValue = "",
+            Options = await SearchPickerFactory.BuildItemOptionsAsync(db, cancellationToken, Current?.SourceBoxId)
+        };
     }
 
     private async Task<List<PhotoInbox>> LoadFilmstripAsync(List<int> orderedIds, int currentId, CancellationToken cancellationToken)
