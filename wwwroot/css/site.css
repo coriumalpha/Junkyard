@@ -570,6 +570,11 @@ a.box-breadcrumb-node:hover {
   gap: 14px;
   align-items: center;
 }
+.inventory-context-actions {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
 .inventory-group {
   display: grid;
   gap: 14px;
@@ -710,6 +715,7 @@ th { color: var(--text-muted); font-size: var(--font-caption); }
   .inventory-group-cover { width: 92px; }
   .inventory-group-head .actions { grid-column: 1 / -1; }
   .inventory-context { grid-template-columns: 1fr; }
+  .inventory-context-actions { justify-items: start; }
   .inventory-row { grid-template-columns: 82px minmax(0, 1fr); }
   .inventory-location { grid-column: 1 / -1; justify-items: start; text-align: left; }
   .orphan-row .actions { grid-column: 1 / -1; }

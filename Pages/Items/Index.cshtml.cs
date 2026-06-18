@@ -17,14 +17,16 @@ public class IndexModel(InventoryDbContext db) : PageModel
     public string BoxCode { get; private set; } = "";
     public bool IncludeChildren { get; private set; }
     public Box? SelectedBox { get; private set; }
+    public string ViewMode { get; private set; } = "grouped";
     public List<string> Categories { get; private set; } = [];
 
-    public async Task OnGetAsync(string? q, string? category, string? box, bool includeChildren, CancellationToken cancellationToken)
+    public async Task OnGetAsync(string? q, string? category, string? box, bool includeChildren, string? view, CancellationToken cancellationToken)
     {
         Query = (q ?? "").Trim();
         Category = (category ?? "").Trim();
         BoxCode = Box.NormalizePublicCode(box);
         IncludeChildren = includeChildren;
+        ViewMode = string.Equals(view, "flat", StringComparison.OrdinalIgnoreCase) ? "flat" : "grouped";
 
         var query = db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
@@ -171,4 +173,6 @@ public class IndexModel(InventoryDbContext db) : PageModel
 
     public string SelectedBoxPath =>
         SelectedBox is null ? "" : BuildBoxPath(SelectedBox);
+
+    public bool IsFlatView => ViewMode == "flat";
 }

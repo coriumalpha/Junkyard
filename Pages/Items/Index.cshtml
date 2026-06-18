@@ -7,11 +7,14 @@
 <div class="section-title">
     <div>
         <h1>Inventario</h1>
-        <p class="section-kicker">Vista completa por contenedor, con prioridad visual para las fotografías.</p>
+        <p class="section-kicker">Consulta operativa de ítems, en vista plana o agrupada por contenedor.</p>
     </div>
     <div class="chips">
         <span class="chip">@Model.Items.Count ítems</span>
-        <span class="chip">@Model.Groups.Count contenedores</span>
+        @if (!Model.IsFlatView)
+        {
+            <span class="chip">@Model.Groups.Count contenedores</span>
+        }
     </div>
 </div>
 
@@ -32,6 +35,7 @@
     </div>
     <input type="hidden" name="box" value="@Model.BoxCode" />
     <input type="hidden" name="includeChildren" value="@(Model.IncludeChildren ? "true" : "false")" />
+    <input type="hidden" name="view" value="@Model.ViewMode" />
     <div class="actions inventory-filter-actions">
         <button class="btn primary" type="submit">Filtrar</button>
         <a class="btn" asp-page="/Items/Index">Limpiar</a>
@@ -55,71 +59,64 @@
                 <div class="chips">
                     <span class="chip">@Model.SelectedBox.ContainerTypeLabel</span>
                     <span class="chip">@Model.SelectedBox.Location?.Name</span>
-                    <span class="chip">@(Model.IncludeChildren ? "Incluye subcontenedores" : "Sólo contenido directo")</span>
+                    <span class="chip">@(Model.IncludeChildren ? "Incluye subcontenedores" : "Sólo este CT")</span>
+                    <span class="chip">@(Model.IsFlatView ? "Vista plana" : "Agrupado por contenedor")</span>
                 </div>
             }
         </div>
-        <div class="actions">
+        <div class="inventory-context-actions">
             @if (Model.SelectedBox is not null)
             {
-                <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.SelectedBox.Code">Volver a ficha</a>
-                <a class="btn @(Model.IncludeChildren ? "" : "primary")"
-                   asp-page="/Items/Index"
-                   asp-route-box="@Model.SelectedBox.Code"
-                   asp-route-includeChildren="false"
-                   asp-route-q="@Model.Query"
-                   asp-route-category="@Model.Category">Sólo directo</a>
-                <a class="btn @(Model.IncludeChildren ? "primary" : "")"
-                   asp-page="/Items/Index"
-                   asp-route-box="@Model.SelectedBox.Code"
-                   asp-route-includeChildren="true"
-                   asp-route-q="@Model.Query"
-                   asp-route-category="@Model.Category">Incluir subcontenedores</a>
+                <div class="actions">
+                    <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.SelectedBox.Code">Volver a ficha</a>
+                    <a class="btn @(Model.IncludeChildren ? "" : "primary")"
+                       asp-page="/Items/Index"
+                       asp-route-box="@Model.SelectedBox.Code"
+                       asp-route-includeChildren="false"
+                       asp-route-view="@Model.ViewMode"
+                       asp-route-q="@Model.Query"
+                       asp-route-category="@Model.Category">Sólo este CT</a>
+                    <a class="btn @(Model.IncludeChildren ? "primary" : "")"
+                       asp-page="/Items/Index"
+                       asp-route-box="@Model.SelectedBox.Code"
+                       asp-route-includeChildren="true"
+                       asp-route-view="@Model.ViewMode"
+                       asp-route-q="@Model.Query"
+                       asp-route-category="@Model.Category">Incluir subcontenedores</a>
+                </div>
+                <div class="actions">
+                    <a class="btn @(Model.IsFlatView ? "primary" : "")"
+                       asp-page="/Items/Index"
+                       asp-route-box="@Model.SelectedBox.Code"
+                       asp-route-includeChildren="@(Model.IncludeChildren ? "true" : "false")"
+                       asp-route-view="flat"
+                       asp-route-q="@Model.Query"
+                       asp-route-category="@Model.Category">Vista plana</a>
+                    <a class="btn @(!Model.IsFlatView ? "primary" : "")"
+                       asp-page="/Items/Index"
+                       asp-route-box="@Model.SelectedBox.Code"
+                       asp-route-includeChildren="@(Model.IncludeChildren ? "true" : "false")"
+                       asp-route-view="grouped"
+                       asp-route-q="@Model.Query"
+                       asp-route-category="@Model.Category">Agrupado por contenedor</a>
+                </div>
             }
         </div>
     </section>
 }
 
 <div class="inventory-board stack-top">
-    @foreach (var group in Model.Groups)
+    @if (Model.IsFlatView)
     {
-        <section class="inventory-group @(group.IsOrphanGroup ? "orphan-group" : "")">
-            <div class="inventory-group-head">
-                <div class="inventory-group-cover">
-                    @if (group.CoverPhoto is string cover)
-                    {
-                        <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(cover))" src="@Model.ThumbUrl(cover)" alt="@group.Name" loading="lazy" decoding="async" />
-                    }
-                    else
-                    {
-                        <span>@group.Code[..1]</span>
-                    }
-                </div>
-                <div class="inventory-group-title">
-                    <div class="chips">
-                        <span class="chip @(group.IsOrphanGroup ? "danger" : "good")">@group.Code</span>
-                        <span class="chip">@group.Items.Count ítems</span>
-                        <span class="chip">@group.PhotoCount fotos</span>
-                    </div>
-                    <h2>@group.Name</h2>
-                    <p class="caption">@group.Path</p>
-                    @if (!string.IsNullOrWhiteSpace(group.LocationName))
-                    {
-                        <p class="caption">@group.LocationName</p>
-                    }
-                </div>
-                <div class="actions">
-                    @if (group.BoxId is int boxId && !group.IsOrphanGroup)
-                    {
-                        var boxCode = group.Code;
-                        <a class="btn" asp-page="/Items/Index" asp-route-box="@boxCode" asp-route-includeChildren="false">Inventario directo</a>
-                        <a class="btn" asp-page="/Boxes/Details" asp-route-code="@boxCode">Abrir caja</a>
-                    }
+        <section class="inventory-group">
+            <div class="section-header compact">
+                <div>
+                    <h2>Ítems aplanados</h2>
+                    <p class="section-kicker">Todos los ítems del alcance actual en una sola vista operativa.</p>
                 </div>
             </div>
-
             <div class="inventory-photo-grid">
-                @foreach (var item in group.Items)
+                @foreach (var item in Model.Items)
                 {
                     <a class="inventory-photo-card" asp-page="/Items/Edit" asp-route-id="@item.Id">
                         @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
@@ -133,7 +130,12 @@
                         <span class="inventory-photo-body">
                             <strong>@item.Name</strong>
                             <small>@item.Category · @item.Quantity @item.Unit</small>
+                            <small>@Inventario.Pages.Items.IndexModel.BuildBoxPath(item.Box)</small>
                             <span class="chips">
+                                @if (item.Box is not null)
+                                {
+                                    <span class="chip good">@item.Box.Code</span>
+                                }
                                 @if (item.Consumable)
                                 {
                                     <span class="chip @(item.MinQuantity != null && item.Quantity <= item.MinQuantity ? "danger" : "good")">stock</span>
@@ -152,6 +154,81 @@
                 }
             </div>
         </section>
+    }
+    else
+    {
+        @foreach (var group in Model.Groups)
+        {
+            <section class="inventory-group @(group.IsOrphanGroup ? "orphan-group" : "")">
+                <div class="inventory-group-head">
+                    <div class="inventory-group-cover">
+                        @if (group.CoverPhoto is string cover)
+                        {
+                            <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(cover))" src="@Model.ThumbUrl(cover)" alt="@group.Name" loading="lazy" decoding="async" />
+                        }
+                        else
+                        {
+                            <span>@group.Code[..1]</span>
+                        }
+                    </div>
+                    <div class="inventory-group-title">
+                        <div class="chips">
+                            <span class="chip @(group.IsOrphanGroup ? "danger" : "good")">@group.Code</span>
+                            <span class="chip">@group.Items.Count ítems</span>
+                            <span class="chip">@group.PhotoCount fotos</span>
+                        </div>
+                        <h2>@group.Name</h2>
+                        <p class="caption">@group.Path</p>
+                        @if (!string.IsNullOrWhiteSpace(group.LocationName))
+                        {
+                            <p class="caption">@group.LocationName</p>
+                        }
+                    </div>
+                    <div class="actions">
+                        @if (group.BoxId is int boxId && !group.IsOrphanGroup)
+                        {
+                            var boxCode = group.Code;
+                            <a class="btn" asp-page="/Items/Index" asp-route-box="@boxCode" asp-route-includeChildren="true" asp-route-view="flat">Inventario directo</a>
+                            <a class="btn" asp-page="/Boxes/Details" asp-route-code="@boxCode">Abrir caja</a>
+                        }
+                    </div>
+                </div>
+
+                <div class="inventory-photo-grid">
+                    @foreach (var item in group.Items)
+                    {
+                        <a class="inventory-photo-card" asp-page="/Items/Edit" asp-route-id="@item.Id">
+                            @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
+                            {
+                                <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
+                            }
+                            else
+                            {
+                                <span class="inventory-photo-empty">@item.Name[..1]</span>
+                            }
+                            <span class="inventory-photo-body">
+                                <strong>@item.Name</strong>
+                                <small>@item.Category · @item.Quantity @item.Unit</small>
+                                <span class="chips">
+                                    @if (item.Consumable)
+                                    {
+                                        <span class="chip @(item.MinQuantity != null && item.Quantity <= item.MinQuantity ? "danger" : "good")">stock</span>
+                                    }
+                                    @if (item.Sentimental)
+                                    {
+                                        <span class="chip good">recuerdo</span>
+                                    }
+                                    @if (item.Obsolete)
+                                    {
+                                        <span class="chip warn">legacy</span>
+                                    }
+                                </span>
+                            </span>
+                        </a>
+                    }
+                </div>
+            </section>
+        }
     }
     @if (Model.Items.Count == 0)
     {
