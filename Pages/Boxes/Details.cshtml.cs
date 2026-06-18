@@ -14,7 +14,9 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
     public List<Photo> Gallery { get; private set; } = [];
     public List<SelectListItem> Boxes { get; private set; } = [];
     public SearchPickerModel BulkBoxPicker { get; private set; } = new();
+    public SearchPickerModel MoveBoxPicker { get; private set; } = new();
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
+    public List<BoxBreadcrumbSegment> Breadcrumb { get; private set; } = [];
     public string[] Categories => CsvInventoryService.Categories;
     public string QrSvg { get; private set; } = "";
 
@@ -26,6 +28,9 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
 
     [BindProperty]
     public BulkEditInput BulkEdit { get; set; } = new();
+
+    [BindProperty]
+    public int MoveTargetBoxId { get; set; }
 
     public async Task<IActionResult> OnGetAsync(string code, CancellationToken cancellationToken)
     {
@@ -107,6 +112,59 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        return RedirectToPage(new { code });
+    }
+
+    public async Task<IActionResult> OnPostMoveAsync(string code, CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes.FirstOrDefaultAsync(b => b.Code == code, cancellationToken);
+        if (box is null)
+        {
+            return NotFound();
+        }
+
+        if (MoveTargetBoxId <= 0)
+        {
+            TempData["HierarchyError"] = "Selecciona un contenedor destino.";
+            return RedirectToPage(new { code });
+        }
+
+        if (box.ParentBoxId == MoveTargetBoxId)
+        {
+            TempData["HierarchyMessage"] = "Ese contenedor ya estaba en ese destino.";
+            return RedirectToPage(new { code });
+        }
+
+        var validation = await BoxHierarchyService.ValidateParentAssignmentAsync(db, box.Id, MoveTargetBoxId, cancellationToken);
+        if (!validation.IsValid)
+        {
+            TempData["HierarchyError"] = validation.ErrorMessage;
+            return RedirectToPage(new { code });
+        }
+
+        box.ParentBoxId = MoveTargetBoxId;
+        await db.SaveChangesAsync(cancellationToken);
+        TempData["HierarchyMessage"] = "Contenedor movido.";
+        return RedirectToPage(new { code });
+    }
+
+    public async Task<IActionResult> OnPostMoveToRootAsync(string code, CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes.FirstOrDefaultAsync(b => b.Code == code, cancellationToken);
+        if (box is null)
+        {
+            return NotFound();
+        }
+
+        if (box.ParentBoxId is null)
+        {
+            TempData["HierarchyMessage"] = "Ese contenedor ya estaba en raíz.";
+            return RedirectToPage(new { code });
+        }
+
+        box.ParentBoxId = null;
+        await db.SaveChangesAsync(cancellationToken);
+        TempData["HierarchyMessage"] = "Contenedor sacado a raíz.";
         return RedirectToPage(new { code });
     }
 
@@ -282,6 +340,7 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
             return false;
         }
 
+        Breadcrumb = await BoxHierarchyService.BuildBreadcrumbAsync(db, Box, cancellationToken);
         Gallery = await db.Photos.AsNoTracking()
             .Where(p => p.EntityType == PhotoEntityType.Box && p.EntityId == Box.Id)
             .OrderByDescending(p => Box.CoverPhoto != null && p.Filename == Box.CoverPhoto)
@@ -307,6 +366,20 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
             NoneOptionValue = "0",
             NoneOptionIcon = "—",
             Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)
+        };
+        var excluded = await BoxHierarchyService.GetDescendantIdsAsync(db, Box.Id, cancellationToken);
+        excluded.Add(Box.Id);
+        MoveBoxPicker = new SearchPickerModel
+        {
+            InputName = nameof(MoveTargetBoxId),
+            InputId = nameof(MoveTargetBoxId),
+            Label = "Mover a…",
+            Placeholder = "Buscar CT destino, nombre o ubicación...",
+            SelectedValue = MoveTargetBoxId > 0 ? MoveTargetBoxId.ToString() : null,
+            EmptyLabel = "Sin destino seleccionado",
+            EmptyHint = "Elige el contenedor donde debe quedar este nodo físico.",
+            ClearValue = "",
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken, excluded)
         };
         var filenames = Box.Items.Select(i => i.CoverPhoto)
             .Concat(Box.ChildBoxes.Select(b => b.CoverPhoto))

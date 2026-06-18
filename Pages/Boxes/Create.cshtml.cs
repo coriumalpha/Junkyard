@@ -48,6 +48,16 @@ public class CreateModel(InventoryDbContext db) : PageModel
             ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.Code)}", "Ese CT ya existe.");
         }
 
+        int? parentBoxId = Input.ParentBoxId == 0 ? null : Input.ParentBoxId;
+        if (parentBoxId is not null)
+        {
+            var parentExists = await db.Boxes.AsNoTracking().AnyAsync(b => b.Id == parentBoxId.Value, cancellationToken);
+            if (!parentExists)
+            {
+                ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.ParentBoxId)}", "El contenedor padre ya no existe.");
+            }
+        }
+
         if (!ModelState.IsValid)
         {
             await LoadSelects(cancellationToken);
@@ -62,7 +72,7 @@ public class CreateModel(InventoryDbContext db) : PageModel
             ContainerType = Box.NormalizeContainerType(Input.ContainerType),
             Description = Input.Description,
             LocationId = Input.LocationId,
-            ParentBoxId = Input.ParentBoxId == 0 ? null : Input.ParentBoxId,
+            ParentBoxId = parentBoxId,
             Status = Input.Status
         };
         db.Boxes.Add(box);

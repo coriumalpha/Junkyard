@@ -10,6 +10,8 @@ public class IndexModel(InventoryDbContext db) : PageModel
 {
     public List<Box> Boxes { get; private set; } = [];
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
+    public IEnumerable<Box> RootBoxes => Boxes.Where(b => b.ParentBox is null).OrderBy(b => b.Code);
+    public IEnumerable<Box> NestedBoxes => Boxes.Where(b => b.ParentBox is not null).OrderBy(b => b.ParentBox!.Code).ThenBy(b => b.Code);
 
     public async Task OnGetAsync(string? status, CancellationToken cancellationToken)
     {

@@ -12,46 +12,119 @@
     <a class="btn primary" asp-page="/Boxes/Create">Nuevo contenedor</a>
 </div>
 
-<div class="grid cards">
-    @foreach (var box in Model.Boxes)
-    {
-        var itemLabel = box.Items.Count == 1 ? "1 ítem" : $"{box.Items.Count} ítems";
-        <a class="card box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
-            @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
+@if (Model.Boxes.Count == 0)
+{
+    <div class="empty full">
+        <strong>No hay contenedores todavía.</strong>
+        <span>Crea uno para empezar a organizar objetos por soportes físicos reales.</span>
+        <div class="actions stack-top"><a class="btn primary" asp-page="/Boxes/Create">Crear contenedor</a></div>
+    </div>
+}
+else
+{
+    <section class="stack-top">
+        <div class="section-title">
+            <div>
+                <h2>Contenedores raíz</h2>
+                <p class="section-kicker">Nodos de primer nivel, fuera de otros contenedores.</p>
+            </div>
+            <span class="chip">@Model.RootBoxes.Count()</span>
+        </div>
+        <div class="grid cards">
+            @foreach (var box in Model.RootBoxes)
             {
-                <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@Model.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
-            }
-            else
-            {
-                <div class="box-cover generated-cover">
-                    <div class="cover-code">@box.Code</div>
-                    <div class="cover-meta">
-                        <span>@box.Location?.Name</span>
-                        <span>@itemLabel</span>
+                var itemLabel = box.Items.Count == 1 ? "1 ítem" : $"{box.Items.Count} ítems";
+                <a class="card box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
+                    @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
+                    {
+                        <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@Model.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
+                    }
+                    else
+                    {
+                        <div class="box-cover generated-cover">
+                            <div class="cover-code">@box.Code</div>
+                            <div class="cover-meta">
+                                <span>@box.Location?.Name</span>
+                                <span>@itemLabel</span>
+                            </div>
+                        </div>
+                    }
+                    <div class="card-body">
+                        <div class="chips">
+                            <span class="chip good">@box.Code</span>
+                            <span class="chip">@box.ContainerTypeLabel</span>
+                            <span class="chip">@box.Status</span>
+                        </div>
+                        <h3>@box.Name</h3>
+                        <p class="box-card-meta"><span>@box.Location?.Name</span><span>@itemLabel</span></p>
+                        <div class="chips">
+                            <span class="chip">Raíz</span>
+                            @if (box.ChildBoxes.Count > 0)
+                            {
+                                <span class="chip">@box.ChildBoxes.Count dentro</span>
+                            }
+                        </div>
                     </div>
-                </div>
+                </a>
             }
-            <div class="card-body">
-                <div class="chips">
-                    <span class="chip good">@box.Code</span>
-                    <span class="chip">@box.ContainerTypeLabel</span>
-                    <span class="chip">@box.Status</span>
-                </div>
-                <h3>@box.Name</h3>
-                <p class="box-card-meta"><span>@(box.ParentBox is null ? box.Location?.Name : $"en {box.ParentBox.Code}")</span><span>@itemLabel</span></p>
-                @if (box.ChildBoxes.Count > 0)
+        </div>
+    </section>
+
+    <section class="stack-top">
+        <div class="section-title">
+            <div>
+                <h2>Dentro de otros contenedores</h2>
+                <p class="section-kicker">Subcontenedores organizados bajo un CT padre.</p>
+            </div>
+            <span class="chip">@Model.NestedBoxes.Count()</span>
+        </div>
+        @if (!Model.NestedBoxes.Any())
+        {
+            <div class="empty">
+                <strong>Aún no hay subcontenedores.</strong>
+                <span>Crea uno desde la ficha de un contenedor o desde el alta general.</span>
+            </div>
+        }
+        else
+        {
+            <div class="grid cards">
+                @foreach (var box in Model.NestedBoxes)
                 {
-                    <span class="chip">@box.ChildBoxes.Count dentro</span>
+                    var itemLabel = box.Items.Count == 1 ? "1 ítem" : $"{box.Items.Count} ítems";
+                    <a class="card box-card nested-box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
+                        @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
+                        {
+                            <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@Model.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
+                        }
+                        else
+                        {
+                            <div class="box-cover generated-cover">
+                                <div class="cover-code">@box.Code</div>
+                                <div class="cover-meta">
+                                    <span>@box.ParentBox?.Code</span>
+                                    <span>@itemLabel</span>
+                                </div>
+                            </div>
+                        }
+                        <div class="card-body">
+                            <div class="chips">
+                                <span class="chip good">@box.Code</span>
+                                <span class="chip">@box.ContainerTypeLabel</span>
+                                <span class="chip">@box.Status</span>
+                            </div>
+                            <h3>@box.Name</h3>
+                            <p class="box-card-meta"><span>Dentro de @box.ParentBox?.Code / @box.ParentBox?.Name</span><span>@itemLabel</span></p>
+                            <div class="chips">
+                                <span class="chip">@box.Location?.Name</span>
+                                @if (box.ChildBoxes.Count > 0)
+                                {
+                                    <span class="chip">@box.ChildBoxes.Count dentro</span>
+                                }
+                            </div>
+                        </div>
+                    </a>
                 }
             </div>
-        </a>
-    }
-    @if (Model.Boxes.Count == 0)
-    {
-        <div class="empty full">
-            <strong>No hay contenedores todavía.</strong>
-            <span>Crea uno para empezar a organizar objetos por soportes físicos reales.</span>
-            <div class="actions stack-top"><a class="btn primary" asp-page="/Boxes/Create">Crear contenedor</a></div>
-        </div>
-    }
-</div>
+        }
+    </section>
+}

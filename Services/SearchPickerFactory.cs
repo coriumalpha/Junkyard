@@ -37,7 +37,7 @@ public static class SearchPickerFactory
             Value = b.Id.ToString(),
             Title = $"{b.Code} · {b.Name}",
             Meta = $"{Box.ContainerTypeLabelFor(b.ContainerType)}{(string.IsNullOrWhiteSpace(b.LocationName) ? "" : $" · {b.LocationName}")}",
-            Detail = string.IsNullOrWhiteSpace(b.ParentCode) ? "Primer nivel" : $"Dentro de {b.ParentCode} · {b.ParentName}",
+            Detail = string.IsNullOrWhiteSpace(b.ParentCode) ? "Contenedor raíz" : $"Dentro de {b.ParentCode} / {b.ParentName}",
             ThumbnailUrl = string.IsNullOrWhiteSpace(b.CoverPhoto) ? null : PhotoStorage.ThumbUrl(b.CoverPhoto),
             Icon = "CT",
             SearchText = $"{b.Code} {b.Name} {b.ContainerType} {b.LocationName} {b.ParentCode} {b.ParentName}"

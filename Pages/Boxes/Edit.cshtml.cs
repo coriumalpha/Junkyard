@@ -56,6 +56,13 @@ public class EditModel(InventoryDbContext db) : PageModel
             ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.Code)}", "Ese CT ya existe.");
         }
 
+        int? parentBoxId = Input.ParentBoxId == 0 ? null : Input.ParentBoxId;
+        var parentValidation = await BoxHierarchyService.ValidateParentAssignmentAsync(db, Input.Id, parentBoxId, cancellationToken);
+        if (!parentValidation.IsValid)
+        {
+            ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.ParentBoxId)}", parentValidation.ErrorMessage!);
+        }
+
         if (!ModelState.IsValid)
         {
             await LoadSelects(Input.Id, cancellationToken);
@@ -73,7 +80,7 @@ public class EditModel(InventoryDbContext db) : PageModel
         box.ContainerType = Box.NormalizeContainerType(Input.ContainerType);
         box.Description = Input.Description;
         box.LocationId = Input.LocationId;
-        box.ParentBoxId = Input.ParentBoxId == 0 ? null : Input.ParentBoxId;
+        box.ParentBoxId = parentBoxId;
         box.Status = Input.Status;
         try
         {
@@ -99,7 +106,7 @@ public class EditModel(InventoryDbContext db) : PageModel
             .Select(l => new SelectListItem(l.Name, l.Id.ToString()))
             .ToListAsync(cancellationToken);
 
-        var excluded = await GetDescendantIdsAsync(currentBoxId, cancellationToken);
+        var excluded = await BoxHierarchyService.GetDescendantIdsAsync(db, currentBoxId, cancellationToken);
         excluded.Add(currentBoxId);
         ParentBoxes = await db.Boxes.AsNoTracking()
             .Where(b => !excluded.Contains(b.Id))
@@ -123,30 +130,6 @@ public class EditModel(InventoryDbContext db) : PageModel
             NoneOptionIcon = "—",
             Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken, excluded)
         };
-    }
-
-    private async Task<HashSet<int>> GetDescendantIdsAsync(int boxId, CancellationToken cancellationToken)
-    {
-        var links = await db.Boxes.AsNoTracking()
-            .Where(b => b.ParentBoxId != null)
-            .Select(b => new { b.Id, ParentId = b.ParentBoxId!.Value })
-            .ToListAsync(cancellationToken);
-        var descendants = new HashSet<int>();
-        var queue = new Queue<int>(links.Where(x => x.ParentId == boxId).Select(x => x.Id));
-        while (queue.TryDequeue(out var id))
-        {
-            if (!descendants.Add(id))
-            {
-                continue;
-            }
-
-            foreach (var childId in links.Where(x => x.ParentId == id).Select(x => x.Id))
-            {
-                queue.Enqueue(childId);
-            }
-        }
-
-        return descendants;
     }
 
     public class BoxInput

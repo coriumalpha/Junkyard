@@ -6,6 +6,43 @@
 
 <section class="detail-hero">
     <div>
+        @if (TempData["HierarchyMessage"] is string hierarchyMessage)
+        {
+            <div class="notice toast stack-top">@hierarchyMessage</div>
+        }
+        @if (TempData["HierarchyError"] is string hierarchyError)
+        {
+            <div class="notice danger-zone toast stack-top">@hierarchyError</div>
+        }
+        @if (Model.Breadcrumb.Count > 0)
+        {
+            <nav class="box-breadcrumb" aria-label="Ruta del contenedor">
+                <span class="eyebrow">Ruta física</span>
+                <div class="box-breadcrumb-trail">
+                    @for (var i = 0; i < Model.Breadcrumb.Count; i++)
+                    {
+                        var segment = Model.Breadcrumb[i];
+                        if (!segment.IsLocation && segment.BoxId == Model.Box.Id)
+                        {
+                            <span class="box-breadcrumb-node current">@(!string.IsNullOrWhiteSpace(segment.Code) ? $"{segment.Code} · {segment.Label}" : segment.Label)</span>
+                        }
+                        else if (!segment.IsLocation && !string.IsNullOrWhiteSpace(segment.Code))
+                        {
+                            <a class="box-breadcrumb-node" asp-page="/Boxes/Details" asp-route-code="@segment.Code">@segment.Code · @segment.Label</a>
+                        }
+                        else
+                        {
+                            <span class="box-breadcrumb-node">@segment.Label</span>
+                        }
+
+                        @if (i < Model.Breadcrumb.Count - 1)
+                        {
+                            <span class="box-breadcrumb-separator">/</span>
+                        }
+                    }
+                </div>
+            </nav>
+        }
         <div class="chips">
             <span class="chip good">@Model.Box.Code</span>
             <span class="chip">@Model.Box.ContainerTypeLabel</span>
@@ -13,14 +50,18 @@
             <span class="chip">@Model.Box.Location?.Name</span>
             @if (Model.Box.ParentBox is not null)
             {
-                <a class="chip" asp-page="/Boxes/Details" asp-route-code="@Model.Box.ParentBox.Code">Dentro de @Model.Box.ParentBox.Code</a>
+                <a class="chip" asp-page="/Boxes/Details" asp-route-code="@Model.Box.ParentBox.Code">Dentro de @Model.Box.ParentBox.Code / @Model.Box.ParentBox.Name</a>
+            }
+            else
+            {
+                <span class="chip">En raíz</span>
             }
         </div>
         <h1>@Model.Box.Name</h1>
         <p class="muted">@Model.Box.Description</p>
         <div class="actions">
             <a class="btn primary" asp-page="/Items/Create" asp-route-boxId="@Model.Box.Id">Añadir ítem</a>
-            <a class="btn" asp-page="/Boxes/Create" asp-route-parentBoxId="@Model.Box.Id">Añadir contenedor hijo</a>
+            <a class="btn" asp-page="/Boxes/Create" asp-route-parentBoxId="@Model.Box.Id">Crear subcontenedor</a>
             <a class="btn" asp-page="/Boxes/Edit" asp-route-id="@Model.Box.Id">Editar contenedor</a>
         </div>
     </div>
@@ -109,8 +150,14 @@
             @if (Model.Box.ChildBoxes.Count > 0)
             {
                 <div class="section-title">
-                    <h2>Contenedores dentro</h2>
-                    <span class="chip">@Model.Box.ChildBoxes.Count</span>
+                    <div>
+                        <h2>Subcontenedores</h2>
+                        <p class="section-kicker">Contenedores hijos directos dentro de este nodo.</p>
+                    </div>
+                    <div class="actions">
+                        <span class="chip">@Model.Box.ChildBoxes.Count</span>
+                        <a class="btn" asp-page="/Boxes/Create" asp-route-parentBoxId="@Model.Box.Id">Crear subcontenedor</a>
+                    </div>
                 </div>
                 <div class="box-content-grid">
                     @foreach (var child in Model.Box.ChildBoxes)
@@ -125,9 +172,10 @@
                             {
                                 <div class="box-item-photo generated">@child.Code[..1]</div>
                             }
-                            <span class="box-item-body">
+                                <span class="box-item-body">
                                 <span class="chips"><span class="chip good">@child.Code</span><span class="chip">@child.ContainerTypeLabel</span></span>
                                 <h3>@child.Name</h3>
+                                <p class="caption">Dentro de @Model.Box.Code / @Model.Box.Name</p>
                                 <p class="caption">@itemLabel</p>
                             </span>
                         </a>
@@ -186,6 +234,38 @@
     </section>
 
     <aside>
+        <section class="panel" id="hierarchy-actions">
+            <div class="section-header compact">
+                <div>
+                    <h2>Jerarquía</h2>
+                    <p class="section-kicker">Mover este contenedor como un nodo del árbol físico.</p>
+                </div>
+            </div>
+            @if (Model.MoveBoxPicker.Options.Count == 0)
+            {
+                <div class="empty">
+                    <strong>No hay destinos válidos.</strong>
+                    <span>Ahora mismo no existe otro contenedor raíz o hermano válido donde moverlo.</span>
+                </div>
+            }
+            else
+            {
+                <form class="form-grid" method="post" asp-page-handler="Move" asp-route-code="@Model.Box.Code">
+                    <div class="field full">
+                        <partial name="_SearchPicker" model="Model.MoveBoxPicker" />
+                    </div>
+                    <div class="actions full">
+                        <button class="btn primary" type="submit">Mover a…</button>
+                    </div>
+                </form>
+            }
+            @if (Model.Box.ParentBox is not null)
+            {
+                <form class="stack-top" method="post" asp-page-handler="MoveToRoot" asp-route-code="@Model.Box.Code">
+                    <button class="btn" type="submit">Sacar a raíz</button>
+                </form>
+            }
+        </section>
         <div class="section-title">
             <h2>Fotos</h2>
         </div>
