@@ -76,82 +76,60 @@
     </div>
 </section>
 
+<section class="stats-grid stack-top">
+    <article class="stat">
+        <span>Ítems directos</span>
+        <strong>@Model.DirectItemCount</strong>
+    </article>
+    <article class="stat">
+        <span>Subcontenedores directos</span>
+        <strong>@Model.DirectChildCount</strong>
+    </article>
+    <article class="stat">
+        <span>Subcontenedores totales</span>
+        <strong>@Model.DescendantBoxCount</strong>
+    </article>
+    <article class="stat">
+        <span>Ítems en el subárbol</span>
+        <strong>@Model.SubtreeItemCount</strong>
+    </article>
+</section>
+
 <div class="split">
     <section>
+        <section class="panel">
+            <div class="section-header compact">
+                <div>
+                    <h2>Operar en Inventario</h2>
+                    <p class="section-kicker">La ficha de contenedor queda centrada en logística. Para operar con ítems, usa Inventario filtrado.</p>
+                </div>
+                <div class="actions">
+                    <a class="btn primary" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="true" asp-route-view="flat">Vista plana</a>
+                    <a class="btn" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="true" asp-route-view="grouped">Agrupado por contenedor</a>
+                </div>
+            </div>
+            <div class="chips">
+                <span class="chip">@Model.SubtreeItemCount ítems en el subárbol</span>
+                <span class="chip">@Model.DescendantBoxCount subcontenedores descendientes</span>
+                <span class="chip">@Model.Gallery.Count fotos propias</span>
+            </div>
+        </section>
+
         <div class="section-title">
-            <h2>Contenido</h2>
-            <span class="chip">@(Model.Box.Items.Count == 1 ? "1 ítem" : $"{Model.Box.Items.Count} ítems")</span>
+            <div>
+                <h2>Logística del contenedor</h2>
+                <p class="section-kicker">Jerarquía y contenido físico del nodo actual.</p>
+            </div>
         </div>
         @if (TempData["BulkEditMessage"] is string bulkMessage)
         {
             <div class="notice toast stack-top">@bulkMessage</div>
         }
-        <form class="bulk-edit-shell" method="post" asp-page-handler="BulkEditItems" asp-route-code="@Model.Box.Code">
-            <details class="bulk-edit-panel panel">
-                <summary>
-                    <span>
-                        <strong>Edición masiva</strong>
-                        <small><span data-selected-count>0</span> seleccionados</small>
-                    </span>
-                    <span class="btn">Opciones</span>
-                </summary>
-                <div class="bulk-toolbar">
-                    <p class="caption">Marca sólo los cambios que quieras aplicar.</p>
-                    <div class="actions">
-                        <button class="btn" type="button" data-select-all>Seleccionar todo</button>
-                        <button class="btn" type="button" data-clear-selection>Limpiar</button>
-                        <button class="btn primary" type="submit">Aplicar cambios</button>
-                    </div>
-                </div>
-                <div class="bulk-edit-grid full">
-                    <label class="bulk-field">
-                        <span><input asp-for="BulkEdit.ApplySentimental" /> Sentimental</span>
-                        <select asp-for="BulkEdit.Sentimental">
-                            <option value="true">Sí</option>
-                            <option value="false">No</option>
-                        </select>
-                    </label>
-                    <label class="bulk-field">
-                        <span><input asp-for="BulkEdit.ApplyObsolete" /> Obsoleto</span>
-                        <select asp-for="BulkEdit.Obsolete">
-                            <option value="true">Sí</option>
-                            <option value="false">No</option>
-                        </select>
-                    </label>
-                    <label class="bulk-field">
-                        <span><input asp-for="BulkEdit.ApplyConsumable" /> Consumible</span>
-                        <select asp-for="BulkEdit.Consumable">
-                            <option value="true">Sí</option>
-                            <option value="false">No</option>
-                        </select>
-                    </label>
-                    <label class="bulk-field">
-                        <span><input asp-for="BulkEdit.ApplyCategory" /> Categoría</span>
-                        <select asp-for="BulkEdit.Category">
-                            @foreach (var category in Model.Categories)
-                            {
-                                <option value="@category">@category</option>
-                            }
-                        </select>
-                    </label>
-                    <div class="bulk-field">
-                        <span><input asp-for="BulkEdit.ApplyBox" /> Caja</span>
-                        <partial name="_SearchPicker" model="Model.BulkBoxPicker" />
-                    </div>
-                    <label class="bulk-field">
-                        <span><input asp-for="BulkEdit.ApplyCondition" /> Estado</span>
-                        <input asp-for="BulkEdit.Condition" placeholder="Sin cambios si no marcas la casilla" />
-                    </label>
-                    <label class="bulk-field">
-                        <span><input asp-for="BulkEdit.ApplyRetention" /> Retención</span>
-                        <input asp-for="BulkEdit.Retention" placeholder="Sin cambios si no marcas la casilla" />
-                    </label>
-                </div>
-            </details>
-
+        <div class="logistics-stack">
             @if (Model.Box.ChildBoxes.Count > 0)
             {
-                <div class="section-title">
+                <section class="panel">
+                <div class="section-header compact">
                     <div>
                         <h2>Subcontenedores</h2>
                         <p class="section-kicker">Contenedores hijos directos dentro de este nodo.</p>
@@ -183,56 +161,120 @@
                         </a>
                     }
                 </div>
+                </section>
             }
 
-            <div class="box-content-grid">
-                @foreach (var item in Model.Box.Items)
-                {
-                    <article class="box-item-card selectable-item">
-                        <label class="select-chip">
-                            <input type="checkbox" name="BulkEdit.SelectedItemIds" value="@item.Id" />
-                            Seleccionar
-                        </label>
-                        <a class="box-item-link" asp-page="/Items/Edit" asp-route-id="@item.Id">
-                        @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
-                        {
-                            <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
-                        }
-                        else
-                        {
-                            <div class="box-item-photo generated">@item.Name[..1]</div>
-                        }
-                        <span class="box-item-body">
-                            <h3>@item.Name</h3>
-                            <p class="caption">@item.Category · @item.Quantity @item.Unit</p>
-                            <span class="chips">
-                            @if (item.Consumable)
-                            {
-                                <span class="chip @(item.MinQuantity != null && item.Quantity <= item.MinQuantity ? "danger" : "good")">stock @item.Quantity @item.Unit</span>
-                            }
-                            @if (item.Sentimental)
-                            {
-                                <span class="chip good">recuerdo</span>
-                            }
-                            @if (item.Obsolete)
-                            {
-                                <span class="chip warn">legacy</span>
-                            }
-                            </span>
+            <form class="bulk-edit-shell" method="post" asp-page-handler="BulkEditItems" asp-route-code="@Model.Box.Code">
+                <details class="bulk-edit-panel panel legacy-content-panel" @(Model.DirectItemCount > 0 ? "" : "open")>
+                    <summary>
+                        <span>
+                            <strong>Vista heredada temporal del contenido directo</strong>
+                            <small>@(Model.Box.Items.Count == 1 ? "1 ítem directo" : $"{Model.Box.Items.Count} ítems directos") · <span data-selected-count>0</span> seleccionados</small>
                         </span>
-                        </a>
-                    </article>
-                }
-                @if (Model.Box.Items.Count == 0)
-                {
-                    <div class="empty">
-                        <strong>Contenedor vacío.</strong>
-                        <span>Añade el primer ítem o importa fotos para clasificar objetos visualmente.</span>
-                        <div class="actions stack-top"><a class="btn primary" asp-page="/Items/Create" asp-route-boxId="@Model.Box.Id">Añadir ítem</a></div>
+                        <span class="btn">Mostrar</span>
+                    </summary>
+                    <div class="bulk-toolbar">
+                        <p class="caption">Mantengo esta sección durante la transición, pero la operación principal debe ir migrando a Inventario.</p>
+                        <div class="actions">
+                            <button class="btn" type="button" data-select-all>Seleccionar todo</button>
+                            <button class="btn" type="button" data-clear-selection>Limpiar</button>
+                            <button class="btn primary" type="submit">Aplicar cambios</button>
+                        </div>
                     </div>
-                }
-            </div>
-        </form>
+                    <div class="bulk-edit-grid full">
+                        <label class="bulk-field">
+                            <span><input asp-for="BulkEdit.ApplySentimental" /> Sentimental</span>
+                            <select asp-for="BulkEdit.Sentimental">
+                                <option value="true">Sí</option>
+                                <option value="false">No</option>
+                            </select>
+                        </label>
+                        <label class="bulk-field">
+                            <span><input asp-for="BulkEdit.ApplyObsolete" /> Obsoleto</span>
+                            <select asp-for="BulkEdit.Obsolete">
+                                <option value="true">Sí</option>
+                                <option value="false">No</option>
+                            </select>
+                        </label>
+                        <label class="bulk-field">
+                            <span><input asp-for="BulkEdit.ApplyConsumable" /> Consumible</span>
+                            <select asp-for="BulkEdit.Consumable">
+                                <option value="true">Sí</option>
+                                <option value="false">No</option>
+                            </select>
+                        </label>
+                        <label class="bulk-field">
+                            <span><input asp-for="BulkEdit.ApplyCategory" /> Categoría</span>
+                            <select asp-for="BulkEdit.Category">
+                                @foreach (var category in Model.Categories)
+                                {
+                                    <option value="@category">@category</option>
+                                }
+                            </select>
+                        </label>
+                        <div class="bulk-field">
+                            <span><input asp-for="BulkEdit.ApplyBox" /> Caja</span>
+                            <partial name="_SearchPicker" model="Model.BulkBoxPicker" />
+                        </div>
+                        <label class="bulk-field">
+                            <span><input asp-for="BulkEdit.ApplyCondition" /> Estado</span>
+                            <input asp-for="BulkEdit.Condition" placeholder="Sin cambios si no marcas la casilla" />
+                        </label>
+                        <label class="bulk-field">
+                            <span><input asp-for="BulkEdit.ApplyRetention" /> Retención</span>
+                            <input asp-for="BulkEdit.Retention" placeholder="Sin cambios si no marcas la casilla" />
+                        </label>
+                    </div>
+
+                    <div class="box-content-grid">
+                        @foreach (var item in Model.Box.Items)
+                        {
+                            <article class="box-item-card selectable-item">
+                                <label class="select-chip">
+                                    <input type="checkbox" name="BulkEdit.SelectedItemIds" value="@item.Id" />
+                                    Seleccionar
+                                </label>
+                                <a class="box-item-link" asp-page="/Items/Edit" asp-route-id="@item.Id">
+                                @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
+                                {
+                                    <img class="box-item-photo rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
+                                }
+                                else
+                                {
+                                    <div class="box-item-photo generated">@item.Name[..1]</div>
+                                }
+                                <span class="box-item-body">
+                                    <h3>@item.Name</h3>
+                                    <p class="caption">@item.Category · @item.Quantity @item.Unit</p>
+                                    <span class="chips">
+                                    @if (item.Consumable)
+                                    {
+                                        <span class="chip @(item.MinQuantity != null && item.Quantity <= item.MinQuantity ? "danger" : "good")">stock @item.Quantity @item.Unit</span>
+                                    }
+                                    @if (item.Sentimental)
+                                    {
+                                        <span class="chip good">recuerdo</span>
+                                    }
+                                    @if (item.Obsolete)
+                                    {
+                                        <span class="chip warn">legacy</span>
+                                    }
+                                    </span>
+                                </span>
+                                </a>
+                            </article>
+                        }
+                        @if (Model.Box.Items.Count == 0)
+                        {
+                            <div class="empty">
+                                <strong>Sin ítems directos.</strong>
+                                <span>Este contenedor no tiene ítems colgando directamente de él.</span>
+                            </div>
+                        }
+                    </div>
+                </details>
+            </form>
+        </div>
     </section>
 
     <aside>
