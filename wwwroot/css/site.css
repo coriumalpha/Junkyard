@@ -564,6 +564,12 @@ a.box-breadcrumb-node:hover {
 }
 .search-picker-copy { min-width: 0; display: grid; gap: 4px; }
 .inventory-board { display: grid; gap: 18px; }
+.inventory-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
 .inventory-group {
   display: grid;
   gap: 14px;
@@ -703,6 +709,7 @@ th { color: var(--text-muted); font-size: var(--font-caption); }
   .inventory-group-head { grid-template-columns: 92px minmax(0, 1fr); }
   .inventory-group-cover { width: 92px; }
   .inventory-group-head .actions { grid-column: 1 / -1; }
+  .inventory-context { grid-template-columns: 1fr; }
   .inventory-row { grid-template-columns: 82px minmax(0, 1fr); }
   .inventory-location { grid-column: 1 / -1; justify-items: start; text-align: left; }
   .orphan-row .actions { grid-column: 1 / -1; }

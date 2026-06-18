@@ -30,11 +30,55 @@
             }
         </select>
     </div>
+    <input type="hidden" name="box" value="@Model.BoxCode" />
+    <input type="hidden" name="includeChildren" value="@(Model.IncludeChildren ? "true" : "false")" />
     <div class="actions inventory-filter-actions">
         <button class="btn primary" type="submit">Filtrar</button>
         <a class="btn" asp-page="/Items/Index">Limpiar</a>
     </div>
 </form>
+
+@if (!string.IsNullOrWhiteSpace(Model.BoxCode))
+{
+    <section class="panel stack-top inventory-context">
+        <div>
+            <p class="eyebrow">Contexto de contenedor</p>
+            @if (Model.SelectedBox is null)
+            {
+                <h2>@Model.BoxCode</h2>
+                <p class="muted">Ese contenedor no existe o ya no está disponible.</p>
+            }
+            else
+            {
+                <h2>@Model.SelectedBox.Code · @Model.SelectedBox.Name</h2>
+                <p class="caption">@Model.SelectedBoxPath</p>
+                <div class="chips">
+                    <span class="chip">@Model.SelectedBox.ContainerTypeLabel</span>
+                    <span class="chip">@Model.SelectedBox.Location?.Name</span>
+                    <span class="chip">@(Model.IncludeChildren ? "Incluye subcontenedores" : "Sólo contenido directo")</span>
+                </div>
+            }
+        </div>
+        <div class="actions">
+            @if (Model.SelectedBox is not null)
+            {
+                <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.SelectedBox.Code">Volver a ficha</a>
+                <a class="btn @(Model.IncludeChildren ? "" : "primary")"
+                   asp-page="/Items/Index"
+                   asp-route-box="@Model.SelectedBox.Code"
+                   asp-route-includeChildren="false"
+                   asp-route-q="@Model.Query"
+                   asp-route-category="@Model.Category">Sólo directo</a>
+                <a class="btn @(Model.IncludeChildren ? "primary" : "")"
+                   asp-page="/Items/Index"
+                   asp-route-box="@Model.SelectedBox.Code"
+                   asp-route-includeChildren="true"
+                   asp-route-q="@Model.Query"
+                   asp-route-category="@Model.Category">Incluir subcontenedores</a>
+            }
+        </div>
+    </section>
+}
 
 <div class="inventory-board stack-top">
     @foreach (var group in Model.Groups)
@@ -68,6 +112,7 @@
                     @if (group.BoxId is int boxId && !group.IsOrphanGroup)
                     {
                         var boxCode = group.Code;
+                        <a class="btn" asp-page="/Items/Index" asp-route-box="@boxCode" asp-route-includeChildren="false">Inventario directo</a>
                         <a class="btn" asp-page="/Boxes/Details" asp-route-code="@boxCode">Abrir caja</a>
                     }
                 </div>

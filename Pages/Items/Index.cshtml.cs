@@ -14,17 +14,53 @@ public class IndexModel(InventoryDbContext db) : PageModel
     public Dictionary<int, int> ItemPhotoCounts { get; private set; } = [];
     public string Query { get; private set; } = "";
     public string Category { get; private set; } = "";
+    public string BoxCode { get; private set; } = "";
+    public bool IncludeChildren { get; private set; }
+    public Box? SelectedBox { get; private set; }
     public List<string> Categories { get; private set; } = [];
 
-    public async Task OnGetAsync(string? q, string? category, CancellationToken cancellationToken)
+    public async Task OnGetAsync(string? q, string? category, string? box, bool includeChildren, CancellationToken cancellationToken)
     {
         Query = (q ?? "").Trim();
         Category = (category ?? "").Trim();
+        BoxCode = Box.NormalizePublicCode(box);
+        IncludeChildren = includeChildren;
 
         var query = db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
             .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
             .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(BoxCode))
+        {
+            SelectedBox = await db.Boxes.AsNoTracking()
+                .Include(b => b.Location)
+                .Include(b => b.ParentBox)
+                .FirstOrDefaultAsync(b => b.Code == BoxCode, cancellationToken);
+
+            if (SelectedBox is null)
+            {
+                Items = [];
+                Groups = [];
+                Categories = await db.Items.AsNoTracking()
+                    .Select(i => i.Category)
+                    .Distinct()
+                    .OrderBy(x => x)
+                    .ToListAsync(cancellationToken);
+                return;
+            }
+
+            if (IncludeChildren)
+            {
+                var allowedBoxIds = await BoxHierarchyService.GetDescendantIdsAsync(db, SelectedBox.Id, cancellationToken);
+                allowedBoxIds.Add(SelectedBox.Id);
+                query = query.Where(i => i.BoxId != null && allowedBoxIds.Contains(i.BoxId.Value));
+            }
+            else
+            {
+                query = query.Where(i => i.BoxId == SelectedBox.Id);
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(Query))
         {
@@ -132,4 +168,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
         List<Item> Items)
     {
     }
+
+    public string SelectedBoxPath =>
+        SelectedBox is null ? "" : BuildBoxPath(SelectedBox);
 }

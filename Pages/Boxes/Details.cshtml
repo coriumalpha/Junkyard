@@ -62,6 +62,8 @@
         <div class="actions">
             <a class="btn primary" asp-page="/Items/Create" asp-route-boxId="@Model.Box.Id">Añadir ítem</a>
             <a class="btn" asp-page="/Boxes/Create" asp-route-parentBoxId="@Model.Box.Id">Crear subcontenedor</a>
+            <a class="btn" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="false">Inventario directo</a>
+            <a class="btn" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="true">Inventario + subcontenedores</a>
             <a class="btn" asp-page="/Boxes/Edit" asp-route-id="@Model.Box.Id">Editar contenedor</a>
         </div>
     </div>
