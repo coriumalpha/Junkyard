@@ -42,7 +42,15 @@ public static class SearchPickerFactory
                 : string.IsNullOrWhiteSpace(b.ParentCode) ? "Contenedor raíz" : $"Dentro de {b.ParentCode} / {b.ParentName}",
             ThumbnailUrl = string.IsNullOrWhiteSpace(b.CoverPhoto) ? null : PhotoStorage.ThumbUrl(b.CoverPhoto),
             Icon = "CT",
-            SearchText = $"{b.Code} {b.Name} {b.ContainerType} {(locationLookup.TryGetValue(b.Id, out var searchLocation) ? searchLocation.LocationName : null)} {b.ParentCode} {b.ParentName}"
+            Tags =
+            [
+                Box.ContainerTypeLabelFor(b.ContainerType),
+                string.IsNullOrWhiteSpace(b.ParentCode) ? "Raíz" : "Subcontenedor",
+                locationLookup.TryGetValue(b.Id, out var searchLocation) && !string.IsNullOrWhiteSpace(searchLocation.LocationName)
+                    ? searchLocation.LocationName!
+                    : "Sin ubicación"
+            ],
+            SearchText = $"{b.Code} {b.Name} {b.ContainerType} {(locationLookup.TryGetValue(b.Id, out var searchLocation2) ? searchLocation2.LocationName : null)} {b.ParentCode} {b.ParentName} {Box.ContainerTypeLabelFor(b.ContainerType)}"
         }).ToList();
     }
 
@@ -60,6 +68,11 @@ public static class SearchPickerFactory
                 i.Name,
                 i.Category,
                 i.CoverPhoto,
+                i.Consumable,
+                i.Sentimental,
+                i.Obsolete,
+                i.Quantity,
+                i.Unit,
                 BoxId = i.Box != null ? i.Box.Id : (int?)null,
                 BoxCode = i.Box != null ? i.Box.Code : null,
                 BoxName = i.Box != null ? i.Box.Name : null
@@ -82,7 +95,15 @@ public static class SearchPickerFactory
                 Detail = detail,
                 ThumbnailUrl = string.IsNullOrWhiteSpace(i.CoverPhoto) ? null : PhotoStorage.ThumbUrl(i.CoverPhoto),
                 Icon = "IT",
-                SearchText = $"{i.Name} {i.Category} {i.BoxCode} {i.BoxName}"
+                Tags =
+                [
+                    i.Category,
+                    string.IsNullOrWhiteSpace(i.BoxCode) ? "Sin contenedor" : i.BoxCode!,
+                    i.Consumable ? "Consumible" : "No consumible",
+                    i.Sentimental ? "Sentimental" : "No sentimental",
+                    i.Obsolete ? "Legacy" : "Activo"
+                ],
+                SearchText = $"{i.Name} {i.Category} {i.BoxCode} {i.BoxName} {i.Consumable} {i.Sentimental} {i.Obsolete} {i.Quantity} {i.Unit}"
             };
         }).ToList();
     }
