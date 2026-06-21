@@ -3,7 +3,7 @@
     var selected = Model.Options.FirstOrDefault(option => option.Value == (Model.SelectedValue ?? ""));
 }
 
-<div class="search-picker" data-search-picker data-empty-label="@Model.EmptyLabel" data-empty-hint="@Model.EmptyHint" data-clear-value="@Model.ClearValue">
+<div class="search-picker" data-search-picker data-empty-label="@Model.EmptyLabel" data-empty-hint="@Model.EmptyHint" data-clear-value="@Model.ClearValue" data-picker-submit-on-enter="@(Model.SubmitOnEnter ? "true" : "false")" data-picker-submit-button-selector="@Model.SubmitButtonSelector">
     <input type="hidden" id="@Model.InputId" name="@Model.InputName" value="@Model.SelectedValue" />
     <div class="search-picker-head">
         <label class="search-picker-label" for="@($"{Model.InputId}__search")">@Model.Label</label>

@@ -342,6 +342,8 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
             return false;
         }
 
+        var locationLookup = await BoxHierarchyService.BuildLocationLookupAsync(db, cancellationToken);
+        BoxHierarchyService.ApplyLocationLookup(new[] { Box }.Concat(Box.ChildBoxes), locationLookup);
         Breadcrumb = await BoxHierarchyService.BuildBreadcrumbAsync(db, Box, cancellationToken);
         var descendants = await BoxHierarchyService.GetDescendantIdsAsync(db, Box.Id, cancellationToken);
         DescendantBoxCount = descendants.Count;

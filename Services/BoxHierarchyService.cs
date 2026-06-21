@@ -6,19 +6,89 @@ namespace Inventario.Services;
 
 public static class BoxHierarchyService
 {
+    public static async Task<IReadOnlyDictionary<int, BoxLocationResolution>> BuildLocationLookupAsync(
+        InventoryDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var nodes = await db.Boxes.AsNoTracking()
+            .Select(b => new BoxLocationNode(
+                b.Id,
+                b.ParentBoxId,
+                b.Code,
+                b.Name,
+                b.LocationId,
+                b.Location != null ? b.Location.Name : null))
+            .ToListAsync(cancellationToken);
+
+        var byId = nodes.ToDictionary(node => node.Id);
+        var cache = new Dictionary<int, BoxLocationResolution>();
+
+        BoxLocationResolution Resolve(int boxId)
+        {
+            if (cache.TryGetValue(boxId, out var cached))
+            {
+                return cached;
+            }
+
+            if (!byId.TryGetValue(boxId, out var node))
+            {
+                return cache[boxId] = new BoxLocationResolution(null, null, null, null, null, false);
+            }
+
+            if (node.ParentBoxId is null)
+            {
+                return cache[boxId] = new BoxLocationResolution(node.LocationId, node.LocationName, null, node.Code, node.Name, false);
+            }
+
+            if (!byId.TryGetValue(node.ParentBoxId.Value, out var parent))
+            {
+                var orphanLabel = string.IsNullOrWhiteSpace(node.LocationName) ? null : node.LocationName;
+                return cache[boxId] = new BoxLocationResolution(node.LocationId, orphanLabel, null, node.Code, node.Name, true);
+            }
+
+            var root = Resolve(parent.Id);
+            var sourceLabel = root.RootCode is null || root.RootName is null ? null : $"{root.RootCode} / {root.RootName}";
+            return cache[boxId] = new BoxLocationResolution(root.LocationId, root.LocationName, sourceLabel, root.RootCode, root.RootName, true);
+        }
+
+        foreach (var node in nodes)
+        {
+            Resolve(node.Id);
+        }
+
+        return cache;
+    }
+
+    public static void ApplyLocationLookup(IEnumerable<Box> boxes, IReadOnlyDictionary<int, BoxLocationResolution> lookup)
+    {
+        foreach (var box in boxes)
+        {
+            if (lookup.TryGetValue(box.Id, out var resolution))
+            {
+                box.EffectiveLocationName = resolution.LocationName;
+                box.EffectiveLocationSourceLabel = resolution.SourceLabel;
+            }
+        }
+    }
+
+    public static async Task<BoxLocationResolution?> ResolveLocationAsync(
+        InventoryDbContext db,
+        int boxId,
+        CancellationToken cancellationToken)
+    {
+        var lookup = await BuildLocationLookupAsync(db, cancellationToken);
+        return lookup.TryGetValue(boxId, out var resolution) ? resolution : null;
+    }
+
     public static async Task<List<BoxBreadcrumbSegment>> BuildBreadcrumbAsync(
         InventoryDbContext db,
         Box box,
         CancellationToken cancellationToken)
     {
         var breadcrumb = new List<BoxBreadcrumbSegment>();
-        if (box.Location is not null)
-        {
-            breadcrumb.Add(new BoxBreadcrumbSegment(null, null, box.Location.Name, true));
-        }
-
         var chain = new List<BoxBreadcrumbSegment>();
         var currentParentId = box.ParentBoxId;
+        string? rootLocationName = box.ParentBoxId is null ? box.Location?.Name : null;
         while (currentParentId is int parentId)
         {
             var parent = await db.Boxes.AsNoTracking()
@@ -27,7 +97,8 @@ public static class BoxHierarchyService
                     b.Id,
                     b.Code,
                     b.Name,
-                    b.ParentBoxId
+                    b.ParentBoxId,
+                    LocationName = b.Location != null ? b.Location.Name : null
                 })
                 .FirstOrDefaultAsync(b => b.Id == parentId, cancellationToken);
             if (parent is null)
@@ -36,10 +107,15 @@ public static class BoxHierarchyService
             }
 
             chain.Add(new BoxBreadcrumbSegment(parent.Id, parent.Code, parent.Name, false));
+            rootLocationName = parent.LocationName;
             currentParentId = parent.ParentBoxId;
         }
 
         chain.Reverse();
+        if (!string.IsNullOrWhiteSpace(rootLocationName))
+        {
+            breadcrumb.Add(new BoxBreadcrumbSegment(null, null, rootLocationName, true));
+        }
         breadcrumb.AddRange(chain);
         breadcrumb.Add(new BoxBreadcrumbSegment(box.Id, box.Code, box.Name, false));
         return breadcrumb;
@@ -104,6 +180,22 @@ public static class BoxHierarchyService
 }
 
 public sealed record BoxBreadcrumbSegment(int? BoxId, string? Code, string Label, bool IsLocation);
+
+public sealed record BoxLocationResolution(
+    int? LocationId,
+    string? LocationName,
+    string? SourceLabel,
+    string? RootCode,
+    string? RootName,
+    bool IsInherited);
+
+internal sealed record BoxLocationNode(
+    int Id,
+    int? ParentBoxId,
+    string Code,
+    string Name,
+    int LocationId,
+    string? LocationName);
 
 public sealed record BoxParentValidationResult(bool IsValid, string? ErrorMessage)
 {

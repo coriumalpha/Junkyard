@@ -11,6 +11,7 @@ public static class SearchPickerFactory
         CancellationToken cancellationToken,
         IReadOnlySet<int>? excludedIds = null)
     {
+        var locationLookup = await BoxHierarchyService.BuildLocationLookupAsync(db, cancellationToken);
         var query = db.Boxes.AsNoTracking();
         if (excludedIds is not null && excludedIds.Count > 0)
         {
@@ -26,7 +27,6 @@ public static class SearchPickerFactory
                 b.Name,
                 b.ContainerType,
                 b.CoverPhoto,
-                LocationName = b.Location != null ? b.Location.Name : null,
                 ParentCode = b.ParentBox != null ? b.ParentBox.Code : null,
                 ParentName = b.ParentBox != null ? b.ParentBox.Name : null
             })
@@ -36,11 +36,13 @@ public static class SearchPickerFactory
         {
             Value = b.Id.ToString(),
             Title = $"{b.Code} · {b.Name}",
-            Meta = $"{Box.ContainerTypeLabelFor(b.ContainerType)}{(string.IsNullOrWhiteSpace(b.LocationName) ? "" : $" · {b.LocationName}")}",
-            Detail = string.IsNullOrWhiteSpace(b.ParentCode) ? "Contenedor raíz" : $"Dentro de {b.ParentCode} / {b.ParentName}",
+            Meta = $"{Box.ContainerTypeLabelFor(b.ContainerType)}{(locationLookup.TryGetValue(b.Id, out var location) && !string.IsNullOrWhiteSpace(location.LocationName) ? $" · {location.LocationName}" : "")}",
+            Detail = locationLookup.TryGetValue(b.Id, out var locationDetail) && locationDetail.IsInherited && !string.IsNullOrWhiteSpace(locationDetail.SourceLabel)
+                ? $"Heredada de {locationDetail.SourceLabel}"
+                : string.IsNullOrWhiteSpace(b.ParentCode) ? "Contenedor raíz" : $"Dentro de {b.ParentCode} / {b.ParentName}",
             ThumbnailUrl = string.IsNullOrWhiteSpace(b.CoverPhoto) ? null : PhotoStorage.ThumbUrl(b.CoverPhoto),
             Icon = "CT",
-            SearchText = $"{b.Code} {b.Name} {b.ContainerType} {b.LocationName} {b.ParentCode} {b.ParentName}"
+            SearchText = $"{b.Code} {b.Name} {b.ContainerType} {(locationLookup.TryGetValue(b.Id, out var searchLocation) ? searchLocation.LocationName : null)} {b.ParentCode} {b.ParentName}"
         }).ToList();
     }
 

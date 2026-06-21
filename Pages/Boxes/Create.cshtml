@@ -29,11 +29,23 @@
         <select asp-for="Input.ContainerType" asp-items="Model.ContainerTypes"></select>
         <span asp-validation-for="Input.ContainerType"></span>
     </div>
-    <div class="field">
+    <div class="field" data-root-location-field hidden="@(Model.CanEditLocation ? (string?)null : "hidden")">
         <label asp-for="Input.LocationId">Ubicación</label>
         <select asp-for="Input.LocationId" asp-items="Model.Locations"></select>
+        <span asp-validation-for="Input.LocationId"></span>
     </div>
-    <div class="field">
+    <div class="field" data-root-location-inherited hidden="@(!Model.CanEditLocation ? (string?)null : "hidden")">
+        <label>Ubicación heredada</label>
+        <div class="readonly-field">
+            <strong>@(string.IsNullOrWhiteSpace(Model.InheritedLocationName) ? "Ubicación no disponible" : Model.InheritedLocationName)</strong>
+            @if (!string.IsNullOrWhiteSpace(Model.InheritedLocationSourceLabel))
+            {
+                <small>@Model.InheritedLocationSourceLabel</small>
+            }
+        </div>
+        <small class="caption">Solo los contenedores raíz permiten editar ubicación.</small>
+    </div>
+    <div class="field" data-parent-box-picker>
         <partial name="_SearchPicker" model="Model.ParentBoxPicker" />
     </div>
     <div class="field">

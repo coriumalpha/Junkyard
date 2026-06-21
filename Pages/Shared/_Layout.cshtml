@@ -26,9 +26,11 @@
             <img class="brand-logo" src="~/img/junkyard-logo.png" alt="" />
             <span>Junkyard</span>
         </a>
-        <form class="top-search" asp-page="/Search" method="get">
-            <input name="q" value="@Context.Request.Query["q"]" placeholder="Buscar objeto, caja, categoría, nota..." autocomplete="off" />
-        </form>
+        <div class="top-search-shell" data-live-search-root data-live-search-mode="suggest" data-live-search-endpoint="/Search?handler=Live">
+            <form class="top-search" asp-page="/Search" method="get">
+                <input name="q" value="@Context.Request.Query["q"]" placeholder="Buscar objeto, caja, categoría, nota..." autocomplete="off" data-live-search-input />
+            </form>
+        </div>
         <nav>
             <a class="@boxesNav" asp-page="/Boxes/Index"><span class="nav-ico">□</span>Cajas</a>
             <a class="@inventoryNav" asp-page="/Items/Index"><span class="nav-ico">≡</span>Inventario</a>

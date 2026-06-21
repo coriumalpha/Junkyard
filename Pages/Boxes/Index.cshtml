@@ -38,17 +38,17 @@ else
                     @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
                     {
                         <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@Model.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
-                    }
-                    else
-                    {
-                        <div class="box-cover generated-cover">
-                            <div class="cover-code">@box.Code</div>
-                            <div class="cover-meta">
-                                <span>@box.Location?.Name</span>
-                                <span>@itemLabel</span>
+                        }
+                        else
+                        {
+                            <div class="box-cover generated-cover">
+                                <div class="cover-code">@box.Code</div>
+                                <div class="cover-meta">
+                                    <span>@box.LocationDisplay</span>
+                                    <span>@itemLabel</span>
+                                </div>
                             </div>
-                        </div>
-                    }
+                        }
                     <div class="card-body">
                         <div class="chips">
                             <span class="chip good">@box.Code</span>
@@ -56,7 +56,14 @@ else
                             <span class="chip">@box.Status</span>
                         </div>
                         <h3>@box.Name</h3>
-                        <p class="box-card-meta"><span>@box.Location?.Name</span><span>@itemLabel</span></p>
+                        <p class="box-card-meta">
+                            <span>@box.LocationDisplay</span>
+                            <span>@itemLabel</span>
+                        </p>
+                        @if (!string.IsNullOrWhiteSpace(box.EffectiveLocationSourceLabel))
+                        {
+                            <p class="caption">@box.EffectiveLocationSourceLabel</p>
+                        }
                         <div class="chips">
                             <span class="chip">Raíz</span>
                             @if (box.ChildBoxes.Count > 0)
@@ -101,7 +108,7 @@ else
                             <div class="box-cover generated-cover">
                                 <div class="cover-code">@box.Code</div>
                                 <div class="cover-meta">
-                                    <span>@box.ParentBox?.Code</span>
+                                    <span>@box.LocationDisplay</span>
                                     <span>@itemLabel</span>
                                 </div>
                             </div>
@@ -113,9 +120,13 @@ else
                                 <span class="chip">@box.Status</span>
                             </div>
                             <h3>@box.Name</h3>
-                            <p class="box-card-meta"><span>Dentro de @box.ParentBox?.Code / @box.ParentBox?.Name</span><span>@itemLabel</span></p>
+                            <p class="box-card-meta"><span>@box.LocationDisplay</span><span>@itemLabel</span></p>
+                            @if (!string.IsNullOrWhiteSpace(box.EffectiveLocationSourceLabel))
+                            {
+                                <p class="caption">@box.EffectiveLocationSourceLabel</p>
+                            }
                             <div class="chips">
-                                <span class="chip">@box.Location?.Name</span>
+                                <span class="chip">@box.ParentBox?.Code / @box.ParentBox?.Name</span>
                                 @if (box.ChildBoxes.Count > 0)
                                 {
                                     <span class="chip">@box.ChildBoxes.Count dentro</span>

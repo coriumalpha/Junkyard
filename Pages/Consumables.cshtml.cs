@@ -19,6 +19,8 @@ public class ConsumablesModel(InventoryDbContext db) : PageModel
             .OrderBy(i => i.MinQuantity != null && i.Quantity <= i.MinQuantity ? 0 : 1)
             .ThenBy(i => i.Name)
             .ToListAsync(cancellationToken);
+        var locationLookup = await BoxHierarchyService.BuildLocationLookupAsync(db, cancellationToken);
+        BoxHierarchyService.ApplyLocationLookup(Items.Where(i => i.Box is not null).Select(i => i.Box!).ToList(), locationLookup);
         var filenames = Items.Select(i => i.CoverPhoto).Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => f!).Distinct().ToList();
         PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
     }

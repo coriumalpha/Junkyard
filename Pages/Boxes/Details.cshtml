@@ -47,7 +47,11 @@
             <span class="chip good">@Model.Box.Code</span>
             <span class="chip">@Model.Box.ContainerTypeLabel</span>
             <span class="chip">@Model.Box.Status</span>
-            <span class="chip">@Model.Box.Location?.Name</span>
+            <span class="chip">@Model.Box.LocationDisplay</span>
+            @if (!string.IsNullOrWhiteSpace(Model.Box.EffectiveLocationSourceLabel))
+            {
+                <span class="chip">@Model.Box.EffectiveLocationSourceLabel</span>
+            }
             @if (Model.Box.ParentBox is not null)
             {
                 <a class="chip" asp-page="/Boxes/Details" asp-route-code="@Model.Box.ParentBox.Code">Dentro de @Model.Box.ParentBox.Code / @Model.Box.ParentBox.Name</a>
@@ -155,6 +159,11 @@
                                 <span class="box-item-body">
                                 <span class="chips"><span class="chip good">@child.Code</span><span class="chip">@child.ContainerTypeLabel</span></span>
                                 <h3>@child.Name</h3>
+                                <p class="caption">@child.LocationDisplay</p>
+                                @if (!string.IsNullOrWhiteSpace(child.EffectiveLocationSourceLabel))
+                                {
+                                    <p class="caption">@child.EffectiveLocationSourceLabel</p>
+                                }
                                 <p class="caption">Dentro de @Model.Box.Code / @Model.Box.Name</p>
                                 <p class="caption">@itemLabel</p>
                             </span>

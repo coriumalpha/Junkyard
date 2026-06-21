@@ -18,6 +18,9 @@ public class EditModel(InventoryDbContext db) : PageModel
     public List<SelectListItem> ParentBoxes { get; private set; } = [];
     public List<SelectListItem> ContainerTypes { get; private set; } = [];
     public SearchPickerModel ParentBoxPicker { get; private set; } = new();
+    public string? InheritedLocationName { get; private set; }
+    public string? InheritedLocationSourceLabel { get; private set; }
+    public bool CanEditLocation => Input.ParentBoxId == 0;
 
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
@@ -38,6 +41,12 @@ public class EditModel(InventoryDbContext db) : PageModel
             ParentBoxId = box.ParentBoxId ?? 0,
             Status = box.Status
         };
+        if (box.ParentBoxId is int parentBoxId)
+        {
+            var location = await BoxHierarchyService.ResolveLocationAsync(db, parentBoxId, cancellationToken);
+            InheritedLocationName = location?.LocationName;
+            InheritedLocationSourceLabel = location?.SourceLabel;
+        }
         await LoadSelects(box.Id, cancellationToken);
         return Page();
     }
@@ -61,6 +70,21 @@ public class EditModel(InventoryDbContext db) : PageModel
         if (!parentValidation.IsValid)
         {
             ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.ParentBoxId)}", parentValidation.ErrorMessage!);
+        }
+        else if (parentBoxId is null && Input.LocationId <= 0)
+        {
+            ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.LocationId)}", "La ubicación es obligatoria para contenedores raíz.");
+        }
+
+        if (parentBoxId is not null)
+        {
+            var location = await BoxHierarchyService.ResolveLocationAsync(db, parentBoxId.Value, cancellationToken);
+            if (location is not null && location.LocationId is int locationId)
+            {
+                Input.LocationId = locationId;
+                InheritedLocationName = location.LocationName;
+                InheritedLocationSourceLabel = location.SourceLabel;
+            }
         }
 
         if (!ModelState.IsValid)

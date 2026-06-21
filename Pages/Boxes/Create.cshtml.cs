@@ -19,6 +19,9 @@ public class CreateModel(InventoryDbContext db) : PageModel
     public List<SelectListItem> ContainerTypes { get; private set; } = [];
     public SearchPickerModel ParentBoxPicker { get; private set; } = new();
     public string SuggestedCode { get; private set; } = Box.FormatCtCode(1);
+    public string? InheritedLocationName { get; private set; }
+    public string? InheritedLocationSourceLabel { get; private set; }
+    public bool CanEditLocation => Input.ParentBoxId == 0;
 
     public async Task OnGetAsync(int? parentBoxId, CancellationToken cancellationToken)
     {
@@ -28,7 +31,10 @@ public class CreateModel(InventoryDbContext db) : PageModel
             if (parent is not null)
             {
                 Input.ParentBoxId = parent.Id;
-                Input.LocationId = parent.LocationId;
+                var location = await BoxHierarchyService.ResolveLocationAsync(db, parent.Id, cancellationToken);
+                Input.LocationId = location?.LocationId ?? parent.LocationId;
+                InheritedLocationName = location?.LocationName;
+                InheritedLocationSourceLabel = location?.SourceLabel;
             }
         }
 
@@ -55,6 +61,21 @@ public class CreateModel(InventoryDbContext db) : PageModel
             if (!parentExists)
             {
                 ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.ParentBoxId)}", "El contenedor padre ya no existe.");
+            }
+        }
+        else if (Input.LocationId <= 0)
+        {
+            ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.LocationId)}", "La ubicación es obligatoria para contenedores raíz.");
+        }
+
+        if (parentBoxId is not null)
+        {
+            var location = await BoxHierarchyService.ResolveLocationAsync(db, parentBoxId.Value, cancellationToken);
+            if (location is not null && location.LocationId is int locationId)
+            {
+                Input.LocationId = locationId;
+                InheritedLocationName = location.LocationName;
+                InheritedLocationSourceLabel = location.SourceLabel;
             }
         }
 
@@ -105,6 +126,12 @@ public class CreateModel(InventoryDbContext db) : PageModel
             .Select(b => new SelectListItem($"{b.Code} · {Box.ContainerTypeLabelFor(b.ContainerType)} · {b.Name}", b.Id.ToString()))
             .ToListAsync(cancellationToken);
         ParentBoxes.Insert(0, new SelectListItem("Ninguno: contenedor de primer nivel", "0"));
+        if (Input.ParentBoxId > 0 && string.IsNullOrWhiteSpace(InheritedLocationName))
+        {
+            var location = await BoxHierarchyService.ResolveLocationAsync(db, Input.ParentBoxId, cancellationToken);
+            InheritedLocationName = location?.LocationName;
+            InheritedLocationSourceLabel = location?.SourceLabel;
+        }
         ParentBoxPicker = new SearchPickerModel
         {
             InputName = "Input.ParentBoxId",
