@@ -27,5 +27,6 @@ public class SearchPickerOption
     public string? Detail { get; init; }
     public string? ThumbnailUrl { get; init; }
     public string Icon { get; init; } = "•";
+    public List<string> Tags { get; init; } = [];
     public string SearchText { get; init; } = "";
 }

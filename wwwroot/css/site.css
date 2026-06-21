@@ -603,7 +603,7 @@ a.box-breadcrumb-node:hover {
 .search-picker-label { margin: 0; font-size: 13px; color: var(--text-muted); }
 .search-picker-current {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -611,6 +611,19 @@ a.box-breadcrumb-node:hover {
 }
 .search-picker-current strong, .search-picker-copy strong { overflow-wrap: anywhere; }
 .search-picker-current small, .search-picker-copy small, .search-picker-empty { color: var(--text-muted); }
+.search-picker-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.search-picker-tag {
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--text-soft);
+  background: rgba(255,255,255,.045);
+}
 .search-picker-list {
   display: grid;
   gap: 8px;

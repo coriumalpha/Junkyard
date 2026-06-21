@@ -21,6 +21,15 @@
             {
                 <small>@selected.Detail</small>
             }
+            @if (selected.Tags.Count > 0)
+            {
+                <div class="search-picker-tags">
+                    @foreach (var tag in selected.Tags)
+                    {
+                        <span class="search-picker-tag">@tag</span>
+                    }
+                </div>
+            }
         }
         else
         {
@@ -44,6 +53,7 @@
                     data-title="@Model.NoneOptionLabel"
                     data-meta=""
                     data-detail="@Model.NoneOptionHint"
+                    data-tags="[]"
                     data-search="@Model.NoneOptionLabel @Model.NoneOptionHint">
                 <span class="search-picker-thumb fallback">@Model.NoneOptionIcon</span>
                 <span class="search-picker-copy">
@@ -64,6 +74,7 @@
                     data-title="@option.Title"
                     data-meta="@option.Meta"
                     data-detail="@option.Detail"
+                    data-tags='@Html.Raw(System.Text.Json.JsonSerializer.Serialize(option.Tags))'
                     data-search="@option.SearchText">
                 @if (!string.IsNullOrWhiteSpace(option.ThumbnailUrl))
                 {
@@ -82,6 +93,15 @@
                     @if (!string.IsNullOrWhiteSpace(option.Detail))
                     {
                         <small>@option.Detail</small>
+                    }
+                    @if (option.Tags.Count > 0)
+                    {
+                        <div class="search-picker-tags">
+                            @foreach (var tag in option.Tags)
+                            {
+                                <span class="search-picker-tag">@tag</span>
+                            }
+                        </div>
                     }
                 </span>
             </button>

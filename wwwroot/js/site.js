@@ -46,6 +46,7 @@
         const title = option?.dataset.title || picker.dataset.emptyLabel || 'Sin seleccionar';
         const meta = option?.dataset.meta || '';
         const detail = option?.dataset.detail || picker.dataset.emptyHint || '';
+        const tags = JSON.parse(option?.dataset.tags || '[]');
         current.innerHTML = '';
         const titleEl = document.createElement('strong');
         titleEl.textContent = title;
@@ -59,6 +60,17 @@
           const detailEl = document.createElement('small');
           detailEl.textContent = detail;
           current.appendChild(detailEl);
+        }
+        if (Array.isArray(tags) && tags.length > 0) {
+          const tagsEl = document.createElement('div');
+          tagsEl.className = 'search-picker-tags';
+          tags.forEach(tag => {
+            const chip = document.createElement('span');
+            chip.className = 'search-picker-tag';
+            chip.textContent = tag;
+            tagsEl.appendChild(chip);
+          });
+          current.appendChild(tagsEl);
         }
       };
 
@@ -84,7 +96,8 @@
         const needle = normalizeSearch(search.value);
         let visible = 0;
         options.forEach(option => {
-          const haystack = normalizeSearch(`${option.dataset.search || ''} ${option.dataset.title || ''} ${option.dataset.meta || ''} ${option.dataset.detail || ''}`);
+          const tags = JSON.parse(option.dataset.tags || '[]');
+          const haystack = normalizeSearch(`${option.dataset.search || ''} ${option.dataset.title || ''} ${option.dataset.meta || ''} ${option.dataset.detail || ''} ${(tags || []).join(' ')}`);
           const show = !needle || haystack.includes(needle);
           option.hidden = !show;
           if (show) visible += 1;
