@@ -26,7 +26,7 @@
             }
             <span class="box-item-body">
                 <h3>@item.Name</h3>
-                <p class="caption">@item.Box?.Code · @item.Box?.Location?.Name · @item.Category</p>
+                <p class="caption">@item.Box?.Code · @item.Box?.LocationDisplay · @item.Category</p>
                 <span class="chips">
                     <span class="chip @(low ? "danger" : "good")">@item.Quantity / @item.MinQuantity @item.Unit</span>
                 </span>

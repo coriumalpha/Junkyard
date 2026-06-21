@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Inventario.Models;
 
 public enum BoxStatus
@@ -37,6 +39,10 @@ public class Box
     public Location? Location { get; set; }
     public int? ParentBoxId { get; set; }
     public Box? ParentBox { get; set; }
+    [NotMapped]
+    public string? EffectiveLocationName { get; set; }
+    [NotMapped]
+    public string? EffectiveLocationSourceLabel { get; set; }
     public BoxStatus Status { get; set; } = BoxStatus.Active;
     public string? CoverPhoto { get; set; }
     public DateTime? ArchivedAt { get; set; }
@@ -104,4 +110,7 @@ public class Box
 
         return compact;
     }
+
+    [NotMapped]
+    public string LocationDisplay => EffectiveLocationName ?? Location?.Name ?? "Sin ubicación";
 }

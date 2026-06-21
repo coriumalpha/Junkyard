@@ -3,7 +3,6 @@ using Inventario.Models;
 using Inventario.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inventario.Pages.Items;
@@ -11,7 +10,7 @@ namespace Inventario.Pages.Items;
 public class OrphansModel(InventoryDbContext db) : PageModel
 {
     public List<Item> Items { get; private set; } = [];
-    public List<SelectListItem> Boxes { get; private set; } = [];
+    public List<SearchPickerOption> BoxOptions { get; private set; } = [];
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
 
     [BindProperty]
@@ -41,13 +40,25 @@ public class OrphansModel(InventoryDbContext db) : PageModel
             .Where(i => i.BoxId == null)
             .OrderBy(i => i.UpdatedAt)
             .ToListAsync(cancellationToken);
-        Boxes = await db.Boxes.AsNoTracking()
-            .OrderBy(b => b.Code)
-            .Select(b => new SelectListItem($"{b.Code} · {b.Name}", b.Id.ToString()))
-            .ToListAsync(cancellationToken);
+        BoxOptions = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken);
         var filenames = Items.Select(i => i.CoverPhoto).Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => f!).Distinct().ToList();
         PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
     }
+
+    public SearchPickerModel BoxPickerFor(int itemId) => new()
+    {
+        InputName = nameof(BoxId),
+        InputId = $"{nameof(BoxId)}_{itemId}",
+        Label = "Caja destino",
+        Placeholder = "Buscar CT, nombre, tipo, ubicación o padre...",
+        SelectedValue = null,
+        EmptyLabel = "Sin destino seleccionado",
+        EmptyHint = "Elige el contenedor para reclasificar este objeto.",
+        ClearValue = "",
+        SubmitOnEnter = true,
+        SubmitButtonSelector = "[type=\"submit\"]",
+        Options = BoxOptions
+    };
 
     public int RotationFor(string? filename) =>
         filename is not null && PhotoStates.TryGetValue(filename, out var state) ? state.RotationDegrees : 0;

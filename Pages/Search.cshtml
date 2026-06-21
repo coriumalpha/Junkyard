@@ -4,17 +4,18 @@
     ViewData["Title"] = "Búsqueda";
 }
 
-<section class="hero compact-hero">
+<section class="hero compact-hero" data-live-search-root data-live-search-mode="results" data-live-search-endpoint="/Search?handler=Live">
     <h1>Búsqueda global</h1>
     <form class="search-hero" method="get">
-        <input name="q" value="@Model.Query" placeholder="Caja, objeto, categoría, nota..." autofocus />
+        <input name="q" value="@Model.Query" placeholder="Caja, objeto, categoría, nota..." autofocus data-live-search-input />
         <button class="btn primary" type="submit">Buscar</button>
     </form>
 </section>
 
-@if (Model.Query.Length < 2)
+<div data-live-search-results>
+@if (Model.Query.Length == 0)
 {
-    <div class="empty stack-top"><strong>Busca cualquier cosa.</strong><span>Escribe al menos 2 caracteres para localizar cajas, objetos, categorías o notas.</span></div>
+    <div class="empty stack-top"><strong>Busca cualquier cosa.</strong><span>Escribe para localizar cajas, objetos, categorías o notas.</span></div>
 }
 else
 {
@@ -35,14 +36,14 @@ else
                         }
                         else
                         {
-                            <div class="box-cover generated-cover">
-                                <div class="cover-code">@box.Code</div>
-                                <div class="cover-meta">
-                                    <span>@box.Location?.Name</span>
-                                    <span>@itemLabel</span>
+                                <div class="box-cover generated-cover">
+                                    <div class="cover-code">@box.Code</div>
+                                    <div class="cover-meta">
+                                    <span>@box.LocationDisplay</span>
+                                        <span>@itemLabel</span>
+                                    </div>
                                 </div>
-                            </div>
-                        }
+                            }
                         <div class="card-body">
                             <div class="chips">
                                 <span class="chip good">@box.Code</span>
@@ -50,7 +51,11 @@ else
                                 <span class="chip">@box.Status</span>
                             </div>
                             <h3>@box.Name</h3>
-                            <p class="box-card-meta"><span>@box.Location?.Name</span><span>@itemLabel</span></p>
+                            <p class="box-card-meta"><span>@box.LocationDisplay</span><span>@itemLabel</span></p>
+                            @if (!string.IsNullOrWhiteSpace(box.EffectiveLocationSourceLabel))
+                            {
+                                <p class="caption">@box.EffectiveLocationSourceLabel</p>
+                            }
                         </div>
                     </a>
                 }
@@ -79,7 +84,11 @@ else
                         }
                         <span class="box-item-body">
                             <h3>@item.Name</h3>
-                            <p class="caption">@item.Box?.Code · @item.Box?.Location?.Name · @item.Category</p>
+                            <p class="caption">@item.Box?.Code · @item.Box?.LocationDisplay · @item.Category</p>
+                            @if (!string.IsNullOrWhiteSpace(item.Box?.EffectiveLocationSourceLabel))
+                            {
+                                <p class="caption">@item.Box?.EffectiveLocationSourceLabel</p>
+                            }
                             <span class="chips">
                                 <span class="chip">@item.Quantity @item.Unit</span>
                             </span>
@@ -94,3 +103,4 @@ else
         </section>
     </div>
 }
+</div>

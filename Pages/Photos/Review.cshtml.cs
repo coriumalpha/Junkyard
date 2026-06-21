@@ -281,6 +281,8 @@ public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageMode
             EmptyLabel = "Sin caja seleccionada",
             EmptyHint = "Elige un contenedor antes de asociar o crear.",
             ClearValue = "",
+            SubmitOnEnter = true,
+            SubmitButtonSelector = "[formaction*=\"AssignBox\"]",
             Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)
         };
         ItemPicker = new SearchPickerModel
@@ -293,6 +295,8 @@ public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageMode
             EmptyLabel = "Sin objeto seleccionado",
             EmptyHint = "Filtra y elige el objeto al que asociar la foto.",
             ClearValue = "",
+            SubmitOnEnter = true,
+            SubmitButtonSelector = "[formaction*=\"AssignItem\"]",
             Options = await SearchPickerFactory.BuildItemOptionsAsync(db, cancellationToken, Current?.SourceBoxId)
         };
     }

@@ -29,7 +29,7 @@
                 <small class="muted">@item.Category · @item.Quantity @item.Unit</small>
             </span>
             <form class="actions" method="post" asp-page-handler="Assign" asp-route-id="@item.Id">
-                <select asp-for="BoxId" asp-items="Model.Boxes"></select>
+                <partial name="_SearchPicker" model="Model.BoxPickerFor(item.Id)" />
                 <button class="btn primary" type="submit">Asignar</button>
                 <a class="btn" asp-page="/Items/Edit" asp-route-id="@item.Id">Editar</a>
             </form>

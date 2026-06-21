@@ -14,6 +14,8 @@ public class SearchPickerModel
     public string? NoneOptionHint { get; init; }
     public string NoneOptionValue { get; init; } = "";
     public string NoneOptionIcon { get; init; } = "—";
+    public bool SubmitOnEnter { get; init; }
+    public string? SubmitButtonSelector { get; init; }
     public List<SearchPickerOption> Options { get; init; } = [];
 }
 

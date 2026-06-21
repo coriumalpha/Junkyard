@@ -3,7 +3,6 @@ using Inventario.Models;
 using Inventario.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inventario.Pages.Photos;
@@ -11,7 +10,7 @@ namespace Inventario.Pages.Photos;
 public class InboxModel(InventoryDbContext db, PhotoStorage storage) : PageModel
 {
     public List<PhotoInbox> Photos { get; private set; } = [];
-    public List<SelectListItem> Boxes { get; private set; } = [];
+    public SearchPickerModel SourceBoxPicker { get; private set; } = new();
     public int PendingCount { get; private set; }
     public int AssignedCount { get; private set; }
     public int DiscardedCount { get; private set; }
@@ -100,9 +99,22 @@ public class InboxModel(InventoryDbContext db, PhotoStorage storage) : PageModel
         PendingCount = await db.PhotoInboxes.CountAsync(p => p.Status == PhotoInboxStatus.Pending, cancellationToken);
         AssignedCount = await db.PhotoInboxes.CountAsync(p => p.Status == PhotoInboxStatus.Assigned, cancellationToken);
         DiscardedCount = await db.PhotoInboxes.CountAsync(p => p.Status == PhotoInboxStatus.Discarded, cancellationToken);
-        Boxes = await db.Boxes.AsNoTracking().OrderBy(b => b.Code)
-            .Select(b => new SelectListItem($"{b.Code} · {b.Name}", b.Id.ToString()))
-            .ToListAsync(cancellationToken);
+        SourceBoxPicker = new SearchPickerModel
+        {
+            InputName = nameof(SourceBoxId),
+            InputId = nameof(SourceBoxId),
+            Label = "Caja origen opcional",
+            Placeholder = "Buscar CT, nombre, tipo, ubicación o padre...",
+            SelectedValue = SourceBoxId?.ToString(),
+            EmptyLabel = "Sin caja origen",
+            EmptyHint = "Las fotos entrarán sin contenedor de referencia.",
+            ClearValue = "",
+            NoneOptionLabel = "Sin caja origen",
+            NoneOptionHint = "Importa las fotos sin asociarlas a una caja de origen.",
+            NoneOptionValue = "",
+            NoneOptionIcon = "—",
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)
+        };
 
         var query = db.PhotoInboxes.AsNoTracking().Include(p => p.SourceBox).AsQueryable();
         if (Enum.TryParse<PhotoInboxStatus>(CurrentFilter, true, out var parsed))

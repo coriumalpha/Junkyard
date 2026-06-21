@@ -1,8 +1,8 @@
 using Inventario.Data;
 using Inventario.Models;
+using Inventario.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inventario.Pages.Boxes;
@@ -10,7 +10,7 @@ namespace Inventario.Pages.Boxes;
 public class DeleteModel(InventoryDbContext db) : PageModel
 {
     public Box Box { get; private set; } = null!;
-    public List<SelectListItem> TargetBoxes { get; private set; } = [];
+    public SearchPickerModel TargetBoxPicker { get; private set; } = new();
 
     [BindProperty]
     public int? TargetBoxId { get; set; }
@@ -107,11 +107,20 @@ public class DeleteModel(InventoryDbContext db) : PageModel
             return false;
         }
 
-        TargetBoxes = await db.Boxes.AsNoTracking()
-            .Where(b => b.Id != id)
-            .OrderBy(b => b.Code)
-            .Select(b => new SelectListItem($"{b.Code} · {b.Name}", b.Id.ToString()))
-            .ToListAsync(cancellationToken);
+        TargetBoxPicker = new SearchPickerModel
+        {
+            InputName = nameof(TargetBoxId),
+            InputId = nameof(TargetBoxId),
+            Label = "Caja destino",
+            Placeholder = "Buscar CT destino, nombre, tipo, ubicación o padre...",
+            SelectedValue = TargetBoxId?.ToString(),
+            EmptyLabel = "Sin destino seleccionado",
+            EmptyHint = "Elige la caja que recibirá los objetos.",
+            ClearValue = "",
+            SubmitOnEnter = true,
+            SubmitButtonSelector = "[type=\"submit\"]",
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken, new HashSet<int> { id })
+        };
         return true;
     }
 }

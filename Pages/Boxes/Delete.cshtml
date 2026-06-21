@@ -13,8 +13,7 @@
     <form class="panel form-grid danger-zone" method="post" asp-page-handler="Move" asp-route-id="@Model.Box.Id">
         <h2 class="full">Mover objetos a otra caja</h2>
         <div class="field full">
-            <label>Caja destino</label>
-            <select asp-for="TargetBoxId" asp-items="Model.TargetBoxes"></select>
+            <partial name="_SearchPicker" model="Model.TargetBoxPicker" />
         </div>
         <button class="btn primary full" type="submit">Mover y archivar caja</button>
         @if (Model.Box.ChildBoxes.Count > 0)

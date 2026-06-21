@@ -27,6 +27,8 @@ public class IndexModel(InventoryDbContext db) : PageModel
         }
 
         Boxes = await query.OrderBy(b => b.Code).ToListAsync(cancellationToken);
+        var locationLookup = await BoxHierarchyService.BuildLocationLookupAsync(db, cancellationToken);
+        BoxHierarchyService.ApplyLocationLookup(Boxes, locationLookup);
         var filenames = Boxes.Select(b => b.CoverPhoto).Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => f!).Distinct().ToList();
         PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
     }

@@ -17,6 +17,8 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
     public SearchPickerModel MoveBoxPicker { get; private set; } = new();
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
     public List<BoxBreadcrumbSegment> Breadcrumb { get; private set; } = [];
+    public int DescendantBoxCount { get; private set; }
+    public int SubtreeItemCount { get; private set; }
     public string[] Categories => CsvInventoryService.Categories;
     public string QrSvg { get; private set; } = "";
 
@@ -340,7 +342,14 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
             return false;
         }
 
+        var locationLookup = await BoxHierarchyService.BuildLocationLookupAsync(db, cancellationToken);
+        BoxHierarchyService.ApplyLocationLookup(new[] { Box }.Concat(Box.ChildBoxes), locationLookup);
         Breadcrumb = await BoxHierarchyService.BuildBreadcrumbAsync(db, Box, cancellationToken);
+        var descendants = await BoxHierarchyService.GetDescendantIdsAsync(db, Box.Id, cancellationToken);
+        DescendantBoxCount = descendants.Count;
+        var subtreeBoxIds = descendants.Append(Box.Id).ToList();
+        SubtreeItemCount = await db.Items.AsNoTracking()
+            .CountAsync(i => i.BoxId != null && subtreeBoxIds.Contains(i.BoxId.Value), cancellationToken);
         Gallery = await db.Photos.AsNoTracking()
             .Where(p => p.EntityType == PhotoEntityType.Box && p.EntityId == Box.Id)
             .OrderByDescending(p => Box.CoverPhoto != null && p.Filename == Box.CoverPhoto)
@@ -390,6 +399,10 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
         PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
         return true;
     }
+
+    public int DirectItemCount => Box.Items.Count;
+
+    public int DirectChildCount => Box.ChildBoxes.Count;
 
     public int RotationFor(string? filename) =>
         filename is not null && PhotoStates.TryGetValue(filename, out var state) ? state.RotationDegrees : 0;
