@@ -667,13 +667,13 @@
 
       const onlyThis = document.createElement('a');
       onlyThis.className = `btn ${payload.includeChildren ? '' : 'primary'}`.trim();
-      onlyThis.href = `?box=${encodeURIComponent(context.code)}&includeChildren=false&view=${encodeURIComponent(payload.viewMode)}&q=${encodeURIComponent(payload.query || '')}&category=${encodeURIComponent(payload.category || '')}`;
+      onlyThis.href = buildInventoryQueryUrl(payload, { boxId: payload.boxId, includeChildren: false, view: payload.viewMode });
       onlyThis.textContent = 'Sólo este CT';
       firstRow.appendChild(onlyThis);
 
       const includeChildren = document.createElement('a');
       includeChildren.className = `btn ${payload.includeChildren ? 'primary' : ''}`.trim();
-      includeChildren.href = `?box=${encodeURIComponent(context.code)}&includeChildren=true&view=${encodeURIComponent(payload.viewMode)}&q=${encodeURIComponent(payload.query || '')}&category=${encodeURIComponent(payload.category || '')}`;
+      includeChildren.href = buildInventoryQueryUrl(payload, { boxId: payload.boxId, includeChildren: true, view: payload.viewMode });
       includeChildren.textContent = 'Incluir subcontenedores';
       firstRow.appendChild(includeChildren);
       actions.appendChild(firstRow);
@@ -683,13 +683,13 @@
 
       const flat = document.createElement('a');
       flat.className = `btn ${payload.viewMode === 'flat' ? 'primary' : ''}`.trim();
-      flat.href = `?box=${encodeURIComponent(context.code)}&includeChildren=${payload.includeChildren ? 'true' : 'false'}&view=flat&q=${encodeURIComponent(payload.query || '')}&category=${encodeURIComponent(payload.category || '')}`;
+      flat.href = buildInventoryQueryUrl(payload, { boxId: payload.boxId, includeChildren: payload.includeChildren, view: 'flat' });
       flat.textContent = 'Vista plana';
       secondRow.appendChild(flat);
 
       const grouped = document.createElement('a');
       grouped.className = `btn ${payload.viewMode === 'grouped' ? 'primary' : ''}`.trim();
-      grouped.href = `?box=${encodeURIComponent(context.code)}&includeChildren=${payload.includeChildren ? 'true' : 'false'}&view=grouped&q=${encodeURIComponent(payload.query || '')}&category=${encodeURIComponent(payload.category || '')}`;
+      grouped.href = buildInventoryQueryUrl(payload, { boxId: payload.boxId, includeChildren: payload.includeChildren, view: 'grouped' });
       grouped.textContent = 'Agrupado por contenedor';
       secondRow.appendChild(grouped);
       actions.appendChild(secondRow);
@@ -697,6 +697,78 @@
     section.appendChild(actions);
     root.appendChild(section);
     return root;
+  };
+
+  const buildInventorySummaryMarkup = payload => {
+    const root = document.createDocumentFragment();
+    const section = document.createElement('div');
+    section.className = 'panel inventory-scope';
+
+    const header = document.createElement('div');
+    header.className = 'section-header compact';
+
+    const copy = document.createElement('div');
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = 'Filtros activos';
+    const kicker = document.createElement('p');
+    kicker.className = 'section-kicker';
+    kicker.textContent = 'Alcance de consulta y operación en Inventario.';
+    copy.append(eyebrow, kicker);
+    header.appendChild(copy);
+
+    const clear = document.createElement('a');
+    clear.className = 'btn';
+    clear.href = '/items';
+    clear.textContent = 'Limpiar filtros';
+    header.appendChild(clear);
+    section.appendChild(header);
+
+    const chips = document.createElement('div');
+    chips.className = 'chips';
+
+    const addChip = (text, className = 'chip') => {
+      const chip = document.createElement('span');
+      chip.className = className;
+      chip.textContent = text;
+      chips.appendChild(chip);
+    };
+
+    if (payload.query) addChip(`Texto: ${payload.query}`, 'chip good');
+    if (payload.category) addChip(`Categoría: ${payload.category}`, 'chip good');
+    if (payload.boxId && payload.selectedBox && !payload.selectedBox.missing) addChip(`Contenedor: ${payload.selectedBox.code} · ${payload.selectedBox.name}`, 'chip good');
+    if (payload.locationId && payload.selectedLocationName) addChip(`Ubicación: ${payload.selectedLocationName}`, 'chip good');
+    if (payload.includeChildren) addChip('Incluye subcontenedores');
+    if (payload.onlyConsumable) addChip('Solo consumibles');
+    if (payload.onlyOrphans) addChip('Solo huérfanos');
+    addChip(payload.viewMode === 'flat' ? 'Vista plana' : 'Agrupado por contenedor');
+
+    section.appendChild(chips);
+    root.appendChild(section);
+    return root;
+  };
+
+  const buildInventoryQueryUrl = (payload, overrides = {}) => {
+    const params = new URLSearchParams();
+    const boxId = overrides.boxId ?? payload.boxId;
+    const locationId = overrides.locationId ?? payload.locationId;
+    const includeChildren = overrides.includeChildren ?? payload.includeChildren;
+    const view = overrides.view ?? payload.viewMode;
+    const query = overrides.query ?? payload.query;
+    const category = overrides.category ?? payload.category;
+    const onlyConsumable = overrides.onlyConsumable ?? payload.onlyConsumable;
+    const onlyOrphans = overrides.onlyOrphans ?? payload.onlyOrphans;
+
+    if (query) params.set('q', query);
+    if (category) params.set('category', category);
+    if (boxId) params.set('boxId', boxId);
+    if (locationId) params.set('locationId', locationId);
+    if (includeChildren) params.set('includeChildren', 'true');
+    if (onlyConsumable) params.set('onlyConsumable', 'true');
+    if (onlyOrphans) params.set('onlyOrphans', 'true');
+    if (view) params.set('view', view);
+    const queryString = params.toString();
+    return queryString ? `?${queryString}` : '/items';
   };
 
   const buildInventoryBoardMarkup = payload => {
@@ -866,9 +938,10 @@
       const form = root.querySelector('form');
       const results = root.querySelector('[data-live-inventory-board]');
       const context = root.querySelector('[data-live-inventory-context]');
+      const summary = root.querySelector('[data-live-inventory-summary]');
       const itemsCount = root.querySelector('[data-live-inventory-items-count]');
       const groupsCount = root.querySelector('[data-live-inventory-groups-count]');
-      if (!(form instanceof HTMLFormElement) || !(results instanceof HTMLElement) || !(context instanceof HTMLElement) || !(itemsCount instanceof HTMLElement)) return;
+      if (!(form instanceof HTMLFormElement) || !(results instanceof HTMLElement) || !(context instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(itemsCount instanceof HTMLElement)) return;
 
       root.dataset.liveFilterReady = 'true';
       const endpoint = root.dataset.liveFilterEndpoint || `${window.location.pathname}?handler=Live`;
@@ -877,15 +950,8 @@
       let controller = null;
 
       const syncUrl = payload => {
-        const url = new URL(window.location.href);
-        const params = new URLSearchParams();
-        if (payload.query) params.set('q', payload.query);
-        if (payload.category) params.set('category', payload.category);
-        if (payload.boxCode) params.set('box', payload.boxCode);
-        if (payload.includeChildren) params.set('includeChildren', 'true');
-        if (payload.viewMode) params.set('view', payload.viewMode);
-        url.search = params.toString();
-        window.history.replaceState({}, '', url);
+        const nextUrl = buildInventoryQueryUrl(payload);
+        window.history.replaceState({}, '', nextUrl);
       };
 
       const applyPayload = payload => {
@@ -894,6 +960,7 @@
           groupsCount.hidden = payload.viewMode === 'flat';
           groupsCount.textContent = `${payload.groupsCount || 0} contenedores`;
         }
+        summary.replaceChildren(buildInventorySummaryMarkup(payload));
         context.replaceChildren(buildInventoryContextMarkup(payload));
         results.replaceChildren(buildInventoryBoardMarkup(payload));
         enhanceRotatedPhotos(context);

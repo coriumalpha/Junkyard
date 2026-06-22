@@ -596,8 +596,23 @@ a.box-breadcrumb-node:hover {
   width: 54px;
   height: 54px;
 }
-.inventory-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, .35fr) auto; gap: 12px; align-items: end; }
+.inventory-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.inventory-filters .full,
+.inventory-filters .inventory-filter-actions { grid-column: 1 / -1; }
+.inventory-filters .inventory-filter-actions { justify-content: flex-start; }
 .inventory-filter-actions { align-self: end; }
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,.04);
+  color: var(--text);
+}
+.toggle-row input { width: 16px; height: 16px; margin: 0; }
+.inventory-scope { display: grid; gap: 12px; }
 .search-picker { display: grid; gap: 10px; min-width: 0; }
 .search-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .search-picker-label { margin: 0; font-size: 13px; color: var(--text-muted); }
