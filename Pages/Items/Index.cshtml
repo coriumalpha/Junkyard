@@ -20,9 +20,23 @@
     </div>
 
     <form class="panel inventory-filters" method="get">
-        <div class="field">
+        <div class="field full">
             <label>Buscar</label>
             <input name="q" type="search" value="@Model.Query" placeholder="Objeto, caja, categoría, nota..." data-live-filter-input />
+        </div>
+        <div class="field">
+            <label>Contenedor</label>
+            <partial name="_SearchPicker" model="Model.BoxPicker" />
+        </div>
+        <div class="field">
+            <label>Ubicación</label>
+            <select name="locationId" data-live-filter-input>
+                <option value="">Todas</option>
+                @foreach (var location in Model.Locations)
+                {
+                    <option value="@location.Value" selected="@(Model.LocationId?.ToString() == location.Value)">@location.Text</option>
+                }
+            </select>
         </div>
         <div class="field">
             <label>Categoría</label>
@@ -34,14 +48,68 @@
                 }
             </select>
         </div>
-        <input type="hidden" name="box" value="@Model.BoxCode" />
-        <input type="hidden" name="includeChildren" value="@(Model.IncludeChildren ? "true" : "false")" />
+        <div class="field">
+            <label>Alcance</label>
+            <label class="toggle-row">
+                <input name="includeChildren" type="checkbox" value="true" checked="@Model.IncludeChildren" data-live-filter-input />
+                <span>Incluir subcontenedores</span>
+            </label>
+            <label class="toggle-row">
+                <input name="onlyConsumable" type="checkbox" value="true" checked="@Model.OnlyConsumable" data-live-filter-input />
+                <span>Solo consumibles</span>
+            </label>
+            <label class="toggle-row">
+                <input name="onlyOrphans" type="checkbox" value="true" checked="@Model.OnlyOrphans" data-live-filter-input />
+                <span>Solo huérfanos</span>
+            </label>
+        </div>
         <input type="hidden" name="view" value="@Model.ViewMode" />
         <div class="actions inventory-filter-actions">
             <button class="btn primary" type="submit">Filtrar</button>
             <a class="btn" asp-page="/Items/Index">Limpiar</a>
         </div>
     </form>
+
+    <div class="panel inventory-scope" data-live-inventory-summary>
+        <div class="section-header compact">
+            <div>
+                <p class="eyebrow">Filtros activos</p>
+                <p class="section-kicker">Alcance de consulta y operación en Inventario.</p>
+            </div>
+            <a class="btn" asp-page="/Items/Index">Limpiar filtros</a>
+        </div>
+        <div class="chips">
+            @if (!string.IsNullOrWhiteSpace(Model.Query))
+            {
+                <span class="chip good">Texto: @Model.Query</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Category))
+            {
+                <span class="chip good">Categoría: @Model.Category</span>
+            }
+            @if (Model.BoxPicker?.Options.FirstOrDefault(option => option.Value == (Model.BoxId?.ToString() ?? "")) is { } selectedBox && !string.IsNullOrWhiteSpace(selectedBox.Title))
+            {
+                <span class="chip good">Contenedor: @selectedBox.Title</span>
+            }
+            @if (Model.LocationId is int locationId)
+            {
+                <span class="chip good">Ubicación: @Model.Locations.FirstOrDefault(location => location.Value == locationId.ToString())?.Text</span>
+            }
+            @if (Model.IncludeChildren)
+            {
+                <span class="chip">Incluye subcontenedores</span>
+            }
+            @if (Model.OnlyConsumable)
+            {
+                <span class="chip">Solo consumibles</span>
+            }
+            @if (Model.OnlyOrphans)
+            {
+                <span class="chip">Solo huérfanos</span>
+            }
+            <span class="chip">@(Model.IsFlatView ? "Vista plana" : "Agrupado por contenedor")</span>
+        </div>
+    </div>
 
     <div data-live-inventory-context>
         @if (!string.IsNullOrWhiteSpace(Model.BoxCode))
@@ -59,14 +127,14 @@
                             <h2>@Model.SelectedBox.Code · @Model.SelectedBox.Name</h2>
                             <p class="caption">@Model.SelectedBoxPath</p>
                             <div class="chips">
-                                <span class="chip">@Model.SelectedBox.ContainerTypeLabel</span>
+                            <span class="chip">@Model.SelectedBox.ContainerTypeLabel</span>
                             <span class="chip">@Model.SelectedBox.LocationDisplay</span>
                             @if (!string.IsNullOrWhiteSpace(Model.SelectedBox.EffectiveLocationSourceLabel))
                             {
                                 <span class="chip">@Model.SelectedBox.EffectiveLocationSourceLabel</span>
                             }
-                                <span class="chip">@(Model.IncludeChildren ? "Incluye subcontenedores" : "Sólo este CT")</span>
-                                <span class="chip">@(Model.IsFlatView ? "Vista plana" : "Agrupado por contenedor")</span>
+                            <span class="chip">@(Model.IncludeChildren ? "Incluye subcontenedores" : "Sólo este CT")</span>
+                            <span class="chip">@(Model.IsFlatView ? "Vista plana" : "Agrupado por contenedor")</span>
                             </div>
                     }
                 </div>
@@ -77,34 +145,46 @@
                             <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.SelectedBox.Code">Volver a ficha</a>
                             <a class="btn @(Model.IncludeChildren ? "" : "primary")"
                                asp-page="/Items/Index"
-                               asp-route-box="@Model.SelectedBox.Code"
+                               asp-route-boxId="@Model.SelectedBox.Id"
                                asp-route-includeChildren="false"
                                asp-route-view="@Model.ViewMode"
                                asp-route-q="@Model.Query"
-                               asp-route-category="@Model.Category">Sólo este CT</a>
+                               asp-route-category="@Model.Category"
+                               asp-route-locationId="@Model.LocationId"
+                               asp-route-onlyConsumable="@Model.OnlyConsumable"
+                               asp-route-onlyOrphans="@Model.OnlyOrphans">Sólo este CT</a>
                             <a class="btn @(Model.IncludeChildren ? "primary" : "")"
                                asp-page="/Items/Index"
-                               asp-route-box="@Model.SelectedBox.Code"
+                               asp-route-boxId="@Model.SelectedBox.Id"
                                asp-route-includeChildren="true"
                                asp-route-view="@Model.ViewMode"
                                asp-route-q="@Model.Query"
-                               asp-route-category="@Model.Category">Incluir subcontenedores</a>
+                               asp-route-category="@Model.Category"
+                               asp-route-locationId="@Model.LocationId"
+                               asp-route-onlyConsumable="@Model.OnlyConsumable"
+                               asp-route-onlyOrphans="@Model.OnlyOrphans">Incluir subcontenedores</a>
                         </div>
                         <div class="actions">
                             <a class="btn @(Model.IsFlatView ? "primary" : "")"
                                asp-page="/Items/Index"
-                               asp-route-box="@Model.SelectedBox.Code"
+                               asp-route-boxId="@Model.SelectedBox.Id"
                                asp-route-includeChildren="@(Model.IncludeChildren ? "true" : "false")"
                                asp-route-view="flat"
                                asp-route-q="@Model.Query"
-                               asp-route-category="@Model.Category">Vista plana</a>
+                               asp-route-category="@Model.Category"
+                               asp-route-locationId="@Model.LocationId"
+                               asp-route-onlyConsumable="@Model.OnlyConsumable"
+                               asp-route-onlyOrphans="@Model.OnlyOrphans">Vista plana</a>
                             <a class="btn @(!Model.IsFlatView ? "primary" : "")"
                                asp-page="/Items/Index"
-                               asp-route-box="@Model.SelectedBox.Code"
+                               asp-route-boxId="@Model.SelectedBox.Id"
                                asp-route-includeChildren="@(Model.IncludeChildren ? "true" : "false")"
                                asp-route-view="grouped"
                                asp-route-q="@Model.Query"
-                               asp-route-category="@Model.Category">Agrupado por contenedor</a>
+                               asp-route-category="@Model.Category"
+                               asp-route-locationId="@Model.LocationId"
+                               asp-route-onlyConsumable="@Model.OnlyConsumable"
+                               asp-route-onlyOrphans="@Model.OnlyOrphans">Agrupado por contenedor</a>
                         </div>
                     }
                 </div>
