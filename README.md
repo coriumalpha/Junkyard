@@ -1,12 +1,20 @@
-# Junkyard
+<p align="center">
+  <img src="wwwroot/img/junkyard-logo.png" alt="Junkyard logo" width="180">
+</p>
 
-**A self-hosted inventory system for real-world storage.**
+<h1 align="center">Junkyard</h1>
 
-Junkyard helps you catalogue physical items, organize them into containers, attach photos, print QR-friendly labels and find things later without digging through every box in the house.
+<p align="center">
+  <strong>A self-hosted inventory system for real-world storage.</strong>
+</p>
 
-It is built for people with homelabs, workshops, storage rooms, tools, cables, spare parts, documents, hobby collections and the recurring thought: _"I know I have one somewhere."_
+<p align="center">
+  Catalogue physical items, organize them into containers, attach photos, print QR-friendly labels and find things later without digging through every box in the house.
+</p>
 
-![Junkyard logo](wwwroot/img/junkyard-logo.png)
+---
+
+Junkyard is built for people with homelabs, workshops, storage rooms, tools, cables, spare parts, documents, hobby collections and the recurring thought: _"I know I have one somewhere."_
 
 ## What you can use it for
 
@@ -82,8 +90,6 @@ Container pages focus on physical logistics: QR, hierarchy, child containers, ph
 You only need Docker and Docker Compose.
 
 ```bash
-git clone https://github.com/coriumalpha/Junkyard.git
-cd Junkyard
 docker compose up -d --build
 ```
 
@@ -112,18 +118,11 @@ Inside the container, Junkyard stores mutable state under `/data`:
 
 Back up the Docker volume separately from the Git repository.
 
-```bash
-docker compose ps
-docker volume ls | grep inventario
-```
-
 ## Local development
 
 Requires the .NET 9 SDK.
 
 ```bash
-git clone https://github.com/coriumalpha/Junkyard.git
-cd Junkyard
 dotnet restore
 dotnet build
 dotnet run
@@ -150,13 +149,6 @@ The following are deliberately ignored by `.gitignore` and `.dockerignore`:
 - `*.sqlite`, `*.db` and journal/WAL files
 - uploaded photos and `wwwroot/uploads/`
 - imports, exports, backups, logs and `.env` files
-
-Before publishing a fork or sharing local changes, run:
-
-```bash
-git status --ignored
-git ls-files | grep -Ei 'sqlite|\.db|uploads|App_Data|backup|\.env' || true
-```
 
 If you expose Junkyard outside a trusted local network, put authentication and TLS in front of it before entering real inventory data.
 
