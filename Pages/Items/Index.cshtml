@@ -78,7 +78,7 @@
                     <partial name="_SearchPicker" model="Model.BoxPicker" />
                 </div>
                 <div class="field">
-                    <label>Ubicación</label>
+                    <label>Ubicación efectiva</label>
                     <select name="locationId" data-live-filter-input>
                         <option value="">Todas</option>
                         @foreach (var location in Model.Locations)
@@ -170,7 +170,7 @@
             }
             @if (Model.LocationId is int locationId)
             {
-                <span class="chip good">Ubicación: @Model.Locations.FirstOrDefault(location => location.Value == locationId.ToString())?.Text</span>
+                <span class="chip good">Ubicación efectiva: @Model.Locations.FirstOrDefault(location => location.Value == locationId.ToString())?.Text</span>
             }
             @if (Model.IncludeChildren)
             {
@@ -184,7 +184,6 @@
             {
                 <span class="chip">Solo huérfanos</span>
             }
-            <span class="chip">@(Model.IsFlatView ? "Vista plana" : "Agrupado por contenedor")</span>
         </div>
     </div>
 
@@ -211,7 +210,6 @@
                                 <span class="chip">@Model.SelectedBox.EffectiveLocationSourceLabel</span>
                             }
                             <span class="chip">@(Model.IncludeChildren ? "Incluye subcontenedores" : "Sólo este CT")</span>
-                            <span class="chip">@(Model.IsFlatView ? "Vista plana" : "Agrupado por contenedor")</span>
                             </div>
                     }
                 </div>
