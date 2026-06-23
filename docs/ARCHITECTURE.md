@@ -18,6 +18,7 @@ Junkyard is a compact ASP.NET Core Razor Pages application.
 - `Services/PhotoStorage.cs`: upload storage, public paths and rotation normalization.
 - `Services/CsvInventoryService.cs`: CSV import/export behavior.
 - `wwwroot/`: CSS, JavaScript, favicon and safe static branding assets.
+- `docs/architecture/frontend.md`: Angular SPA conventions for the future frontend migration.
 
 ## Data Model
 
