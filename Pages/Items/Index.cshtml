@@ -333,8 +333,11 @@
                         @if (group.BoxId is int boxId && !group.IsOrphanGroup)
                         {
                             var boxCode = group.Code;
-                            <a class="btn" asp-page="/Items/Index" asp-route-box="@boxCode" asp-route-includeChildren="true" asp-route-view="flat">Inventario + subcontenedores</a>
-                            <a class="btn" asp-page="/Boxes/Details" asp-route-code="@boxCode">Abrir caja</a>
+                            <a class="btn" asp-page="/Items/Index" asp-route-box="@boxCode" asp-route-includeChildren="false" asp-route-view="flat">Ver directo</a>
+                            <a class="btn" asp-page="/Items/Index" asp-route-box="@boxCode" asp-route-includeChildren="true" asp-route-view="grouped">Ver rama</a>
+                            <a class="btn" asp-page="/Boxes/Details" asp-route-code="@boxCode">Abrir ficha</a>
+                            <a class="btn" asp-page="/Boxes/Edit" asp-route-id="@group.BoxId">Editar contenedor</a>
+                            <a class="btn" asp-page="/Boxes/Create" asp-route-parentBoxId="@group.BoxId">Crear subcontenedor</a>
                         }
                     </div>
 

@@ -66,8 +66,8 @@
         <div class="actions">
             <a class="btn primary" asp-page="/Items/Create" asp-route-boxId="@Model.Box.Id">Añadir ítem</a>
             <a class="btn" asp-page="/Boxes/Create" asp-route-parentBoxId="@Model.Box.Id">Crear subcontenedor</a>
-            <a class="btn" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="true" asp-route-view="flat">Inventario + subcontenedores</a>
-            <a class="btn" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="true" asp-route-view="grouped">Inventario + subcontenedores</a>
+            <a class="btn" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="false" asp-route-view="flat">Ver directo</a>
+            <a class="btn" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="true" asp-route-view="grouped">Ver rama</a>
             <a class="btn" asp-page="/Boxes/Edit" asp-route-id="@Model.Box.Id">Editar contenedor</a>
         </div>
     </div>
@@ -108,7 +108,7 @@
                     <p class="section-kicker">La ficha queda centrada en logística. Para operar con ítems, usa Inventario filtrado.</p>
                 </div>
                 <div class="actions">
-                    <a class="btn primary" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="true" asp-route-view="flat">Vista plana</a>
+                    <a class="btn primary" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="false" asp-route-view="flat">Vista plana</a>
                     <a class="btn" asp-page="/Items/Index" asp-route-box="@Model.Box.Code" asp-route-includeChildren="true" asp-route-view="grouped">Agrupado por contenedor</a>
                 </div>
             </div>
