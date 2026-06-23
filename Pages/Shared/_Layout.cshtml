@@ -7,10 +7,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body>
+<body data-icon-sprite="@Url.Content("~/lib/bootstrap-icons/bootstrap-icons.svg")">
 @{
     var path = Context.Request.Path.Value ?? "/";
     var query = Context.Request.Query;
+    var iconSprite = Url.Content("~/lib/bootstrap-icons/bootstrap-icons.svg");
+    Microsoft.AspNetCore.Html.IHtmlContent Icon(string name) => new Microsoft.AspNetCore.Html.HtmlString($"<svg class=\"icon-svg\" aria-hidden=\"true\" focusable=\"false\"><use href=\"{iconSprite}#{name}\"></use></svg>");
     string Active(string prefix) => path.Equals(prefix, StringComparison.OrdinalIgnoreCase) || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase) ? " active" : "";
     var boxesNav = "nav-link" + Active("/Boxes") + Active("/boxes");
     var inventoryNav = "nav-link" + Active("/items");
@@ -38,15 +40,15 @@
             </form>
         </div>
         <nav>
-            <a class="@boxesNav" asp-page="/Boxes/Index"><span class="nav-ico">□</span>Cajas</a>
-            <a class="@inventoryNav" asp-page="/Items/Index"><span class="nav-ico">≡</span>Inventario</a>
-            <a class="@locationsNav" asp-page="/Locations"><span class="nav-ico">⌂</span>Ubicaciones</a>
-            <a class="@consumablesNav" asp-page="/Items/Index" asp-route-onlyConsumable="true" asp-route-view="flat"><span class="nav-ico">↓</span>Consumibles</a>
-            <a class="@photosNav" asp-page="/Photos/Inbox"><span class="nav-ico">◉</span>Fotos</a>
-            <a class="@actionsNav" asp-page="/Pendientes"><span class="nav-ico">•</span>Pendientes</a>
-            <a class="@archiveNav" asp-page="/Archive"><span class="nav-ico">⌁</span>Archivo</a>
-            <a class="@importNav" asp-page="/Import"><span class="nav-ico">↑</span>Importar</a>
-            <a class="@exportNav" asp-page="/Export"><span class="nav-ico">↓</span>Exportar</a>
+            <a class="@boxesNav" asp-page="/Boxes/Index">@Icon("box-seam")<span>Cajas</span></a>
+            <a class="@inventoryNav" asp-page="/Items/Index">@Icon("list-ul")<span>Inventario</span></a>
+            <a class="@locationsNav" asp-page="/Locations">@Icon("geo-alt")<span>Ubicaciones</span></a>
+            <a class="@consumablesNav" asp-page="/Items/Index" asp-route-onlyConsumable="true" asp-route-view="flat">@Icon("basket")<span>Consumibles</span></a>
+            <a class="@photosNav" asp-page="/Photos/Inbox">@Icon("images")<span>Fotos</span></a>
+            <a class="@actionsNav" asp-page="/Pendientes">@Icon("clock-history")<span>Pendientes</span></a>
+            <a class="@archiveNav" asp-page="/Archive">@Icon("archive")<span>Archivo</span></a>
+            <a class="@importNav" asp-page="/Import">@Icon("arrow-down-square")<span>Importar</span></a>
+            <a class="@exportNav" asp-page="/Export">@Icon("arrow-up-square")<span>Exportar</span></a>
         </nav>
     </header>
     <main class="shell page">

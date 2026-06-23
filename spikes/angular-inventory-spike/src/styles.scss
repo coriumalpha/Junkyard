@@ -1,0 +1,72 @@
+@import '@angular/material/prebuilt-themes/pink-bluegrey.css';
+
+:root {
+  color-scheme: dark;
+  --app-bg: #0b1020;
+  --app-surface: #111831;
+  --app-surface-raised: #16213f;
+  --app-surface-soft: rgba(255, 255, 255, 0.04);
+  --app-surface-hover: rgba(255, 255, 255, 0.06);
+  --app-border: rgba(255, 255, 255, 0.08);
+  --app-border-strong: rgba(255, 255, 255, 0.16);
+  --app-text: #f3f7ff;
+  --app-muted: #b9c5de;
+  --app-accent: #8ad6ff;
+  --app-danger: #ff6b8b;
+  --app-success: #6ee7b7;
+  --app-warning: #ffbd6b;
+  --app-focus: rgba(138, 214, 255, 0.28);
+  --app-shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.18);
+  --app-shadow-md: 0 18px 60px rgba(0, 0, 0, 0.22);
+  --app-shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.28);
+  --app-radius-xs: 10px;
+  --app-radius-sm: 14px;
+  --app-radius-md: 18px;
+  --app-radius-lg: 24px;
+  --app-space-1: 4px;
+  --app-space-2: 8px;
+  --app-space-3: 12px;
+  --app-space-4: 16px;
+  --app-space-5: 20px;
+  --app-space-6: 24px;
+  --app-density-compact: -3;
+  --app-density-default: 0;
+
+  --bg-0: var(--app-bg);
+  --bg-1: var(--app-surface);
+  --bg-2: var(--app-surface-raised);
+  --ink-0: var(--app-text);
+  --ink-1: var(--app-muted);
+  --ink-2: #8593b5;
+  --line: var(--app-border);
+  --accent: var(--app-accent);
+  --accent-2: #ff9bc8;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(138, 214, 255, 0.16), transparent 28%),
+    radial-gradient(circle at 85% 20%, rgba(255, 155, 200, 0.12), transparent 24%),
+    linear-gradient(180deg, var(--app-bg), var(--app-surface) 45%, #0b1328 100%);
+  color: var(--app-text);
+}
+
+a {
+  color: inherit;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+app-root {
+  display: block;
+  min-height: 100vh;
+}

@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text;
 using Inventario.Data;
 using Inventario.Models;
 using Inventario.Services;
@@ -74,8 +72,8 @@ public class SearchModel(InventoryDbContext db) : PageModel
             return new SearchData(query, [], [], new Dictionary<string, PhotoViewState>(StringComparer.OrdinalIgnoreCase), new Dictionary<int, string>(), new Dictionary<int, BoxLocationResolution>());
         }
 
-        var normalizedQuery = NormalizeSearchText(query);
-        var terms = TokenizeSearchTerms(query);
+        var normalizedQuery = SearchText.Normalize(query);
+        var terms = SearchText.Tokenize(query);
         var normalizedCode = Box.NormalizePublicCode(query);
         var ctDigits = Box.TryParseCtSequence(query, out var sequence) ? sequence.ToString("000000") : null;
         var boxCandidates = await db.Boxes.AsNoTracking()
@@ -137,34 +135,6 @@ public class SearchModel(InventoryDbContext db) : PageModel
         return new SearchData(query, boxes, items, photoStates, itemPhotoById, locationLookup);
     }
 
-    private static string NormalizeSearchText(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return "";
-        }
-
-        var normalized = value.Trim().Normalize(NormalizationForm.FormD);
-        var builder = new StringBuilder(normalized.Length);
-        foreach (var ch in normalized)
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
-            {
-                builder.Append(char.ToLowerInvariant(ch));
-            }
-        }
-
-        return builder.ToString().Normalize(NormalizationForm.FormC);
-    }
-
-    private static List<string> TokenizeSearchTerms(string? value)
-    {
-        return NormalizeSearchText(value)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-    }
-
     private static int ScoreBox(string rawQuery, string normalizedQuery, IReadOnlyList<string> terms, string? normalizedCode, string? ctDigits, Box box)
     {
         var locationName = box.Location?.Name;
@@ -183,7 +153,7 @@ public class SearchModel(InventoryDbContext db) : PageModel
             (parentName, 35)
         };
 
-        return ScoreSearchEntry(rawQuery, normalizedQuery, terms, normalizedCode, ctDigits, fields);
+        return SearchText.ScoreEntry(rawQuery, normalizedQuery, terms, normalizedCode, ctDigits, fields);
     }
 
     private static int ScoreItem(string rawQuery, string normalizedQuery, IReadOnlyList<string> terms, Item item)
@@ -206,113 +176,7 @@ public class SearchModel(InventoryDbContext db) : PageModel
             (item.Retention, 10)
         };
 
-        return ScoreSearchEntry(rawQuery, normalizedQuery, terms, null, null, fields);
-    }
-
-    private static int ScoreSearchEntry(
-        string rawQuery,
-        string normalizedQuery,
-        IReadOnlyList<string> terms,
-        string? normalizedCode,
-        string? ctDigits,
-        IReadOnlyList<(string? Value, int Weight)> fields)
-    {
-        if (terms.Count == 0)
-        {
-            return int.MinValue;
-        }
-
-        var normalizedFields = fields
-            .Select(field => (Value: NormalizeSearchText(field.Value), field.Weight))
-            .ToList();
-
-        var combined = string.Join(' ', normalizedFields.Select(field => field.Value).Where(value => !string.IsNullOrWhiteSpace(value)));
-        if (combined.Length == 0)
-        {
-            return int.MinValue;
-        }
-
-        var score = 0;
-        var matchedTerms = 0;
-        foreach (var term in terms)
-        {
-            var termMatched = false;
-            foreach (var field in normalizedFields)
-            {
-                if (string.IsNullOrWhiteSpace(field.Value))
-                {
-                    continue;
-                }
-
-                if (field.Value == term)
-                {
-                    score += field.Weight * 5;
-                    termMatched = true;
-                }
-                else if (field.Value.StartsWith(term, StringComparison.Ordinal))
-                {
-                    score += field.Weight * 4;
-                    termMatched = true;
-                }
-                else if (field.Value.Contains(term, StringComparison.Ordinal))
-                {
-                    score += field.Weight * 2;
-                    termMatched = true;
-                }
-            }
-
-            if (!termMatched)
-            {
-                return int.MinValue;
-            }
-
-            matchedTerms++;
-        }
-
-        score += matchedTerms * 20;
-
-        if (combined == normalizedQuery)
-        {
-            score += 800;
-        }
-        else if (combined.StartsWith(normalizedQuery, StringComparison.Ordinal))
-        {
-            score += 300;
-        }
-        else if (combined.Contains(normalizedQuery, StringComparison.Ordinal))
-        {
-            score += 120;
-        }
-
-        var firstField = normalizedFields.FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(firstField.Value))
-        {
-            if (firstField.Value == normalizedQuery)
-            {
-                score += 200;
-            }
-            else if (firstField.Value.StartsWith(normalizedQuery, StringComparison.Ordinal))
-            {
-                score += 80;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(normalizedCode) && normalizedFields.Any(field => field.Value == normalizedCode))
-        {
-            score += 1000;
-        }
-
-        if (!string.IsNullOrWhiteSpace(ctDigits) && normalizedFields.Any(field => field.Value != null && field.Value.EndsWith(ctDigits, StringComparison.Ordinal)))
-        {
-            score += 160;
-        }
-
-        if (rawQuery.IndexOf(' ') >= 0)
-        {
-            score += 10;
-        }
-
-        return score;
+        return SearchText.ScoreEntry(rawQuery, normalizedQuery, terms, null, null, fields);
     }
 
     private record SearchData(

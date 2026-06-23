@@ -2,6 +2,8 @@
 @model Inventario.Pages.Items.IndexModel
 @{
     ViewData["Title"] = "Inventario";
+    var iconSprite = Url.Content("~/lib/bootstrap-icons/bootstrap-icons.svg");
+    Microsoft.AspNetCore.Html.IHtmlContent Icon(string name) => new Microsoft.AspNetCore.Html.HtmlString($"<svg class=\"icon-svg\" aria-hidden=\"true\" focusable=\"false\"><use href=\"{iconSprite}#{name}\"></use></svg>");
 }
 
 <div data-live-filter-root data-live-filter-mode="inventory" data-live-filter-endpoint="/items?handler=Live" data-live-filter-delay="80">
@@ -10,12 +12,17 @@
             <h1>Inventario</h1>
             <p class="section-kicker">Consulta operativa de ítems, en vista plana o agrupada por contenedor.</p>
         </div>
-        <div class="chips">
-            <span class="chip" data-live-inventory-items-count>@Model.Items.Count ítems</span>
-            @if (!Model.IsFlatView)
-            {
-                <span class="chip" data-live-inventory-groups-count>@Model.Groups.Count contenedores</span>
-            }
+        <div class="section-title-actions">
+            <div class="chips">
+                <span class="chip" data-live-inventory-items-count>@Model.Items.Count ítems</span>
+                @if (!Model.IsFlatView)
+                {
+                    <span class="chip" data-live-inventory-groups-count>@Model.Groups.Count contenedores</span>
+                }
+            </div>
+            <div class="actions">
+                <a class="btn primary" asp-page="/Boxes/Create">@Icon("plus-lg")<span>Nuevo contenedor</span></a>
+            </div>
         </div>
     </div>
 
@@ -24,7 +31,53 @@
             <label>Buscar</label>
             <input name="q" type="search" value="@Model.Query" placeholder="Objeto, caja, categoría, nota..." data-live-filter-input />
         </div>
-        <details class="inventory-filters-advanced full">
+        <div class="panel inventory-filter-status full" data-live-inventory-summary>
+            <div class="section-header compact inventory-filter-status-header">
+                <div>
+                    <p class="eyebrow">Filtros activos</p>
+                    <p class="section-kicker">Consulta y alcance en Inventario.</p>
+                </div>
+                <div class="actions inventory-filter-status-actions">
+                    <button class="btn" type="button" data-inventory-filters-toggle>@Icon("funnel")<span>Editar filtros</span></button>
+                    <a class="btn" asp-page="/Items/Index">@Icon("x-lg")<span>Limpiar filtros</span></a>
+                </div>
+            </div>
+            <div class="chips inventory-filter-status-chips">
+                @if (!string.IsNullOrWhiteSpace(Model.Query))
+                {
+                    <span class="chip good">Texto: @Model.Query</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.Category))
+                {
+                    <span class="chip good">Categoría: @Model.Category</span>
+                }
+                @if (Model.SelectedBoxes.Count == 1)
+                {
+                    <span class="chip good">Contenedor: @Model.SelectedBoxes[0].Code · @Model.SelectedBoxes[0].Name</span>
+                }
+                else if (Model.SelectedBoxes.Count > 1)
+                {
+                    <span class="chip good">Contenedores: @Model.SelectedBoxes.Count</span>
+                }
+                @if (Model.LocationId is int locationId)
+                {
+                    <span class="chip good">Ubicación efectiva: @Model.Locations.FirstOrDefault(location => location.Value == locationId.ToString())?.Text</span>
+                }
+                @if (Model.IncludeChildren)
+                {
+                    <span class="chip">Incluye subcontenedores</span>
+                }
+                @if (Model.OnlyConsumable)
+                {
+                    <span class="chip">Solo consumibles</span>
+                }
+                @if (Model.OnlyOrphans)
+                {
+                    <span class="chip">Solo huérfanos</span>
+                }
+            </div>
+        </div>
+        <details class="inventory-filters-advanced full" data-inventory-filters-panel>
             <summary>
                 <span>
                     <strong>Filtros avanzados</strong>
@@ -39,7 +92,7 @@
                             <label>Contenedores</label>
                             <p class="section-kicker">Puedes sumar varios CT a la vez. El alcance se combina.</p>
                         </div>
-                        <div class="chips">
+                    <div class="chips">
                             <span class="chip @(Model.SelectedBoxes.Count > 0 ? "good" : "")">@Model.SelectedBoxes.Count seleccionados</span>
                             @if (Model.SelectedBoxes.Count > 1)
                             {
@@ -47,7 +100,7 @@
                             }
                             @if (Model.SelectedBoxes.Count > 0)
                             {
-                                <button class="btn" type="button" data-box-clear-all>Limpiar contenedores</button>
+                                <button class="btn" type="button" data-box-clear-all>@Icon("x-lg")<span>Limpiar contenedores</span></button>
                             }
                         </div>
                     </div>
@@ -101,91 +154,60 @@
                     <label>Alcance</label>
                     <label class="toggle-row">
                         <input name="includeChildren" type="checkbox" value="true" checked="@Model.IncludeChildren" data-live-filter-input />
+                        <span class="toggle-ui" aria-hidden="true"></span>
                         <span>Incluir subcontenedores</span>
                     </label>
                     <label class="toggle-row">
                         <input name="onlyConsumable" type="checkbox" value="true" checked="@Model.OnlyConsumable" data-live-filter-input />
+                        <span class="toggle-ui" aria-hidden="true"></span>
                         <span>Solo consumibles</span>
                     </label>
                     <label class="toggle-row">
                         <input name="onlyOrphans" type="checkbox" value="true" checked="@Model.OnlyOrphans" data-live-filter-input />
+                        <span class="toggle-ui" aria-hidden="true"></span>
                         <span>Solo huérfanos</span>
                     </label>
                 </div>
             </div>
         </details>
         <input type="hidden" name="view" value="@Model.ViewMode" />
-        <div class="actions inventory-filter-actions">
-            <button class="btn primary" type="submit">Filtrar</button>
-            <a class="btn" asp-page="/Items/Index">Limpiar</a>
+</form>
+
+@{
+    var inventoryReturnUrl = Model.CurrentReturnUrl;
+}
+
+<section class="panel bulk-edit-panel inventory-bulk-panel" data-inventory-bulk-root>
+    @if (TempData["BulkMoveMessage"] is string bulkMoveMessage)
+    {
+        <div class="notice toast stack-top">@bulkMoveMessage</div>
+    }
+    <form class="bulk-edit-shell" method="post" asp-page-handler="MoveSelected" data-inventory-bulk-form>
+        <input type="hidden" name="returnUrl" value="@inventoryReturnUrl" />
+        <div class="bulk-toolbar">
+            <div class="bulk-toolbar-copy">
+                <div class="section-header compact">
+                    <div>
+                        <p class="eyebrow">Operaciones masivas</p>
+                        <h2>Mover seleccionados</h2>
+                        <p class="section-kicker">Selecciona uno o varios ítems y mándalos a otro contenedor con el selector rico.</p>
+                    </div>
+                    <div class="actions">
+                        <span class="chip" data-inventory-bulk-count>0 seleccionados</span>
+                        <button class="btn" type="button" data-inventory-bulk-clear>@Icon("x-lg")<span>Limpiar selección</span></button>
+                    </div>
+                </div>
+                <div class="inventory-bulk-empty caption" data-inventory-bulk-empty>Selecciona ítems en la vista para activar el movimiento masivo.</div>
+                <div class="chips inventory-bulk-selected-list" data-inventory-bulk-selected-list></div>
+                <div hidden data-inventory-bulk-selected-inputs></div>
+            </div>
+            <div class="bulk-toolbar-target">
+                <partial name="_SearchPicker" model="Model.BulkMoveBoxPicker" />
+                <button class="btn primary full" type="submit" data-inventory-bulk-submit disabled>@Icon("arrow-right-circle")<span>Mover seleccionados</span></button>
+            </div>
         </div>
     </form>
-
-    <div class="panel inventory-scope" data-live-inventory-summary>
-        <div class="section-header compact">
-            <div>
-                <p class="eyebrow">Filtros activos</p>
-                <p class="section-kicker">Alcance de consulta y operación en Inventario.</p>
-            </div>
-            <a class="btn" asp-page="/Items/Index">Limpiar filtros</a>
-        </div>
-        <div class="inventory-presets">
-            <p class="caption">Accesos rápidos</p>
-            <div class="actions">
-                <a class="btn" asp-page="/Items/Index" asp-route-onlyConsumable="true" asp-route-view="flat">Consumibles</a>
-                <a class="btn" asp-page="/Items/Index" asp-route-onlyOrphans="true" asp-route-view="grouped">Huérfanos</a>
-                <a class="btn" asp-page="/Locations">Ubicaciones</a>
-                <a class="btn primary" asp-page="/Boxes/Create">Nuevo contenedor</a>
-                @foreach (var location in Model.Locations.Take(5))
-                {
-                    <a class="btn" asp-page="/Items/Index" asp-route-locationId="@location.Value" asp-route-view="grouped">@location.Text</a>
-                }
-            </div>
-        </div>
-        <div class="inventory-presets">
-            <p class="caption">Vista</p>
-            <div class="actions">
-                <a class="btn @(Model.IsFlatView ? "primary" : "")"
-                   href="@Model.BuildInventoryUrl(view: "flat")">Vista plana</a>
-                <a class="btn @(!Model.IsFlatView ? "primary" : "")"
-                   href="@Model.BuildInventoryUrl(view: "grouped")">Agrupado por contenedor</a>
-            </div>
-        </div>
-        <div class="chips">
-            @if (!string.IsNullOrWhiteSpace(Model.Query))
-            {
-                <span class="chip good">Texto: @Model.Query</span>
-            }
-            @if (!string.IsNullOrWhiteSpace(Model.Category))
-            {
-                <span class="chip good">Categoría: @Model.Category</span>
-            }
-            @if (Model.SelectedBoxes.Count == 1)
-            {
-                <span class="chip good">Contenedor: @Model.SelectedBoxes[0].Code · @Model.SelectedBoxes[0].Name</span>
-            }
-            else if (Model.SelectedBoxes.Count > 1)
-            {
-                <span class="chip good">Contenedores: @Model.SelectedBoxes.Count</span>
-            }
-            @if (Model.LocationId is int locationId)
-            {
-                <span class="chip good">Ubicación efectiva: @Model.Locations.FirstOrDefault(location => location.Value == locationId.ToString())?.Text</span>
-            }
-            @if (Model.IncludeChildren)
-            {
-                <span class="chip">Incluye subcontenedores</span>
-            }
-            @if (Model.OnlyConsumable)
-            {
-                <span class="chip">Solo consumibles</span>
-            }
-            @if (Model.OnlyOrphans)
-            {
-                <span class="chip">Solo huérfanos</span>
-            }
-        </div>
-    </div>
+</section>
 
     <div data-live-inventory-context>
         @if (!string.IsNullOrWhiteSpace(Model.BoxCode))
@@ -217,11 +239,13 @@
                     @if (Model.SelectedBox is not null)
                     {
                         <div class="actions">
-                            <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.SelectedBox.Code">Volver a ficha</a>
-                            <a class="btn @(Model.IncludeChildren ? "" : "primary")"
-                               href="@Model.BuildInventoryUrl(boxIds: new[] { Model.SelectedBox.Id }, includeChildren: false, view: Model.ViewMode)">Sólo este CT</a>
-                            <a class="btn @(Model.IncludeChildren ? "primary" : "")"
-                               href="@Model.BuildInventoryUrl(boxIds: new[] { Model.SelectedBox.Id }, includeChildren: true, view: Model.ViewMode)">Incluir subcontenedores</a>
+                            <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.SelectedBox.Code">@Icon("box-seam")<span>Volver a ficha</span></a>
+                            <div class="segmented" role="group" aria-label="Alcance del contenedor">
+                                <a class="segmented-item @(Model.IncludeChildren ? "" : "is-active")"
+                                   href="@Model.BuildInventoryUrl(boxIds: new[] { Model.SelectedBox.Id }, includeChildren: false, view: Model.ViewMode)">@Icon("toggle-off")<span>Sólo este CT</span></a>
+                                <a class="segmented-item @(Model.IncludeChildren ? "is-active" : "")"
+                                   href="@Model.BuildInventoryUrl(boxIds: new[] { Model.SelectedBox.Id }, includeChildren: true, view: Model.ViewMode)">@Icon("toggle-on")<span>Incluir subcontenedores</span></a>
+                            </div>
                         </div>
                     }
                 </div>
@@ -233,48 +257,63 @@
         @if (Model.IsFlatView)
         {
             <section class="inventory-group">
-                <div class="section-header compact">
+                <div class="section-header compact inventory-board-header">
                     <div>
                         <h2>Ítems aplanados</h2>
                         <p class="section-kicker">Todos los ítems del alcance actual en una sola vista operativa.</p>
+                    </div>
+                    <div class="actions">
+                        <a class="btn" href="@Model.BuildInventoryUrl(onlyConsumable: true, onlyOrphans: false, view: "flat")">@Icon("basket")<span>Consumibles</span></a>
+                        <a class="btn" href="@Model.BuildInventoryUrl(onlyConsumable: false, onlyOrphans: true, view: "grouped")">@Icon("archive")<span>Huérfanos</span></a>
+                        <a class="btn" asp-page="/Locations">@Icon("geo-alt")<span>Ubicaciones</span></a>
+                        <div class="segmented" role="group" aria-label="Vista de inventario">
+                            <a class="segmented-item is-active" aria-current="page" href="@Model.BuildInventoryUrl(view: "flat")">@Icon("list-ul")<span>Vista plana</span></a>
+                            <a class="segmented-item" href="@Model.BuildInventoryUrl(view: "grouped")">@Icon("boxes")<span>Agrupado</span></a>
+                        </div>
                     </div>
                 </div>
                 <div class="inventory-photo-grid">
                     @foreach (var item in Model.Items)
                     {
-                        <a class="inventory-photo-card" asp-page="/Items/Edit" asp-route-id="@item.Id">
-                            @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
-                            {
-                                <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
-                            }
-                            else
-                            {
-                                <span class="inventory-photo-empty">@item.Name[..1]</span>
-                            }
-                            <span class="inventory-photo-body">
-                                <strong>@item.Name</strong>
-                                <small>@item.Category · @item.Quantity @item.Unit</small>
-                                <small>@Inventario.Pages.Items.IndexModel.BuildBoxPath(item.Box)</small>
-                                <span class="chips">
-                                    @if (item.Box is not null)
-                                    {
-                                        <span class="chip good">@item.Box.Code</span>
-                                    }
-                                    @if (item.Consumable)
-                                    {
-                                        <span class="chip @(item.MinQuantity != null && item.Quantity <= item.MinQuantity ? "danger" : "good")">stock</span>
-                                    }
-                                    @if (item.Sentimental)
-                                    {
-                                        <span class="chip good">recuerdo</span>
-                                    }
-                                    @if (item.Obsolete)
-                                    {
-                                        <span class="chip warn">legacy</span>
-                                    }
+                        <article class="inventory-photo-card selectable-item" data-inventory-item-card data-item-id="@item.Id">
+                            <button class="select-chip" type="button" data-inventory-select-item aria-pressed="false">
+                                @Icon("square")
+                                <span>Seleccionar</span>
+                            </button>
+                            <a class="inventory-photo-link" asp-page="/Items/Edit" asp-route-id="@item.Id">
+                                @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
+                                {
+                                    <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
+                                }
+                                else
+                                {
+                                    <span class="inventory-photo-empty">@item.Name[..1]</span>
+                                }
+                                <span class="inventory-photo-body">
+                                    <strong>@item.Name</strong>
+                                    <small>@item.Category · @item.Quantity @item.Unit</small>
+                                    <small>@Inventario.Pages.Items.IndexModel.BuildBoxPath(item.Box)</small>
+                                    <span class="chips">
+                                        @if (item.Box is not null)
+                                        {
+                                            <span class="chip good">@item.Box.Code</span>
+                                        }
+                                        @if (item.Consumable)
+                                        {
+                                            <span class="chip @(item.MinQuantity != null && item.Quantity <= item.MinQuantity ? "danger" : "good")">stock</span>
+                                        }
+                                        @if (item.Sentimental)
+                                        {
+                                            <span class="chip good">recuerdo</span>
+                                        }
+                                        @if (item.Obsolete)
+                                        {
+                                            <span class="chip warn">legacy</span>
+                                        }
+                                    </span>
                                 </span>
-                            </span>
-                        </a>
+                            </a>
+                        </article>
                     }
                 </div>
             </section>
@@ -282,18 +321,24 @@
         else
         {
             <div class="inventory-group-controls">
-            <div class="section-header compact">
-                <div>
-                    <h2>Ítems agrupados</h2>
-                    <p class="section-kicker">Cada contenedor se puede plegar para navegar más rápido.</p>
-                </div>
-                <div class="actions">
-                    <a class="btn primary" asp-page="/Boxes/Create">Nuevo contenedor</a>
-                    <button class="btn" type="button" data-inventory-collapse-groups>Colapsar todo</button>
-                    <button class="btn primary" type="button" data-inventory-expand-groups>Expandir todo</button>
+                <div class="section-header compact inventory-board-header">
+                    <div>
+                        <h2>Ítems agrupados</h2>
+                        <p class="section-kicker">Cada contenedor se puede plegar para navegar más rápido.</p>
+                    </div>
+                    <div class="actions">
+                        <a class="btn" href="@Model.BuildInventoryUrl(onlyConsumable: true, onlyOrphans: false, view: "flat")">@Icon("basket")<span>Consumibles</span></a>
+                        <a class="btn" href="@Model.BuildInventoryUrl(onlyConsumable: false, onlyOrphans: true, view: "grouped")">@Icon("archive")<span>Huérfanos</span></a>
+                        <a class="btn" asp-page="/Locations">@Icon("geo-alt")<span>Ubicaciones</span></a>
+                        <div class="segmented" role="group" aria-label="Vista de inventario">
+                            <a class="segmented-item" href="@Model.BuildInventoryUrl(view: "flat")">@Icon("list-ul")<span>Vista plana</span></a>
+                            <a class="segmented-item is-active" aria-current="page" href="@Model.BuildInventoryUrl(view: "grouped")">@Icon("boxes")<span>Agrupado</span></a>
+                        </div>
+                        <button class="btn" type="button" data-inventory-collapse-groups>@Icon("toggle-off")<span>Colapsar todo</span></button>
+                        <button class="btn primary" type="button" data-inventory-expand-groups>@Icon("toggle-on")<span>Expandir todo</span></button>
+                    </div>
                 </div>
             </div>
-        </div>
             @foreach (var group in Model.Groups)
             {
                 <details class="inventory-group @(group.IsOrphanGroup ? "orphan-group" : "")">
@@ -311,8 +356,16 @@
                         <div class="inventory-group-title">
                             <div class="chips">
                                 <span class="chip @(group.IsOrphanGroup ? "danger" : "good")">@group.Code</span>
-                                <span class="chip">@group.Items.Count ítems</span>
+                                <span class="chip">@group.Items.Count ítems directos</span>
                                 <span class="chip">@group.PhotoCount fotos</span>
+                                @if (group.ChildCount > 0)
+                                {
+                                    <span class="chip">@group.ChildCount subcontenedores</span>
+                                }
+                                else
+                                {
+                                    <span class="chip">Sin subcontenedores</span>
+                                }
                             </div>
                             <h2>@group.Name</h2>
                             <p class="caption">@group.Path</p>
@@ -333,43 +386,56 @@
                             var boxCode = group.Code;
                             <a class="btn" asp-page="/Items/Index" asp-route-box="@boxCode" asp-route-includeChildren="false" asp-route-view="flat">Ver directo</a>
                             <a class="btn" asp-page="/Items/Index" asp-route-box="@boxCode" asp-route-includeChildren="true" asp-route-view="grouped">Ver rama</a>
-                            <a class="btn" asp-page="/Boxes/Details" asp-route-code="@boxCode">Abrir ficha</a>
-                            <a class="btn" asp-page="/Boxes/Edit" asp-route-id="@group.BoxId">Editar contenedor</a>
-                            <a class="btn" asp-page="/Boxes/Create" asp-route-parentBoxId="@group.BoxId">Crear subcontenedor</a>
+                            <details class="photo-action-menu inventory-group-menu">
+                                <summary class="btn">@Icon("three-dots")<span>Acciones</span></summary>
+                                <div class="photo-action-menu-panel">
+                                    <a class="menu-action" asp-page="/Boxes/Details" asp-route-code="@boxCode">Abrir ficha</a>
+                                    <a class="menu-action" asp-page="/Boxes/Edit" asp-route-id="@group.BoxId">Editar contenedor</a>
+                                    <a class="menu-action" asp-page="/Boxes/Create" asp-route-parentBoxId="@group.BoxId">Crear subcontenedor</a>
+                                    <a class="menu-action" asp-page="/Boxes/Details" asp-route-code="@boxCode" asp-fragment="hierarchy-actions">Mover / jerarquía</a>
+                                    <a class="menu-action" asp-page="/Boxes/Details" asp-route-code="@boxCode" asp-fragment="photos">Gestionar fotos</a>
+                                </div>
+                            </details>
                         }
                     </div>
 
                     <div class="inventory-photo-grid">
                         @foreach (var item in group.Items)
                         {
-                            <a class="inventory-photo-card" asp-page="/Items/Edit" asp-route-id="@item.Id">
-                                @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
-                                {
-                                    <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
-                                }
-                                else
-                                {
-                                    <span class="inventory-photo-empty">@item.Name[..1]</span>
-                                }
-                                <span class="inventory-photo-body">
-                                    <strong>@item.Name</strong>
-                                    <small>@item.Category · @item.Quantity @item.Unit</small>
-                                    <span class="chips">
-                                        @if (item.Consumable)
-                                        {
-                                            <span class="chip @(item.MinQuantity != null && item.Quantity <= item.MinQuantity ? "danger" : "good")">stock</span>
-                                        }
-                                        @if (item.Sentimental)
-                                        {
-                                            <span class="chip good">recuerdo</span>
-                                        }
-                                        @if (item.Obsolete)
-                                        {
-                                            <span class="chip warn">legacy</span>
-                                        }
+                            <article class="inventory-photo-card selectable-item" data-inventory-item-card data-item-id="@item.Id">
+                                <button class="select-chip" type="button" data-inventory-select-item aria-pressed="false">
+                                    @Icon("square")
+                                    <span>Seleccionar</span>
+                                </button>
+                                <a class="inventory-photo-link" asp-page="/Items/Edit" asp-route-id="@item.Id">
+                                    @if (!string.IsNullOrWhiteSpace(item.CoverPhoto))
+                                    {
+                                        <img class="rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(item.CoverPhoto))" src="@Model.ThumbUrl(item.CoverPhoto)" alt="@item.Name" loading="lazy" decoding="async" />
+                                    }
+                                    else
+                                    {
+                                        <span class="inventory-photo-empty">@item.Name[..1]</span>
+                                    }
+                                    <span class="inventory-photo-body">
+                                        <strong>@item.Name</strong>
+                                        <small>@item.Category · @item.Quantity @item.Unit</small>
+                                        <span class="chips">
+                                            @if (item.Consumable)
+                                            {
+                                                <span class="chip @(item.MinQuantity != null && item.Quantity <= item.MinQuantity ? "danger" : "good")">stock</span>
+                                            }
+                                            @if (item.Sentimental)
+                                            {
+                                                <span class="chip good">recuerdo</span>
+                                            }
+                                            @if (item.Obsolete)
+                                            {
+                                                <span class="chip warn">legacy</span>
+                                            }
+                                        </span>
                                     </span>
-                                </span>
-                            </a>
+                                </a>
+                            </article>
                         }
                     </div>
                 </details>

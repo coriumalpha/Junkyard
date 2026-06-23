@@ -1,6 +1,7 @@
 using Inventario.Data;
 using Inventario.Models;
 using Inventario.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +12,16 @@ public class ConsumablesModel(InventoryDbContext db) : PageModel
     public List<Item> Items { get; private set; } = [];
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
 
-    public async Task OnGetAsync(CancellationToken cancellationToken)
+    public IActionResult OnGet()
+    {
+        return RedirectToPage("/Items/Index", new
+        {
+            onlyConsumable = true,
+            view = "flat"
+        });
+    }
+
+    private async Task LoadAsync(CancellationToken cancellationToken)
     {
         Items = await db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)

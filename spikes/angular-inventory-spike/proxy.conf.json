@@ -1,0 +1,22 @@
+{
+  "/api": {
+    "target": "http://127.0.0.1:8089",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/items": {
+    "target": "http://127.0.0.1:8089",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/uploads": {
+    "target": "http://127.0.0.1:8089",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/photo-derivatives": {
+    "target": "http://127.0.0.1:8089",
+    "secure": false,
+    "changeOrigin": true
+  }
+}
