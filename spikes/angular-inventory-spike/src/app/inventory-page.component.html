@@ -1,0 +1,262 @@
+<div class="page-shell">
+  <header class="hero">
+    <mat-toolbar class="hero-toolbar">
+      <span class="brand">
+        <mat-icon>inventory_2</mat-icon>
+        Inventario SPA spike
+      </span>
+      <span class="spacer"></span>
+      <a mat-stroked-button class="ghost-link" [href]="backendUrl('/items')" target="_blank" rel="noreferrer">
+        <mat-icon>open_in_new</mat-icon>
+        Abrir Razor
+      </a>
+    </mat-toolbar>
+
+    <section class="hero-copy">
+      <div>
+        <p class="eyebrow">Angular + Material + backend real</p>
+        <h1>Una sola pantalla para validar navegación, filtros y back/forward.</h1>
+        <p class="lede">
+          Este spike consume el endpoint actual de Inventario y sincroniza el estado en URL para comprobar
+          que la futura SPA puede convivir con la API existente sin reventar el flujo operativo.
+        </p>
+      </div>
+
+      <div class="hero-metrics">
+        <mat-card>
+          <span class="metric-label">Items</span>
+          <strong>{{ data()?.itemsCount ?? 0 }}</strong>
+        </mat-card>
+        <mat-card>
+          <span class="metric-label">Grupos</span>
+          <strong>{{ data()?.groupsCount ?? 0 }}</strong>
+        </mat-card>
+        <mat-card>
+          <span class="metric-label">Caja</span>
+          <strong>{{ data()?.boxCode || 'sin alcance' }}</strong>
+        </mat-card>
+      </div>
+    </section>
+  </header>
+
+  <main class="content-shell">
+    <mat-card class="filters-card">
+      <div class="filters-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Buscar</mat-label>
+          <input
+            matInput
+            [value]="state().q"
+            (input)="setQuery(($any($event.target)).value)"
+            placeholder="Recuerdos, cables, herramientas..."
+          />
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Contenedor</mat-label>
+          <input
+            matInput
+            [value]="state().box"
+            (input)="setBox(($any($event.target)).value)"
+            placeholder="CT-001"
+          />
+          <mat-icon matSuffix>inventory_2</mat-icon>
+        </mat-form-field>
+      </div>
+
+      <div class="controls-row">
+        <mat-button-toggle-group [value]="state().view" (change)="setView($event.value)" aria-label="Vista">
+          <mat-button-toggle value="grouped">
+            <mat-icon>account_tree</mat-icon>
+            Agrupado
+          </mat-button-toggle>
+          <mat-button-toggle value="flat">
+            <mat-icon>view_agenda</mat-icon>
+            Plano
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+
+        <mat-slide-toggle [checked]="state().includeChildren" (change)="setIncludeChildren($event.checked)">
+          Incluir hijos
+        </mat-slide-toggle>
+
+        <mat-slide-toggle [checked]="state().onlyConsumable" (change)="setOnlyConsumable($event.checked)">
+          Consumibles
+        </mat-slide-toggle>
+
+        <mat-slide-toggle [checked]="state().onlyOrphans" (change)="setOnlyOrphans($event.checked)">
+          Huérfanos
+        </mat-slide-toggle>
+      </div>
+
+      <mat-divider />
+
+      <div class="summary-row">
+        <mat-chip-set>
+          @for (item of filterSummary(); track item) {
+            <mat-chip>{{ item }}</mat-chip>
+          }
+        </mat-chip-set>
+      </div>
+    </mat-card>
+
+    @if (loading()) {
+      <section class="state-panel">
+        <mat-progress-spinner mode="indeterminate" diameter="52" />
+        <p>Cargando el inventario desde el backend...</p>
+      </section>
+    } @else if (error()) {
+      <mat-card class="state-panel error">
+        <mat-icon>warning</mat-icon>
+        <div>
+          <h2>Ha fallado la carga</h2>
+          <p>{{ error() }}</p>
+        </div>
+      </mat-card>
+    } @else {
+      @if (data()?.selectedBoxes?.length) {
+        <mat-card class="scope-card">
+          <div class="scope-header">
+            <div>
+              <p class="eyebrow">Ámbito activo</p>
+              <h2>{{ data()?.selectedBox?.name || data()?.boxCode || 'Inventario general' }}</h2>
+              <p class="scope-path">
+                {{ data()?.selectedBox?.path || (data()?.selectedBoxes?.[0]?.path ?? 'Sin caja seleccionada') }}
+              </p>
+            </div>
+            <a mat-button [href]="currentScopeBackendUrl()" target="_blank" rel="noreferrer">
+              <mat-icon>launch</mat-icon>
+              Abrir en Razor
+            </a>
+          </div>
+
+          <div class="scope-tags">
+            <mat-chip-set>
+              @for (box of data()?.selectedBoxes ?? []; track box.id) {
+                <mat-chip>
+                  <mat-icon>inventory_2</mat-icon>
+                  {{ box.code }} · {{ box.name }}
+                </mat-chip>
+              }
+            </mat-chip-set>
+          </div>
+        </mat-card>
+      }
+
+      @if (state().view === 'grouped') {
+        <section class="cards-grid">
+          @for (group of groups(); track trackByGroup($index, group)) {
+            <mat-card class="group-card">
+              <mat-card-header>
+                <div mat-card-avatar class="avatar">
+                  {{ group.generatedLabel || group.code.slice(0, 1) }}
+                </div>
+                <mat-card-title>{{ group.code }}</mat-card-title>
+                <mat-card-subtitle>{{ group.name }}</mat-card-subtitle>
+              </mat-card-header>
+
+              <mat-card-content>
+                <div class="group-meta">
+                  <span>{{ group.itemCount }} ítems</span>
+                  <span>{{ group.photoCount }} fotos</span>
+                  <span>{{ group.childCount }} hijos</span>
+                </div>
+                <p class="group-path">{{ group.path }}</p>
+                @if (group.locationName || group.locationSourceLabel) {
+                  <p class="group-location">
+                    {{ group.locationName || 'Sin ubicación' }}
+                    @if (group.locationSourceLabel) {
+                      · {{ group.locationSourceLabel }}
+                    }
+                  </p>
+                }
+
+                @if (group.coverUrl) {
+                  <img
+                    class="cover"
+                    [src]="assetUrl(group.coverUrl)!"
+                    [style.transform]="'rotate(' + group.rotationDegrees + 'deg)'"
+                    [alt]="group.name"
+                  />
+                }
+
+                <div class="mini-list">
+                  @for (item of group.items.slice(0, 4); track trackByItem($index, item)) {
+                    <div class="mini-item">
+                      <span class="mini-name">{{ item.name }}</span>
+                      <span class="mini-meta">{{ item.quantityLabel }}</span>
+                    </div>
+                  }
+                </div>
+              </mat-card-content>
+
+              <mat-card-actions align="end">
+                <a mat-button [href]="backendUrl(group.url)" target="_blank" rel="noreferrer">
+                  <mat-icon>open_in_new</mat-icon>
+                  Abrir contenedor
+                </a>
+              </mat-card-actions>
+            </mat-card>
+          }
+        </section>
+      } @else {
+        <section class="cards-grid flat-grid">
+          @for (item of items(); track trackByItem($index, item)) {
+            <mat-card class="item-card">
+              <div class="item-card-top">
+                @if (item.coverUrl) {
+                  <img
+                    class="thumb"
+                    [src]="assetUrl(item.coverUrl)!"
+                    [style.transform]="'rotate(' + item.rotationDegrees + 'deg)'"
+                    [alt]="item.name"
+                  />
+                } @else {
+                  <div class="thumb placeholder">{{ item.generatedLabel || item.name.slice(0, 1) }}</div>
+                }
+
+                <div class="item-copy">
+                  <p class="eyebrow">{{ item.category }}</p>
+                  <h3>{{ item.name }}</h3>
+                  <p>{{ item.quantityLabel }}</p>
+                  <p class="item-path">{{ item.boxPath || 'Sin caja' }}</p>
+                </div>
+              </div>
+
+              <div class="item-badges">
+                <span [class]="badgeClass(item)">{{ item.consumable ? 'Consumible' : 'No consumible' }}</span>
+                @if (item.lowStock) {
+                  <span class="badge low">Bajo stock</span>
+                }
+                @if (item.sentimental) {
+                  <span class="badge warm">Sentimental</span>
+                }
+                @if (item.obsolete) {
+                  <span class="badge muted">Obsoleto</span>
+                }
+              </div>
+
+              <mat-card-actions align="end">
+                <a mat-button [href]="backendUrl(item.url)" target="_blank" rel="noreferrer">
+                  <mat-icon>edit</mat-icon>
+                  Editar ítem
+                </a>
+              </mat-card-actions>
+            </mat-card>
+          }
+        </section>
+      }
+
+      @if (!(groups().length || items().length)) {
+        <mat-card class="state-panel empty">
+          <mat-icon>inventory_2</mat-icon>
+          <div>
+            <h2>Sin resultados</h2>
+            <p>La consulta es válida, pero el backend no devolvió grupos ni ítems para este estado.</p>
+          </div>
+        </mat-card>
+      }
+    }
+  </main>
+</div>
