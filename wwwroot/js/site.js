@@ -1082,17 +1082,35 @@
     const actions = document.createElement('div');
     actions.className = 'inventory-group-actions actions';
     if (group.boxId && !group.isOrphanGroup) {
-      const inventoryLink = document.createElement('a');
-      inventoryLink.className = 'btn';
-      inventoryLink.href = `/items?box=${encodeURIComponent(group.code)}&includeChildren=true&view=flat`;
-      inventoryLink.textContent = 'Inventario + subcontenedores';
-      actions.appendChild(inventoryLink);
+      const directLink = document.createElement('a');
+      directLink.className = 'btn';
+      directLink.href = `/items?box=${encodeURIComponent(group.code)}&includeChildren=false&view=flat`;
+      directLink.textContent = 'Ver directo';
+      actions.appendChild(directLink);
+
+      const branchLink = document.createElement('a');
+      branchLink.className = 'btn';
+      branchLink.href = `/items?box=${encodeURIComponent(group.code)}&includeChildren=true&view=grouped`;
+      branchLink.textContent = 'Ver rama';
+      actions.appendChild(branchLink);
 
       const boxLink = document.createElement('a');
       boxLink.className = 'btn';
       boxLink.href = `/Boxes/Details?code=${encodeURIComponent(group.code)}`;
-      boxLink.textContent = 'Abrir caja';
+      boxLink.textContent = 'Abrir ficha';
       actions.appendChild(boxLink);
+
+      const editLink = document.createElement('a');
+      editLink.className = 'btn';
+      editLink.href = `/Boxes/Edit?id=${encodeURIComponent(group.boxId)}`;
+      editLink.textContent = 'Editar contenedor';
+      actions.appendChild(editLink);
+
+      const createChild = document.createElement('a');
+      createChild.className = 'btn';
+      createChild.href = `/Boxes/Create?parentBoxId=${encodeURIComponent(group.boxId)}`;
+      createChild.textContent = 'Crear subcontenedor';
+      actions.appendChild(createChild);
     }
     section.appendChild(actions);
 
