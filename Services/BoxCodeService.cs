@@ -9,27 +9,31 @@ public static class BoxCodeService
     public static async Task<string> GetNextCtCodeAsync(InventoryDbContext db, CancellationToken cancellationToken)
     {
         var codes = await db.Boxes
-            .IgnoreQueryFilters()
             .AsNoTracking()
             .Select(box => box.Code)
             .ToListAsync(cancellationToken);
 
-        var maxSequence = 0;
+        var usedSequences = new HashSet<int>();
         foreach (var code in codes)
         {
-            if (Box.TryParseCtSequence(code, out var sequence) && sequence > maxSequence)
+            if (Box.TryParseCanonicalCtSequence(code, out var sequence))
             {
-                maxSequence = sequence;
+                usedSequences.Add(sequence);
             }
         }
 
-        return Box.FormatCtCode(maxSequence + 1);
+        var nextSequence = 1;
+        while (usedSequences.Contains(nextSequence))
+        {
+            nextSequence++;
+        }
+
+        return Box.FormatCtCode(nextSequence);
     }
 
     public static async Task<bool> IsDuplicateAsync(InventoryDbContext db, string normalizedCode, int? excludeBoxId, CancellationToken cancellationToken)
     {
         var codes = await db.Boxes
-            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(box => !excludeBoxId.HasValue || box.Id != excludeBoxId.Value)
             .Select(box => new { box.Id, box.Code })

@@ -3,13 +3,26 @@
     var selected = Model.Options.FirstOrDefault(option => option.Value == (Model.SelectedValue ?? ""));
 }
 
-<div class="search-picker" data-search-picker data-empty-label="@Model.EmptyLabel" data-empty-hint="@Model.EmptyHint" data-clear-value="@Model.ClearValue" data-picker-submit-on-enter="@(Model.SubmitOnEnter ? "true" : "false")" data-picker-submit-button-selector="@Model.SubmitButtonSelector">
+<div class="search-picker @(Model.Compact ? "search-picker-compact" : "")"
+     data-search-picker
+     data-empty-label="@Model.EmptyLabel"
+     data-empty-hint="@Model.EmptyHint"
+     data-clear-value="@Model.ClearValue"
+     data-picker-submit-on-enter="@(Model.SubmitOnEnter ? "true" : "false")"
+     data-picker-submit-button-selector="@Model.SubmitButtonSelector"
+     data-picker-compact="@(Model.Compact ? "true" : "false")">
     <input type="hidden" id="@Model.InputId" name="@Model.InputName" value="@Model.SelectedValue" />
     <div class="search-picker-head">
         <label class="search-picker-label" for="@($"{Model.InputId}__search")">@Model.Label</label>
-        <button class="btn" type="button" data-picker-clear>Limpiar</button>
+        <div class="search-picker-head-actions">
+            <button class="btn" type="button" data-picker-clear>Limpiar</button>
+            @if (Model.Compact)
+            {
+                <button class="btn primary" type="button" data-picker-toggle>Explorar</button>
+            }
+        </div>
     </div>
-    <div class="search-picker-current" data-picker-current>
+    <button class="search-picker-current" type="button" data-picker-current data-picker-toggle aria-expanded="false">
         @if (selected is not null)
         {
             <strong>@selected.Title</strong>
@@ -39,73 +52,75 @@
                 <small>@Model.EmptyHint</small>
             }
         }
-    </div>
-    <div class="field">
-        <input id="@($"{Model.InputId}__search")" type="search" placeholder="@Model.Placeholder" autocomplete="off" data-picker-search />
-    </div>
-    <div class="search-picker-list" data-picker-list>
-        @if (!string.IsNullOrWhiteSpace(Model.NoneOptionLabel))
-        {
-            var isEmptySelected = (Model.SelectedValue ?? "") == Model.NoneOptionValue;
-            <button class="search-picker-option @(isEmptySelected ? "is-selected" : "")" type="button"
-                    data-picker-option
-                    data-value="@Model.NoneOptionValue"
-                    data-title="@Model.NoneOptionLabel"
-                    data-meta=""
-                    data-detail="@Model.NoneOptionHint"
-                    data-tags="[]"
-                    data-search="@Model.NoneOptionLabel @Model.NoneOptionHint">
-                <span class="search-picker-thumb fallback">@Model.NoneOptionIcon</span>
-                <span class="search-picker-copy">
-                    <strong>@Model.NoneOptionLabel</strong>
-                    @if (!string.IsNullOrWhiteSpace(Model.NoneOptionHint))
+    </button>
+    <div class="search-picker-panel" data-picker-panel @(Model.Compact ? "hidden" : null)>
+        <div class="field">
+            <input id="@($"{Model.InputId}__search")" type="search" placeholder="@Model.Placeholder" autocomplete="off" data-picker-search />
+        </div>
+        <div class="search-picker-list" data-picker-list>
+            @if (!string.IsNullOrWhiteSpace(Model.NoneOptionLabel))
+            {
+                var isEmptySelected = (Model.SelectedValue ?? "") == Model.NoneOptionValue;
+                <button class="search-picker-option @(isEmptySelected ? "is-selected" : "")" type="button"
+                        data-picker-option
+                        data-value="@Model.NoneOptionValue"
+                        data-title="@Model.NoneOptionLabel"
+                        data-meta=""
+                        data-detail="@Model.NoneOptionHint"
+                        data-tags="[]"
+                        data-search="@Model.NoneOptionLabel @Model.NoneOptionHint">
+                    <span class="search-picker-thumb fallback">@Model.NoneOptionIcon</span>
+                    <span class="search-picker-copy">
+                        <strong>@Model.NoneOptionLabel</strong>
+                        @if (!string.IsNullOrWhiteSpace(Model.NoneOptionHint))
+                        {
+                            <small>@Model.NoneOptionHint</small>
+                        }
+                    </span>
+                </button>
+            }
+            @foreach (var option in Model.Options)
+            {
+                var isSelected = option.Value == (Model.SelectedValue ?? "");
+                <button class="search-picker-option @(isSelected ? "is-selected" : "")" type="button"
+                        data-picker-option
+                        data-value="@option.Value"
+                        data-title="@option.Title"
+                        data-meta="@option.Meta"
+                        data-detail="@option.Detail"
+                        data-tags='@Html.Raw(System.Text.Json.JsonSerializer.Serialize(option.Tags))'
+                        data-search="@option.SearchText">
+                    @if (!string.IsNullOrWhiteSpace(option.ThumbnailUrl))
                     {
-                        <small>@Model.NoneOptionHint</small>
+                        <img class="search-picker-thumb" src="@option.ThumbnailUrl" alt="@option.Title" loading="lazy" decoding="async" />
                     }
-                </span>
-            </button>
-        }
-        @foreach (var option in Model.Options)
-        {
-            var isSelected = option.Value == (Model.SelectedValue ?? "");
-            <button class="search-picker-option @(isSelected ? "is-selected" : "")" type="button"
-                    data-picker-option
-                    data-value="@option.Value"
-                    data-title="@option.Title"
-                    data-meta="@option.Meta"
-                    data-detail="@option.Detail"
-                    data-tags='@Html.Raw(System.Text.Json.JsonSerializer.Serialize(option.Tags))'
-                    data-search="@option.SearchText">
-                @if (!string.IsNullOrWhiteSpace(option.ThumbnailUrl))
-                {
-                    <img class="search-picker-thumb" src="@option.ThumbnailUrl" alt="@option.Title" loading="lazy" decoding="async" />
-                }
-                else
-                {
-                    <span class="search-picker-thumb fallback">@option.Icon</span>
-                }
-                <span class="search-picker-copy">
-                    <strong>@option.Title</strong>
-                    @if (!string.IsNullOrWhiteSpace(option.Meta))
+                    else
                     {
-                        <small>@option.Meta</small>
+                        <span class="search-picker-thumb fallback">@option.Icon</span>
                     }
-                    @if (!string.IsNullOrWhiteSpace(option.Detail))
-                    {
-                        <small>@option.Detail</small>
-                    }
-                    @if (option.Tags.Count > 0)
-                    {
-                        <div class="search-picker-tags">
-                            @foreach (var tag in option.Tags)
-                            {
-                                <span class="search-picker-tag">@tag</span>
-                            }
-                        </div>
-                    }
-                </span>
-            </button>
-        }
-        <div class="search-picker-empty" data-picker-empty hidden>Sin resultados para ese filtro.</div>
+                    <span class="search-picker-copy">
+                        <strong>@option.Title</strong>
+                        @if (!string.IsNullOrWhiteSpace(option.Meta))
+                        {
+                            <small>@option.Meta</small>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(option.Detail))
+                        {
+                            <small>@option.Detail</small>
+                        }
+                        @if (option.Tags.Count > 0)
+                        {
+                            <div class="search-picker-tags">
+                                @foreach (var tag in option.Tags)
+                                {
+                                    <span class="search-picker-tag">@tag</span>
+                                }
+                            </div>
+                        }
+                    </span>
+                </button>
+            }
+            <div class="search-picker-empty" data-picker-empty hidden>Sin resultados para ese filtro.</div>
+        </div>
     </div>
 </div>

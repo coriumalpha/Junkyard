@@ -1,0 +1,179 @@
+@page "/Pendientes"
+@model Inventario.Pages.PendientesModel
+@{
+    ViewData["Title"] = "Pendientes";
+}
+
+<div class="section-title">
+    <div>
+        <h1>Pendientes</h1>
+        <p class="section-kicker">Libreta discreta de acciones operativas del inventario.</p>
+    </div>
+    <div class="chips">
+        <span class="chip good">@Model.OpenActions.Count abiertas</span>
+        <span class="chip">@Model.CompletedActions.Count completadas</span>
+    </div>
+</div>
+
+<section class="panel stack-top inventory-actions-create">
+    <div class="section-header compact">
+        <div>
+            <p class="eyebrow">Nueva acción</p>
+            <p class="section-kicker">Crea una nota breve sin convertir Junkyard en un gestor de tareas.</p>
+        </div>
+    </div>
+    <form class="form-grid" method="post" asp-page-handler="Create">
+        <div class="field full">
+            <label asp-for="Input.Title">Título</label>
+            <input asp-for="Input.Title" placeholder="Ej. Revisar fotos de CT-000001" />
+        </div>
+        <div class="field full">
+            <label asp-for="Input.Description">Descripción</label>
+            <textarea asp-for="Input.Description" placeholder="Notas cortas opcionales"></textarea>
+        </div>
+        <div class="field">
+            <label asp-for="Input.Priority">Prioridad</label>
+            <select asp-for="Input.Priority">
+                @for (var priority = 1; priority <= 5; priority++)
+                {
+                    <option value="@priority">@priority</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label asp-for="Input.LinkedEntityType">Vínculo</label>
+            <select asp-for="Input.LinkedEntityType" data-action-link-type>
+                <option value="@Inventario.Models.InventoryActionLinkedEntityType.None">Sin vínculo</option>
+                <option value="@Inventario.Models.InventoryActionLinkedEntityType.Box">Contenedor</option>
+                <option value="@Inventario.Models.InventoryActionLinkedEntityType.Item">Ítem</option>
+            </select>
+        </div>
+        <div class="field full" data-action-link-picker="box" hidden="@(Model.Input.LinkedEntityType != Inventario.Models.InventoryActionLinkedEntityType.Box)">
+            <partial name="_SearchPicker" model="Model.BoxPicker" />
+        </div>
+        <div class="field full" data-action-link-picker="item" hidden="@(Model.Input.LinkedEntityType != Inventario.Models.InventoryActionLinkedEntityType.Item)">
+            <partial name="_SearchPicker" model="Model.ItemPicker" />
+        </div>
+        <div class="actions full">
+            <button class="btn primary" type="submit">Guardar acción</button>
+        </div>
+    </form>
+</section>
+
+<section class="stack-top">
+    <div class="section-header compact">
+        <div>
+            <h2>Abiertas</h2>
+            <p class="section-kicker">Se ven primero para no enterrar el trabajo pendiente.</p>
+        </div>
+        <form class="actions" method="get">
+            <div class="field">
+                <label for="q">Buscar</label>
+                <input id="q" name="q" value="@Model.Query" placeholder="texto, caja o ítem..." />
+            </div>
+            <div class="field">
+                <label for="priority">Prioridad</label>
+                <select id="priority" name="priority">
+                    <option value="">Todas</option>
+                    @foreach (var option in Model.PriorityFilters)
+                    {
+                        <option value="@option.Value" selected="@option.Selected">@option.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="actions">
+                <button class="btn primary" type="submit">Filtrar</button>
+                <a class="btn" asp-page="/Pendientes">Limpiar</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="inventory-actions-list">
+        @if (Model.OpenActions.Count == 0)
+        {
+            <div class="empty">
+                <strong>Sin acciones abiertas.</strong>
+                <span>Cuando aparezca una revisión, saldrá aquí.</span>
+            </div>
+        }
+        else
+        {
+            @foreach (var action in Model.OpenActions)
+            {
+                <article class="panel inventory-action-card">
+                    <div class="section-header compact">
+                        <div>
+                            <div class="chips">
+                                <span class="chip good">P@action.Priority</span>
+                                <span class="chip">@action.LinkedLabel</span>
+                            </div>
+                            <h3>@action.Title</h3>
+                            @if (!string.IsNullOrWhiteSpace(action.Description))
+                            {
+                                <p class="caption">@action.Description</p>
+                            }
+                        </div>
+                        <div class="actions">
+                            @if (!string.IsNullOrWhiteSpace(action.LinkedUrl))
+                            {
+                                <a class="btn" href="@action.LinkedUrl">Abrir vínculo</a>
+                            }
+                            <form method="post" asp-page-handler="Complete" asp-route-id="@action.Id">
+                                <button class="btn primary" type="submit">Completar</button>
+                            </form>
+                        </div>
+                    </div>
+                </article>
+            }
+        }
+    </div>
+</section>
+
+<details class="panel stack-top" @(Model.ShowCompleted ? "open" : null)>
+    <summary class="inventory-actions-summary">
+        <span>
+            <strong>Completadas</strong>
+            <small>Se conservan como histórico, pero no dominan la pantalla.</small>
+        </span>
+        <span class="chip">@Model.CompletedActions.Count</span>
+    </summary>
+    <div class="inventory-actions-list stack-top">
+        @if (Model.CompletedActions.Count == 0)
+        {
+            <div class="empty">
+                <strong>No hay completadas.</strong>
+                <span>Cuando cierres acciones, aparecerán aquí.</span>
+            </div>
+        }
+        else
+        {
+            @foreach (var action in Model.CompletedActions)
+            {
+                <article class="panel inventory-action-card completed">
+                    <div class="section-header compact">
+                        <div>
+                            <div class="chips">
+                                <span class="chip">P@action.Priority</span>
+                                <span class="chip">@action.LinkedLabel</span>
+                            </div>
+                            <h3>@action.Title</h3>
+                            @if (!string.IsNullOrWhiteSpace(action.Description))
+                            {
+                                <p class="caption">@action.Description</p>
+                            }
+                        </div>
+                        <div class="actions">
+                            @if (!string.IsNullOrWhiteSpace(action.LinkedUrl))
+                            {
+                                <a class="btn" href="@action.LinkedUrl">Abrir vínculo</a>
+                            }
+                            <form method="post" asp-page-handler="Reopen" asp-route-id="@action.Id">
+                                <button class="btn" type="submit">Reabrir</button>
+                            </form>
+                        </div>
+                    </div>
+                </article>
+            }
+        }
+    </div>
+</details>

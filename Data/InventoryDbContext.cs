@@ -8,6 +8,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Box> Boxes => Set<Box>();
     public DbSet<Item> Items => Set<Item>();
+    public DbSet<InventoryAction> InventoryActions => Set<InventoryAction>();
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<PhotoInbox> PhotoInboxes => Set<PhotoInbox>();
 
@@ -25,8 +26,10 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
             entity.Property(x => x.ContainerType).HasMaxLength(24).HasDefaultValue(Box.DefaultContainerType).IsRequired();
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
-            entity.HasIndex(x => x.Code).IsUnique();
             entity.HasQueryFilter(x => x.ArchivedAt == null);
+            entity.HasIndex(x => x.Code)
+                .IsUnique()
+                .HasFilter("\"ArchivedAt\" IS NULL");
             entity.HasOne(x => x.Location).WithMany(x => x.Boxes).HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.ParentBox).WithMany(x => x.ChildBoxes).HasForeignKey(x => x.ParentBoxId).OnDelete(DeleteBehavior.SetNull);
         });
@@ -41,6 +44,19 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.HasOne(x => x.Box).WithMany(x => x.Items).HasForeignKey(x => x.BoxId).OnDelete(DeleteBehavior.SetNull);
             entity.HasIndex(x => x.Name);
             entity.HasIndex(x => x.Category);
+        });
+
+        modelBuilder.Entity<InventoryAction>(entity =>
+        {
+            entity.ToTable(tb => tb.HasCheckConstraint("CK_InventoryActions_Priority", "\"Priority\" BETWEEN 1 AND 5"));
+            entity.Property(x => x.Title).HasMaxLength(180).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+            entity.Property(x => x.LinkedEntityType).HasConversion<string>().HasMaxLength(16);
+            entity.Property(x => x.Priority).IsRequired();
+            entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => new { x.LinkedEntityType, x.LinkedEntityId });
+            entity.HasIndex(x => new { x.Priority, x.CreatedAt });
         });
 
         modelBuilder.Entity<Photo>(entity =>

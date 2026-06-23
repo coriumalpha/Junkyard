@@ -34,6 +34,16 @@ public class ArchiveModel(InventoryDbContext db) : PageModel
     {
         var box = await db.Boxes.IgnoreQueryFilters().FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
         if (box is null) return NotFound();
+
+        var codeInUse = await db.Boxes
+            .AsNoTracking()
+            .AnyAsync(b => b.Id != box.Id && b.ArchivedAt == null && b.Code == box.Code, cancellationToken);
+        if (codeInUse)
+        {
+            TempData["ArchiveMessage"] = $"No se puede restaurar {box.Code} porque ya existe un contenedor activo con ese CT.";
+            return RedirectToPage();
+        }
+
         box.ArchivedAt = null;
         box.Status = BoxStatus.Active;
         await db.SaveChangesAsync(cancellationToken);

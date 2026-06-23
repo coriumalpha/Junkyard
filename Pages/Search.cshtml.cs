@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Inventario.Data;
 using Inventario.Models;
 using Inventario.Services;
@@ -72,30 +74,44 @@ public class SearchModel(InventoryDbContext db) : PageModel
             return new SearchData(query, [], [], new Dictionary<string, PhotoViewState>(StringComparer.OrdinalIgnoreCase), new Dictionary<int, string>(), new Dictionary<int, BoxLocationResolution>());
         }
 
-        var term = query.ToLowerInvariant();
+        var normalizedQuery = NormalizeSearchText(query);
+        var terms = TokenizeSearchTerms(query);
         var normalizedCode = Box.NormalizePublicCode(query);
         var ctDigits = Box.TryParseCtSequence(query, out var sequence) ? sequence.ToString("000000") : null;
-        var boxes = await db.Boxes.AsNoTracking()
+        var boxCandidates = await db.Boxes.AsNoTracking()
             .Include(b => b.Location)
             .Include(b => b.Items)
-            .Where(b => b.Code.ToLower().Contains(term)
-                || b.Code == normalizedCode
-                || (ctDigits != null && b.Code.EndsWith(ctDigits))
-                || b.Name.ToLower().Contains(term)
-                || b.ContainerType.ToLower().Contains(term)
-                || (b.Description != null && b.Description.ToLower().Contains(term)))
-            .OrderBy(b => b.Code)
-            .Take(20)
             .ToListAsync(cancellationToken);
 
-        var items = await db.Items.AsNoTracking()
+        var itemCandidates = await db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
-            .Where(i => i.Name.ToLower().Contains(term)
-                || i.Category.ToLower().Contains(term)
-                || (i.Notes != null && i.Notes.ToLower().Contains(term)))
-            .OrderBy(i => i.Name)
-            .Take(40)
             .ToListAsync(cancellationToken);
+
+        var boxes = boxCandidates
+            .Select(box => new
+            {
+                Box = box,
+                Score = ScoreBox(query, normalizedQuery, terms, normalizedCode, ctDigits, box)
+            })
+            .Where(entry => entry.Score > int.MinValue)
+            .OrderByDescending(entry => entry.Score)
+            .ThenBy(entry => entry.Box.Code)
+            .Take(20)
+            .Select(entry => entry.Box)
+            .ToList();
+
+        var items = itemCandidates
+            .Select(item => new
+            {
+                Item = item,
+                Score = ScoreItem(query, normalizedQuery, terms, item)
+            })
+            .Where(entry => entry.Score > int.MinValue)
+            .OrderByDescending(entry => entry.Score)
+            .ThenBy(entry => entry.Item.Name)
+            .Take(40)
+            .Select(entry => entry.Item)
+            .ToList();
 
         var itemIds = items.Select(item => item.Id).ToList();
         var itemPhotoFilenames = await db.Photos.AsNoTracking()
@@ -119,6 +135,184 @@ public class SearchModel(InventoryDbContext db) : PageModel
             .ToList();
         var photoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
         return new SearchData(query, boxes, items, photoStates, itemPhotoById, locationLookup);
+    }
+
+    private static string NormalizeSearchText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        var normalized = value.Trim().Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var ch in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+            {
+                builder.Append(char.ToLowerInvariant(ch));
+            }
+        }
+
+        return builder.ToString().Normalize(NormalizationForm.FormC);
+    }
+
+    private static List<string> TokenizeSearchTerms(string? value)
+    {
+        return NormalizeSearchText(value)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static int ScoreBox(string rawQuery, string normalizedQuery, IReadOnlyList<string> terms, string? normalizedCode, string? ctDigits, Box box)
+    {
+        var locationName = box.Location?.Name;
+        var locationSourceLabel = box.EffectiveLocationSourceLabel;
+        var parentCode = box.ParentBox?.Code;
+        var parentName = box.ParentBox?.Name;
+        var fields = new (string? Value, int Weight)[]
+        {
+            (box.Code, 140),
+            (box.Name, 120),
+            (box.ContainerTypeLabel, 60),
+            (box.Description, 30),
+            (locationName, 50),
+            (locationSourceLabel, 20),
+            (parentCode, 35),
+            (parentName, 35)
+        };
+
+        return ScoreSearchEntry(rawQuery, normalizedQuery, terms, normalizedCode, ctDigits, fields);
+    }
+
+    private static int ScoreItem(string rawQuery, string normalizedQuery, IReadOnlyList<string> terms, Item item)
+    {
+        var boxCode = item.Box?.Code;
+        var boxName = item.Box?.Name;
+        var locationName = item.Box?.LocationDisplay;
+        var locationSourceLabel = item.Box?.EffectiveLocationSourceLabel;
+        var fields = new (string? Value, int Weight)[]
+        {
+            (item.Name, 140),
+            (item.Category, 95),
+            (item.Notes, 35),
+            (boxCode, 70),
+            (boxName, 55),
+            (locationName, 25),
+            (locationSourceLabel, 20),
+            (item.Unit, 15),
+            (item.Condition, 15),
+            (item.Retention, 10)
+        };
+
+        return ScoreSearchEntry(rawQuery, normalizedQuery, terms, null, null, fields);
+    }
+
+    private static int ScoreSearchEntry(
+        string rawQuery,
+        string normalizedQuery,
+        IReadOnlyList<string> terms,
+        string? normalizedCode,
+        string? ctDigits,
+        IReadOnlyList<(string? Value, int Weight)> fields)
+    {
+        if (terms.Count == 0)
+        {
+            return int.MinValue;
+        }
+
+        var normalizedFields = fields
+            .Select(field => (Value: NormalizeSearchText(field.Value), field.Weight))
+            .ToList();
+
+        var combined = string.Join(' ', normalizedFields.Select(field => field.Value).Where(value => !string.IsNullOrWhiteSpace(value)));
+        if (combined.Length == 0)
+        {
+            return int.MinValue;
+        }
+
+        var score = 0;
+        var matchedTerms = 0;
+        foreach (var term in terms)
+        {
+            var termMatched = false;
+            foreach (var field in normalizedFields)
+            {
+                if (string.IsNullOrWhiteSpace(field.Value))
+                {
+                    continue;
+                }
+
+                if (field.Value == term)
+                {
+                    score += field.Weight * 5;
+                    termMatched = true;
+                }
+                else if (field.Value.StartsWith(term, StringComparison.Ordinal))
+                {
+                    score += field.Weight * 4;
+                    termMatched = true;
+                }
+                else if (field.Value.Contains(term, StringComparison.Ordinal))
+                {
+                    score += field.Weight * 2;
+                    termMatched = true;
+                }
+            }
+
+            if (!termMatched)
+            {
+                return int.MinValue;
+            }
+
+            matchedTerms++;
+        }
+
+        score += matchedTerms * 20;
+
+        if (combined == normalizedQuery)
+        {
+            score += 800;
+        }
+        else if (combined.StartsWith(normalizedQuery, StringComparison.Ordinal))
+        {
+            score += 300;
+        }
+        else if (combined.Contains(normalizedQuery, StringComparison.Ordinal))
+        {
+            score += 120;
+        }
+
+        var firstField = normalizedFields.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(firstField.Value))
+        {
+            if (firstField.Value == normalizedQuery)
+            {
+                score += 200;
+            }
+            else if (firstField.Value.StartsWith(normalizedQuery, StringComparison.Ordinal))
+            {
+                score += 80;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedCode) && normalizedFields.Any(field => field.Value == normalizedCode))
+        {
+            score += 1000;
+        }
+
+        if (!string.IsNullOrWhiteSpace(ctDigits) && normalizedFields.Any(field => field.Value != null && field.Value.EndsWith(ctDigits, StringComparison.Ordinal)))
+        {
+            score += 160;
+        }
+
+        if (rawQuery.IndexOf(' ') >= 0)
+        {
+            score += 10;
+        }
+
+        return score;
     }
 
     private record SearchData(

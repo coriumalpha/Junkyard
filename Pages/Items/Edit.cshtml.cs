@@ -11,6 +11,8 @@ namespace Inventario.Pages.Items;
 
 public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
 {
+    public bool IsEditMode { get; private set; }
+
     [BindProperty]
     public ItemInput Input { get; set; } = new();
 
@@ -22,15 +24,20 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
 
     public List<SelectListItem> Boxes { get; private set; } = [];
     public SearchPickerModel BoxPicker { get; private set; } = new();
+    public List<InventoryAction> LinkedActions { get; private set; } = [];
     public List<Photo> Gallery { get; private set; } = [];
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
     public string[] Categories => CsvInventoryService.Categories;
     public string? CurrentBoxCode { get; private set; }
+    public string? CurrentBoxName { get; private set; }
+    public string? CurrentBoxLocation { get; private set; }
+    public string? CurrentBoxTypeLabel { get; private set; }
     public string? CoverPhotoFilename { get; private set; }
     public string SuggestedBoxCode { get; private set; } = "";
 
-    public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnGetAsync(int id, string? mode, CancellationToken cancellationToken)
     {
+        IsEditMode = string.Equals(mode, "edit", StringComparison.OrdinalIgnoreCase);
         if (!await LoadItem(id, cancellationToken))
         {
             return NotFound();
@@ -43,6 +50,7 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
     {
         if (!ModelState.IsValid)
         {
+            IsEditMode = true;
             await LoadAux(Input.Id, cancellationToken);
             return Page();
         }
@@ -135,6 +143,30 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostCompleteActionAsync(int id, int actionId, CancellationToken cancellationToken)
+    {
+        var item = await db.Items.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        var action = await db.InventoryActions.FirstOrDefaultAsync(a =>
+            a.Id == actionId &&
+            a.LinkedEntityType == InventoryActionLinkedEntityType.Item &&
+            a.LinkedEntityId == item.Id, cancellationToken);
+        if (action is null)
+        {
+            return NotFound();
+        }
+
+        action.Status = InventoryActionStatus.Completed;
+        action.CompletedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        TempData["InventoryActionMessage"] = "Acción completada.";
         return RedirectToPage(new { id });
     }
 
@@ -298,7 +330,11 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
 
     private async Task<bool> LoadItem(int id, CancellationToken cancellationToken)
     {
-        var item = await db.Items.AsNoTracking().Include(i => i.Box).FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        var item = await db.Items
+            .AsNoTracking()
+            .Include(i => i.Box!)
+            .ThenInclude(b => b.Location)
+            .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
         if (item is null)
         {
             return false;
@@ -321,6 +357,9 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
             Notes = item.Notes
         };
         CurrentBoxCode = item.Box?.Code;
+        CurrentBoxName = item.Box?.Name;
+        CurrentBoxLocation = item.Box?.Location?.Name;
+        CurrentBoxTypeLabel = item.Box is not null ? Box.ContainerTypeLabelFor(item.Box.ContainerType) : null;
         CoverPhotoFilename = item.CoverPhoto;
         SuggestedBoxCode = await SuggestBoxCodeAsync(item, cancellationToken);
         await LoadAux(id, cancellationToken);
@@ -418,6 +457,11 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
             .ThenByDescending(p => p.CreatedAt)
             .ToListAsync(cancellationToken);
         PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, new[] { CoverPhotoFilename }, cancellationToken);
+        LinkedActions = await db.InventoryActions.AsNoTracking()
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Item && action.LinkedEntityId == itemId && action.Status == InventoryActionStatus.Open)
+            .OrderByDescending(action => action.Priority)
+            .ThenByDescending(action => action.CreatedAt)
+            .ToListAsync(cancellationToken);
     }
 
     public string PreviewUrl(Photo photo) => PhotoStorage.PreviewUrl(photo.Filename, photo.UpdatedAt);
