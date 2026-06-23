@@ -20,7 +20,7 @@
       return 0;
     }
 
-    const normalizedHaystack = state.combined;
+    const normalizedHaystack = normalizeSearch(state.combined);
     let score = 0;
     for (const term of terms) {
       if (!normalizedHaystack.includes(term)) {
@@ -67,6 +67,40 @@
       image.className = 'photo-fit-img rotatable';
       image.removeAttribute('style');
     });
+  };
+
+  const iconSpriteUrl = document.body?.dataset.iconSprite || '/lib/bootstrap-icons/bootstrap-icons.svg';
+  const createIcon = (name, extraClass = '') => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('icon-svg');
+    if (extraClass) {
+      svg.classList.add(extraClass);
+    }
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.setAttribute('viewBox', '0 0 16 16');
+
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    const href = `${iconSpriteUrl}#${name}`;
+    use.setAttribute('href', href);
+    use.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
+    svg.appendChild(use);
+    return svg;
+  };
+  const appendIconText = (parent, iconName, text) => {
+    parent.appendChild(createIcon(iconName));
+    const label = document.createElement('span');
+    label.textContent = text;
+    parent.appendChild(label);
+  };
+
+  const setButtonLabel = (button, iconName, text) => {
+    if (!(button instanceof HTMLElement)) return;
+    button.replaceChildren();
+    button.appendChild(createIcon(iconName));
+    const label = document.createElement('span');
+    label.textContent = text;
+    button.appendChild(label);
   };
 
   const initItemViewCarousels = scope => {
@@ -290,16 +324,32 @@
           detail: normalizeSearch(option.dataset.detail || ''),
           search: normalizeSearch(option.dataset.search || ''),
           tags: normalizeSearch((Array.isArray(tags) ? tags : []).join(' ')),
-          combined: [
+          combined: normalizeSearch([
             option.dataset.search || '',
             option.dataset.title || '',
             option.dataset.meta || '',
             option.dataset.detail || '',
             (Array.isArray(tags) ? tags : []).join(' ')
-          ].join(' ')
+          ].join(' '))
         };
       });
       let isOpen = !compact;
+      let activeOption = null;
+
+      const getVisibleOptions = () => options.filter(option => !option.hidden);
+
+      const setActiveOption = option => {
+        if (activeOption === option) return;
+        if (activeOption instanceof HTMLElement) {
+          activeOption.classList.remove('is-active');
+          activeOption.setAttribute('aria-selected', activeOption.classList.contains('is-selected') ? 'true' : 'false');
+        }
+        activeOption = option instanceof HTMLElement && !option.hidden ? option : null;
+        if (activeOption instanceof HTMLElement) {
+          activeOption.classList.add('is-active');
+          activeOption.setAttribute('aria-selected', 'true');
+        }
+      };
 
       const renderCurrent = option => {
         const title = option?.dataset.title || picker.dataset.emptyLabel || 'Sin seleccionar';
@@ -315,12 +365,12 @@
           metaEl.textContent = meta;
           current.appendChild(metaEl);
         }
-        if (detail) {
+        if (detail && !compact) {
           const detailEl = document.createElement('small');
           detailEl.textContent = detail;
           current.appendChild(detailEl);
         }
-        if (Array.isArray(tags) && tags.length > 0) {
+        if (!compact && Array.isArray(tags) && tags.length > 0) {
           const tagsEl = document.createElement('div');
           tagsEl.className = 'search-picker-tags';
           tags.forEach(tag => {
@@ -330,6 +380,12 @@
             tagsEl.appendChild(chip);
           });
           current.appendChild(tagsEl);
+        }
+        if (compact) {
+          const cta = document.createElement('small');
+          cta.className = 'search-picker-current-cta';
+          cta.textContent = 'Elegir contenedores';
+          current.appendChild(cta);
         }
       };
 
@@ -413,9 +469,19 @@
         if (empty instanceof HTMLElement) {
           empty.hidden = visible > 0;
         }
+
+        if (visible === 1) {
+          setActiveOption(rankedVisible[0]?.option || null);
+        } else if (activeOption instanceof HTMLElement && activeOption.hidden) {
+          setActiveOption(null);
+        }
       };
 
-      options.forEach(option => option.addEventListener('click', () => chooseOption(option)));
+      options.forEach(option => {
+        option.addEventListener('click', () => chooseOption(option));
+        option.addEventListener('mouseenter', () => setActiveOption(option));
+        option.addEventListener('focus', () => setActiveOption(option));
+      });
       search.addEventListener('input', filterOptions);
       if (compact) {
         search.addEventListener('focus', openPanel);
@@ -427,35 +493,49 @@
         });
       }
       search.addEventListener('keydown', event => {
-        const firstVisibleOption = () => options.find(option => !option.hidden);
+        const visibleOptions = () => getVisibleOptions();
         if (event.key === 'Enter') {
-          const option = firstVisibleOption();
-          if (!option) return;
-          event.preventDefault();
-          event.stopPropagation();
-          chooseOption(option);
-          if (picker.dataset.pickerSubmitOnEnter === 'true') {
-            const form = picker.closest('form');
-            const selector = picker.dataset.pickerSubmitButtonSelector || '';
-            const submitButton = selector && form ? form.querySelector(selector) : null;
-            if (form instanceof HTMLFormElement) {
-              if (submitButton instanceof HTMLElement && typeof form.requestSubmit === 'function') {
-                form.requestSubmit(submitButton);
-              } else if (typeof form.requestSubmit === 'function') {
-                form.requestSubmit();
-              } else {
-                form.submit();
+          const visible = visibleOptions();
+          const option = activeOption instanceof HTMLElement && !activeOption.hidden
+            ? activeOption
+            : (visible.length === 1 ? visible[0] : null);
+          if (option) {
+            event.preventDefault();
+            event.stopPropagation();
+            chooseOption(option);
+            if (picker.dataset.pickerSubmitOnEnter === 'true') {
+              const form = picker.closest('form');
+              const selector = picker.dataset.pickerSubmitButtonSelector || '';
+              const submitButton = selector && form ? form.querySelector(selector) : null;
+              if (form instanceof HTMLFormElement) {
+                if (submitButton instanceof HTMLElement && typeof form.requestSubmit === 'function') {
+                  form.requestSubmit(submitButton);
+                } else if (typeof form.requestSubmit === 'function') {
+                  form.requestSubmit();
+                } else {
+                  form.submit();
+                }
               }
             }
-          }
-          if (!compact) {
-            search.focus();
+            if (!compact) {
+              search.focus();
+            }
           }
         }
         if (event.key === 'ArrowDown') {
-          const option = firstVisibleOption();
+          const visible = visibleOptions();
+          const option = activeOption instanceof HTMLElement && !activeOption.hidden ? activeOption : visible[0];
           if (!option) return;
           event.preventDefault();
+          setActiveOption(option);
+          option.focus();
+        }
+        if (event.key === 'ArrowUp') {
+          const visible = visibleOptions();
+          const option = activeOption instanceof HTMLElement && !activeOption.hidden ? activeOption : visible[visible.length - 1];
+          if (!option) return;
+          event.preventDefault();
+          setActiveOption(option);
           option.focus();
         }
         if (event.key === 'Escape') {
@@ -482,6 +562,7 @@
 
       updateSelectedState(hidden.value);
       filterOptions();
+      setActiveOption(options.find(option => option.classList.contains('is-selected')) || null);
       syncToggleState();
       if (compact) {
         panel.hidden = true;
@@ -661,6 +742,25 @@
       });
 
       updateEmptyState();
+    });
+  };
+
+  const initInventoryFilterToggles = () => {
+    if (document.body?.dataset.inventoryFiltersToggleReady === 'true') return;
+    if (document.body) {
+      document.body.dataset.inventoryFiltersToggleReady = 'true';
+    }
+    document.addEventListener('click', event => {
+      if (!(event.target instanceof Element)) return;
+      const button = event.target.closest('[data-inventory-filters-toggle]');
+      if (!(button instanceof HTMLButtonElement)) return;
+      const root = button.closest('[data-live-filter-root]');
+      const panel = root?.querySelector('[data-inventory-filters-panel]');
+      if (!(panel instanceof HTMLDetailsElement)) return;
+      panel.open = !panel.open;
+      if (panel.open) {
+        panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
     });
   };
 
@@ -949,9 +1049,22 @@
   };
 
   const buildInventoryItemCard = item => {
-    const card = document.createElement('a');
-    card.className = 'inventory-photo-card';
-    card.href = item.url;
+    const card = document.createElement('article');
+    card.className = 'inventory-photo-card selectable-item';
+    card.dataset.inventoryItemCard = 'true';
+    card.dataset.itemId = String(item.id);
+
+    const select = document.createElement('button');
+    select.className = 'select-chip';
+    select.type = 'button';
+    select.dataset.inventorySelectItem = 'true';
+    select.setAttribute('aria-pressed', 'false');
+    setButtonLabel(select, 'square', 'Seleccionar');
+    card.appendChild(select);
+
+    const link = document.createElement('a');
+    link.className = 'inventory-photo-link';
+    link.href = item.url;
 
     if (item.coverUrl) {
       const image = document.createElement('img');
@@ -960,12 +1073,12 @@
       image.alt = item.name;
       image.loading = 'lazy';
       image.decoding = 'async';
-      card.appendChild(image);
+      link.appendChild(image);
     } else {
       const empty = document.createElement('span');
       empty.className = 'inventory-photo-empty';
       empty.textContent = item.generatedLabel || item.name.slice(0, 1).toUpperCase();
-      card.appendChild(empty);
+      link.appendChild(empty);
     }
 
     const body = document.createElement('span');
@@ -1010,7 +1123,8 @@
     }
     body.appendChild(chips);
 
-    card.appendChild(body);
+    link.appendChild(body);
+    card.appendChild(link);
     return card;
   };
 
@@ -1045,8 +1159,9 @@
     chips.className = 'chips';
     [
       ['chip', group.code, group.isOrphanGroup ? 'danger' : 'good'],
-      ['chip', `${group.itemCount} ítems`, ''],
-      ['chip', `${group.photoCount} fotos`, '']
+      ['chip', `${group.itemCount} ítems directos`, ''],
+      ['chip', `${group.photoCount} fotos`, ''],
+      ['chip', group.childCount > 0 ? `${group.childCount} subcontenedores` : 'Sin subcontenedores', group.childCount > 0 ? '' : 'muted']
     ].forEach(([className, text, extra]) => {
       const chip = document.createElement('span');
       chip.className = `${className}${extra ? ` ${extra}` : ''}`;
@@ -1085,32 +1200,58 @@
       const directLink = document.createElement('a');
       directLink.className = 'btn';
       directLink.href = `/items?box=${encodeURIComponent(group.code)}&includeChildren=false&view=flat`;
-      directLink.textContent = 'Ver directo';
+      appendIconText(directLink, 'list-ul', 'Ver directo');
       actions.appendChild(directLink);
 
       const branchLink = document.createElement('a');
       branchLink.className = 'btn';
       branchLink.href = `/items?box=${encodeURIComponent(group.code)}&includeChildren=true&view=grouped`;
-      branchLink.textContent = 'Ver rama';
+      appendIconText(branchLink, 'boxes', 'Ver rama');
       actions.appendChild(branchLink);
 
-      const boxLink = document.createElement('a');
-      boxLink.className = 'btn';
-      boxLink.href = `/Boxes/Details?code=${encodeURIComponent(group.code)}`;
-      boxLink.textContent = 'Abrir ficha';
-      actions.appendChild(boxLink);
+      const menu = document.createElement('details');
+      menu.className = 'photo-action-menu inventory-group-menu';
+
+      const summary = document.createElement('summary');
+      summary.className = 'btn';
+      appendIconText(summary, 'three-dots', 'Acciones');
+      menu.appendChild(summary);
+
+      const panel = document.createElement('div');
+      panel.className = 'photo-action-menu-panel';
+
+      const openLink = document.createElement('a');
+      openLink.className = 'menu-action';
+      openLink.href = `/Boxes/Details?code=${encodeURIComponent(group.code)}`;
+      openLink.textContent = 'Abrir ficha';
+      panel.appendChild(openLink);
 
       const editLink = document.createElement('a');
-      editLink.className = 'btn';
+      editLink.className = 'menu-action';
       editLink.href = `/Boxes/Edit?id=${encodeURIComponent(group.boxId)}`;
       editLink.textContent = 'Editar contenedor';
-      actions.appendChild(editLink);
+      panel.appendChild(editLink);
 
       const createChild = document.createElement('a');
-      createChild.className = 'btn';
+      createChild.className = 'menu-action';
       createChild.href = `/Boxes/Create?parentBoxId=${encodeURIComponent(group.boxId)}`;
       createChild.textContent = 'Crear subcontenedor';
-      actions.appendChild(createChild);
+      panel.appendChild(createChild);
+
+      const hierarchyLink = document.createElement('a');
+      hierarchyLink.className = 'menu-action';
+      hierarchyLink.href = `/Boxes/Details?code=${encodeURIComponent(group.code)}#hierarchy-actions`;
+      hierarchyLink.textContent = 'Mover / jerarquía';
+      panel.appendChild(hierarchyLink);
+
+      const photosLink = document.createElement('a');
+      photosLink.className = 'menu-action';
+      photosLink.href = `/Boxes/Details?code=${encodeURIComponent(group.code)}#photos`;
+      photosLink.textContent = 'Gestionar fotos';
+      panel.appendChild(photosLink);
+
+      menu.appendChild(panel);
+      actions.appendChild(menu);
     }
     section.appendChild(actions);
 
@@ -1121,12 +1262,172 @@
     return section;
   };
 
+  const inventoryBulkStates = new WeakMap();
+
+  const getInventoryBulkState = root => {
+    let state = inventoryBulkStates.get(root);
+    if (state) return state;
+
+    const form = root.querySelector('[data-inventory-bulk-form]');
+    const count = root.querySelector('[data-inventory-bulk-count]');
+    const empty = root.querySelector('[data-inventory-bulk-empty]');
+    const selectedList = root.querySelector('[data-inventory-bulk-selected-list]');
+    const selectedInputs = root.querySelector('[data-inventory-bulk-selected-inputs]');
+    const submit = root.querySelector('[data-inventory-bulk-submit]');
+    const clear = root.querySelector('[data-inventory-bulk-clear]');
+    const target = form?.querySelector('input[name="BulkMove.BoxId"]');
+
+    state = {
+      root,
+      form,
+      count,
+      empty,
+      selectedList,
+      selectedInputs,
+      submit,
+      clear,
+      target,
+      selectedIds: new Set(),
+      selectedLabels: new Map()
+    };
+    inventoryBulkStates.set(root, state);
+    return state;
+  };
+
+  const syncInventoryBulkSelection = root => {
+    const state = getInventoryBulkState(root);
+    if (!state.form) return;
+
+    const selectedCards = [...root.querySelectorAll('[data-inventory-item-card]')];
+    selectedCards.forEach(card => {
+      const id = Number.parseInt(card.dataset.itemId || '', 10);
+      if (!Number.isFinite(id)) return;
+      const selected = state.selectedIds.has(id);
+      card.classList.toggle('selected', selected);
+      const button = card.querySelector('[data-inventory-select-item]');
+      if (button instanceof HTMLButtonElement) {
+        button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        setButtonLabel(button, selected ? 'check2-square' : 'square', selected ? 'Seleccionado' : 'Seleccionar');
+      }
+    });
+
+    if (state.count instanceof HTMLElement) {
+      state.count.textContent = `${state.selectedIds.size} seleccionados`;
+    }
+
+    if (state.empty instanceof HTMLElement) {
+      state.empty.hidden = state.selectedIds.size > 0;
+    }
+
+    if (state.selectedList instanceof HTMLElement) {
+      state.selectedList.replaceChildren();
+      const labels = [...state.selectedIds]
+        .map(id => ({ id, label: state.selectedLabels.get(id) || `Ítem #${id}` }))
+        .sort((a, b) => a.label.localeCompare(b.label, 'es'));
+      labels.slice(0, 8).forEach(entry => {
+        const chip = document.createElement('span');
+        chip.className = 'chip chip-box-selected';
+        const label = document.createElement('span');
+        label.textContent = entry.label;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'chip-remove';
+        remove.dataset.inventoryUnselectItem = String(entry.id);
+        remove.setAttribute('aria-label', `Quitar ${entry.label}`);
+        remove.textContent = '×';
+        chip.append(label, remove);
+        state.selectedList.appendChild(chip);
+      });
+      if (labels.length > 8) {
+        const more = document.createElement('span');
+        more.className = 'chip';
+        more.textContent = `+${labels.length - 8} más`;
+        state.selectedList.appendChild(more);
+      }
+    }
+
+    if (state.selectedInputs instanceof HTMLElement) {
+      state.selectedInputs.replaceChildren();
+      [...state.selectedIds].sort((a, b) => a - b).forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'BulkMove.SelectedItemIds';
+        input.value = String(id);
+        state.selectedInputs.appendChild(input);
+      });
+    }
+
+    const targetValue = state.target instanceof HTMLInputElement ? Number.parseInt(state.target.value || '0', 10) || 0 : 0;
+    const canSubmit = state.selectedIds.size > 0 && targetValue > 0;
+    if (state.submit instanceof HTMLButtonElement) {
+      state.submit.disabled = !canSubmit;
+    }
+  };
+
+  const initInventoryBulkSelection = scope => {
+    const root = (scope || document).querySelector('[data-inventory-bulk-root]');
+    if (!(root instanceof HTMLElement)) return;
+    const state = getInventoryBulkState(root);
+    if (state.root.dataset.inventoryBulkReady === 'true') {
+      syncInventoryBulkSelection(root);
+      return;
+    }
+    state.root.dataset.inventoryBulkReady = 'true';
+
+    const toggleCard = card => {
+      const id = Number.parseInt(card?.dataset.itemId || '', 10);
+      if (!Number.isFinite(id)) return;
+      const title = card.querySelector('.inventory-photo-body strong')?.textContent?.trim() || `Ítem #${id}`;
+      if (state.selectedIds.has(id)) {
+        state.selectedIds.delete(id);
+        state.selectedLabels.delete(id);
+      } else {
+        state.selectedIds.add(id);
+        state.selectedLabels.set(id, title);
+      }
+      syncInventoryBulkSelection(root);
+    };
+
+    root.addEventListener('click', event => {
+      const button = event.target instanceof HTMLElement
+        ? event.target.closest('[data-inventory-select-item], [data-inventory-unselect-item]')
+        : null;
+      if (button instanceof HTMLElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (button.hasAttribute('data-inventory-unselect-item')) {
+          const id = Number.parseInt(button.dataset.inventoryUnselectItem || '', 10);
+          if (Number.isFinite(id)) {
+            state.selectedIds.delete(id);
+            state.selectedLabels.delete(id);
+            syncInventoryBulkSelection(root);
+          }
+          return;
+        }
+        const card = button.closest('[data-inventory-item-card]');
+        toggleCard(card);
+        return;
+      }
+    });
+
+    state.clear?.addEventListener('click', () => {
+      state.selectedIds.clear();
+      state.selectedLabels.clear();
+      syncInventoryBulkSelection(root);
+    });
+
+    state.form?.addEventListener('change', () => syncInventoryBulkSelection(root));
+    state.form?.addEventListener('input', () => syncInventoryBulkSelection(root));
+
+    syncInventoryBulkSelection(root);
+  };
+
   const buildInventoryFlatMarkup = payload => {
     const section = document.createElement('section');
     section.className = 'inventory-group';
 
     const header = document.createElement('div');
-    header.className = 'section-header compact';
+    header.className = 'section-header compact inventory-board-header';
     const copy = document.createElement('div');
     const h2 = document.createElement('h2');
     h2.textContent = 'Ítems aplanados';
@@ -1135,6 +1436,48 @@
     kicker.textContent = 'Todos los ítems del alcance actual en una sola vista operativa.';
     copy.append(h2, kicker);
     header.appendChild(copy);
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+
+    const consumables = document.createElement('a');
+    consumables.className = 'btn';
+    consumables.href = buildInventoryQueryUrl(payload, { onlyConsumable: true, onlyOrphans: false, view: 'flat' });
+    appendIconText(consumables, 'basket', 'Consumibles');
+    actions.appendChild(consumables);
+
+    const orphans = document.createElement('a');
+    orphans.className = 'btn';
+    orphans.href = buildInventoryQueryUrl(payload, { onlyOrphans: true, onlyConsumable: false, view: 'grouped' });
+    appendIconText(orphans, 'archive', 'Huérfanos');
+    actions.appendChild(orphans);
+
+    const locations = document.createElement('a');
+    locations.className = 'btn';
+    locations.href = '/Locations';
+    appendIconText(locations, 'geo-alt', 'Ubicaciones');
+    actions.appendChild(locations);
+
+    const segmented = document.createElement('div');
+    segmented.className = 'segmented';
+    segmented.setAttribute('role', 'group');
+    segmented.setAttribute('aria-label', 'Vista de inventario');
+
+    const flatLink = document.createElement('a');
+    flatLink.className = 'segmented-item is-active';
+    flatLink.setAttribute('aria-current', 'page');
+    flatLink.href = buildInventoryQueryUrl(payload, { view: 'flat' });
+    appendIconText(flatLink, 'list-ul', 'Vista plana');
+    segmented.appendChild(flatLink);
+
+    const groupedLink = document.createElement('a');
+    groupedLink.className = 'segmented-item';
+    groupedLink.href = buildInventoryQueryUrl(payload, { view: 'grouped' });
+    appendIconText(groupedLink, 'boxes', 'Agrupado');
+    segmented.appendChild(groupedLink);
+
+    actions.appendChild(segmented);
+    header.appendChild(actions);
     section.appendChild(header);
 
     const grid = document.createElement('div');
@@ -1205,20 +1548,29 @@
       const back = document.createElement('a');
       back.className = 'btn';
       back.href = `/Boxes/Details?code=${encodeURIComponent(context.code)}`;
-      back.textContent = 'Volver a ficha';
+      appendIconText(back, 'box-seam', 'Volver a ficha');
       firstRow.appendChild(back);
 
+      const segmented = document.createElement('div');
+      segmented.className = 'segmented';
+      segmented.setAttribute('role', 'group');
+      segmented.setAttribute('aria-label', 'Alcance del contenedor');
+
       const onlyThis = document.createElement('a');
-      onlyThis.className = `btn ${payload.includeChildren ? '' : 'primary'}`.trim();
+      onlyThis.className = `segmented-item ${payload.includeChildren ? '' : 'is-active'}`.trim();
+      if (!payload.includeChildren) onlyThis.setAttribute('aria-current', 'page');
       onlyThis.href = buildInventoryQueryUrl(payload, { boxId: payload.boxId, includeChildren: false, view: payload.viewMode });
-      onlyThis.textContent = 'Sólo este CT';
-      firstRow.appendChild(onlyThis);
+      appendIconText(onlyThis, 'toggle-off', 'Sólo este CT');
+      segmented.appendChild(onlyThis);
 
       const includeChildren = document.createElement('a');
-      includeChildren.className = `btn ${payload.includeChildren ? 'primary' : ''}`.trim();
+      includeChildren.className = `segmented-item ${payload.includeChildren ? 'is-active' : ''}`.trim();
+      if (payload.includeChildren) includeChildren.setAttribute('aria-current', 'page');
       includeChildren.href = buildInventoryQueryUrl(payload, { boxId: payload.boxId, includeChildren: true, view: payload.viewMode });
-      includeChildren.textContent = 'Incluir subcontenedores';
-      firstRow.appendChild(includeChildren);
+      appendIconText(includeChildren, 'toggle-on', 'Incluir subcontenedores');
+      segmented.appendChild(includeChildren);
+
+      firstRow.appendChild(segmented);
       actions.appendChild(firstRow);
     }
     section.appendChild(actions);
@@ -1229,10 +1581,10 @@
   const buildInventorySummaryMarkup = payload => {
     const root = document.createDocumentFragment();
     const section = document.createElement('div');
-    section.className = 'panel inventory-scope';
+    section.className = 'panel inventory-filter-status';
 
     const header = document.createElement('div');
-    header.className = 'section-header compact';
+    header.className = 'section-header compact inventory-filter-status-header';
 
     const copy = document.createElement('div');
     const eyebrow = document.createElement('p');
@@ -1240,26 +1592,32 @@
     eyebrow.textContent = 'Filtros activos';
     const kicker = document.createElement('p');
     kicker.className = 'section-kicker';
-    kicker.textContent = 'Alcance de consulta y operación en Inventario.';
+    kicker.textContent = 'Consulta y alcance en Inventario.';
     copy.append(eyebrow, kicker);
     header.appendChild(copy);
+
+    const actions = document.createElement('div');
+    actions.className = 'actions inventory-filter-status-actions';
+
+    const edit = document.createElement('button');
+    edit.className = 'btn';
+    edit.type = 'button';
+    edit.dataset.inventoryFiltersToggle = 'true';
+    appendIconText(edit, 'funnel', 'Editar filtros');
+    actions.appendChild(edit);
 
     const clear = document.createElement('a');
     clear.className = 'btn';
     clear.href = '/items';
-    clear.textContent = 'Limpiar filtros';
-    header.appendChild(clear);
+    appendIconText(clear, 'x-lg', 'Limpiar filtros');
+    actions.appendChild(clear);
 
-    const createBox = document.createElement('a');
-    createBox.className = 'btn primary';
-    createBox.href = '/Boxes/Create';
-    createBox.textContent = 'Nuevo contenedor';
-    header.appendChild(createBox);
+    header.appendChild(actions);
 
     section.appendChild(header);
 
     const chips = document.createElement('div');
-    chips.className = 'chips';
+    chips.className = 'chips inventory-filter-status-chips';
 
     const addChip = (text, className = 'chip') => {
       const chip = document.createElement('span');
@@ -1510,6 +1868,7 @@
         results.replaceChildren(buildInventoryBoardMarkup(payload));
         enhanceRotatedPhotos(context);
         enhanceRotatedPhotos(results);
+        syncInventoryBulkSelection(root);
         syncUrl(payload);
       };
 
@@ -1602,10 +1961,14 @@
     document.addEventListener('DOMContentLoaded', initSearchPickers, { once: true });
     document.addEventListener('DOMContentLoaded', initPendingActionLinkers, { once: true });
     document.addEventListener('DOMContentLoaded', initInventoryBoxMultiFilters, { once: true });
+    document.addEventListener('DOMContentLoaded', initInventoryFilterToggles, { once: true });
+    document.addEventListener('DOMContentLoaded', initInventoryBulkSelection, { once: true });
   } else {
     initSearchPickers();
     initPendingActionLinkers();
     initInventoryBoxMultiFilters();
+    initInventoryFilterToggles();
+    initInventoryBulkSelection();
   }
 
   if (document.readyState === 'loading') {

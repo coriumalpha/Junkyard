@@ -28,8 +28,12 @@ public class IndexModel(InventoryDbContext db) : PageModel
     public Box? SelectedBox { get; private set; }
     public List<SelectListItem> Locations { get; private set; } = [];
     public SearchPickerModel? BoxPicker { get; private set; }
+    public SearchPickerModel? BulkMoveBoxPicker { get; private set; }
     public string ViewMode { get; private set; } = "grouped";
     public List<string> Categories { get; private set; } = [];
+
+    [BindProperty]
+    public BulkMoveInput BulkMove { get; set; } = new();
 
     public async Task OnGetAsync(string? q, string? category, string? box, int[]? boxIds, int? boxId, int? locationId, bool includeChildren, bool onlyConsumable, bool onlyOrphans, string? view, CancellationToken cancellationToken)
     {
@@ -87,6 +91,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
                     group.LocationSourceLabel,
                     group.Path,
                     group.IsOrphanGroup,
+                    group.ChildCount,
                     group.PhotoCount,
                     group.Items.Count,
                     string.IsNullOrWhiteSpace(group.CoverPhoto) ? group.Code[..Math.Min(1, group.Code.Length)] : null,
@@ -96,6 +101,57 @@ public class IndexModel(InventoryDbContext db) : PageModel
                 ? data.Items.Select(item => ToItemDto(item, data)).ToList()
                 : data.Items.Select(item => ToItemDto(item, data)).ToList()
         ));
+    }
+
+    public async Task<IActionResult> OnPostMoveSelectedAsync(string? returnUrl, CancellationToken cancellationToken)
+    {
+        var selectedIds = BulkMove.SelectedItemIds.Where(id => id > 0).Distinct().ToList();
+        if (selectedIds.Count == 0)
+        {
+            TempData["BulkMoveMessage"] = "No había ítems seleccionados.";
+            return SafeRedirect(returnUrl);
+        }
+
+        if (BulkMove.BoxId <= 0)
+        {
+            TempData["BulkMoveMessage"] = "Selecciona un contenedor de destino.";
+            return SafeRedirect(returnUrl);
+        }
+
+        var targetBox = await db.Boxes.FirstOrDefaultAsync(b => b.Id == BulkMove.BoxId, cancellationToken);
+        if (targetBox is null)
+        {
+            TempData["BulkMoveMessage"] = "El contenedor de destino no existe.";
+            return SafeRedirect(returnUrl);
+        }
+
+        var items = await db.Items
+            .Where(item => selectedIds.Contains(item.Id))
+            .ToListAsync(cancellationToken);
+
+        if (items.Count == 0)
+        {
+            TempData["BulkMoveMessage"] = "No se encontraron ítems válidos para mover.";
+            return SafeRedirect(returnUrl);
+        }
+
+        var movedCount = 0;
+        foreach (var item in items)
+        {
+            if (item.BoxId == targetBox.Id)
+            {
+                continue;
+            }
+
+            item.BoxId = targetBox.Id;
+            movedCount++;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        TempData["BulkMoveMessage"] = movedCount == 0
+            ? "Los ítems ya estaban en ese contenedor."
+            : $"Movidos {movedCount} {(movedCount == 1 ? "ítem" : "ítems")} a {targetBox.Code} · {targetBox.Name}.";
+        return SafeRedirect(returnUrl);
     }
 
     private void Apply(InventoryData data)
@@ -118,6 +174,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
         Categories = data.Categories;
         PhotoStates = data.PhotoStates;
         BoxPicker = data.BoxPicker;
+        BulkMoveBoxPicker = data.BulkMoveBoxPicker;
     }
 
     private async Task<InventoryData> LoadInventoryDataAsync(string? q, string? category, string? box, int[]? boxIds, int? boxId, int? locationId, bool includeChildren, bool onlyConsumable, bool onlyOrphans, string? view, CancellationToken cancellationToken)
@@ -267,6 +324,11 @@ public class IndexModel(InventoryDbContext db) : PageModel
                 .Select(g => new { ItemId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.ItemId, x => x.Count, cancellationToken);
 
+        var childCountLookup = await db.Boxes.AsNoTracking()
+            .GroupBy(b => b.ParentBoxId)
+            .Select(group => new { ParentBoxId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(entry => entry.ParentBoxId ?? 0, entry => entry.Count, cancellationToken);
+
         var groups = items
             .GroupBy(i => i.BoxId)
             .Select(g =>
@@ -288,6 +350,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
                     sourceLabel,
                     BuildBoxPath(box),
                     box is null,
+                    box is not null && childCountLookup.TryGetValue(box.Id, out var childCount) ? childCount : 0,
                     groupedItems.Sum(i => itemPhotoCounts.GetValueOrDefault(i.Id)),
                     groupedItems);
             })
@@ -308,8 +371,8 @@ public class IndexModel(InventoryDbContext db) : PageModel
         {
             InputName = "boxAdder",
             InputId = "boxAdder",
-            Label = "Añadir contenedor",
-            Placeholder = "Buscar CT, nombre, ubicación o padre para añadir...",
+            Label = "Elegir contenedores",
+            Placeholder = "Buscar CT, nombre, ubicación o padre para elegir...",
             SelectedValue = null,
             EmptyLabel = "Sin contenedores adicionales",
             EmptyHint = "Busca un CT para sumarlo al alcance actual.",
@@ -319,6 +382,20 @@ public class IndexModel(InventoryDbContext db) : PageModel
             Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken, selectedBoxIds.ToHashSet())
         };
         boxPicker.Compact = true;
+
+        var bulkMoveBoxPicker = new SearchPickerModel
+        {
+            InputName = "BulkMove.BoxId",
+            InputId = "BulkMove_BoxId",
+            Label = "Contenedor destino",
+            Placeholder = "Buscar CT, nombre, tipo, ubicación o padre...",
+            SelectedValue = BulkMove.BoxId > 0 ? BulkMove.BoxId.ToString() : null,
+            EmptyLabel = "Sin destino seleccionado",
+            EmptyHint = "Busca el contenedor donde quieres mover los ítems seleccionados.",
+            ClearValue = "",
+            Compact = true,
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)
+        };
 
         return new InventoryData(
             queryValue,
@@ -347,7 +424,8 @@ public class IndexModel(InventoryDbContext db) : PageModel
             locations,
             photoStates,
             locationLookup,
-            boxPicker);
+            boxPicker,
+            bulkMoveBoxPicker);
     }
 
     private async Task<List<string>> LoadCategoriesAsync(CancellationToken cancellationToken) =>
@@ -491,6 +569,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
         string? LocationSourceLabel,
         string Path,
         bool IsOrphanGroup,
+        int ChildCount,
         int PhotoCount,
         List<Item> Items)
     {
@@ -500,6 +579,31 @@ public class IndexModel(InventoryDbContext db) : PageModel
         SelectedBox is null ? "" : BuildBoxPath(SelectedBox);
 
     public bool IsFlatView => ViewMode == "flat";
+
+    public string CurrentReturnUrl =>
+        string.IsNullOrWhiteSpace(Request.QueryString.Value)
+            ? (Request.Path.Value ?? "/")
+            : $"{Request.Path.Value}{Request.QueryString.Value}";
+
+    private IActionResult SafeRedirect(string? returnUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+
+        return RedirectToPage(new
+        {
+            q = Query,
+            category = Category,
+            boxIds = BoxIds.Count == 0 ? null : BoxIds.ToArray(),
+            locationId = LocationId,
+            includeChildren = IncludeChildren,
+            onlyConsumable = OnlyConsumable,
+            onlyOrphans = OnlyOrphans,
+            view = ViewMode
+        });
+    }
 
     private static InventoryItemDto ToItemDto(Item item, InventoryData data)
     {
@@ -545,7 +649,8 @@ public class IndexModel(InventoryDbContext db) : PageModel
         List<SelectListItem> Locations,
         Dictionary<string, PhotoViewState> PhotoStates,
         IReadOnlyDictionary<int, BoxLocationResolution> LocationLookup,
-        SearchPickerModel BoxPicker)
+        SearchPickerModel BoxPicker,
+        SearchPickerModel BulkMoveBoxPicker)
     {
         public string SelectedBoxPath =>
             SelectedBox is null ? "" : BuildBoxPath(SelectedBox);
@@ -562,6 +667,12 @@ public class IndexModel(InventoryDbContext db) : PageModel
             filename is not null && PhotoStates.TryGetValue(filename, out var state)
                 ? PhotoStorage.ThumbUrl(filename, state.UpdatedAt)
                 : null;
+    }
+
+    public class BulkMoveInput
+    {
+        public List<int> SelectedItemIds { get; set; } = [];
+        public int BoxId { get; set; }
     }
 
     public record SelectedBoxView(
@@ -623,6 +734,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
         string? LocationSourceLabel,
         string Path,
         bool IsOrphanGroup,
+        int ChildCount,
         int PhotoCount,
         int ItemCount,
         string? GeneratedLabel,
