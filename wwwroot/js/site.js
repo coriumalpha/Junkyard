@@ -1185,10 +1185,7 @@
       const scopeChip = document.createElement('span');
       scopeChip.className = 'chip';
       scopeChip.textContent = payload.includeChildren ? 'Incluye subcontenedores' : 'Sólo este CT';
-      const viewChip = document.createElement('span');
-      viewChip.className = 'chip';
-      viewChip.textContent = payload.viewMode === 'flat' ? 'Vista plana' : 'Agrupado por contenedor';
-      chips.append(typeChip, locationChip, scopeChip, viewChip);
+      chips.append(typeChip, locationChip, scopeChip);
       left.appendChild(chips);
       if (context.locationSourceLabel) {
         const source = document.createElement('p');
@@ -1224,21 +1221,7 @@
       firstRow.appendChild(includeChildren);
       actions.appendChild(firstRow);
 
-      const secondRow = document.createElement('div');
-      secondRow.className = 'actions';
 
-      const flat = document.createElement('a');
-      flat.className = `btn ${payload.viewMode === 'flat' ? 'primary' : ''}`.trim();
-      flat.href = buildInventoryQueryUrl(payload, { boxId: payload.boxId, includeChildren: payload.includeChildren, view: 'flat' });
-      flat.textContent = 'Vista plana';
-      secondRow.appendChild(flat);
-
-      const grouped = document.createElement('a');
-      grouped.className = `btn ${payload.viewMode === 'grouped' ? 'primary' : ''}`.trim();
-      grouped.href = buildInventoryQueryUrl(payload, { boxId: payload.boxId, includeChildren: payload.includeChildren, view: 'grouped' });
-      grouped.textContent = 'Agrupado por contenedor';
-      secondRow.appendChild(grouped);
-      actions.appendChild(secondRow);
     }
     section.appendChild(actions);
     root.appendChild(section);
@@ -1299,15 +1282,10 @@
     if (payload.query) addChipLink(`Texto: ${payload.query} ×`, buildInventoryQueryUrl(payload, { query: '' }), 'chip chip-link good');
     if (payload.category) addChipLink(`Categoría: ${payload.category} ×`, buildInventoryQueryUrl(payload, { category: '' }), 'chip chip-link good');
     if (selectedBoxes.length > 0) addChipLink(`Contenedores: ${selectedBoxes.length} ×`, buildInventoryQueryUrl(payload, { boxIds: [] }), 'chip chip-link good');
-    if (payload.locationId && payload.selectedLocationName) addChipLink(`Ubicación: ${payload.selectedLocationName} ×`, buildInventoryQueryUrl(payload, { locationId: null }), 'chip chip-link good');
+    if (payload.locationId && payload.selectedLocationName) addChipLink(`Ubicación efectiva: ${payload.selectedLocationName} ×`, buildInventoryQueryUrl(payload, { locationId: null }), 'chip chip-link good');
     if (payload.includeChildren) addChipLink('Incluye subcontenedores ×', buildInventoryQueryUrl(payload, { includeChildren: false }), 'chip chip-link');
     if (payload.onlyConsumable) addChipLink('Solo consumibles ×', buildInventoryQueryUrl(payload, { onlyConsumable: false }), 'chip chip-link');
     if (payload.onlyOrphans) addChipLink('Solo huérfanos ×', buildInventoryQueryUrl(payload, { onlyOrphans: false }), 'chip chip-link');
-    addChipLink(
-      payload.viewMode === 'flat' ? 'Vista plana ×' : 'Agrupado por contenedor ×',
-      buildInventoryQueryUrl(payload, { view: payload.viewMode === 'flat' ? 'grouped' : 'flat' }),
-      'chip chip-link'
-    );
 
     section.appendChild(chips);
     root.appendChild(section);
