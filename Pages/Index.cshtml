@@ -81,7 +81,7 @@
     <aside>
         <div class="section-title">
             <h2>Consumibles bajos</h2>
-            <a class="btn" asp-page="/Consumables">Abrir</a>
+            <a class="btn" asp-page="/Items/Index" asp-route-onlyConsumable="true" asp-route-view="flat">Abrir</a>
         </div>
         <div class="panel visual-list">
             @if (Model.LowStockItems.Count == 0)

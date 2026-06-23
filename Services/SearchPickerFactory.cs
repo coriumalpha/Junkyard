@@ -1,14 +1,11 @@
 using Inventario.Data;
 using Inventario.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Text.RegularExpressions;
 
 namespace Inventario.Services;
 
 public static class SearchPickerFactory
 {
-    private static readonly Regex AcronymRegex = new(@"[A-Z0-9]{2,}", RegexOptions.Compiled);
-
     public static async Task<List<SearchPickerOption>> BuildBoxOptionsAsync(
         InventoryDbContext db,
         CancellationToken cancellationToken,
@@ -31,7 +28,7 @@ public static class SearchPickerFactory
             .GroupBy(item => item.BoxId!.Value)
             .ToDictionary(
                 group => group.Key,
-                group => BuildSearchIndexText(group.SelectMany(item =>
+                group => SearchText.BuildIndex(group.SelectMany(item =>
                     new[] { item.Name, item.Category, item.Notes, item.Unit })));
 
         var query = db.Boxes.AsNoTracking();
@@ -73,7 +70,7 @@ public static class SearchPickerFactory
                     ? searchLocation.LocationName!
                     : "Sin ubicación"
             ],
-            SearchText = BuildSearchIndexText(
+            SearchText = SearchText.BuildIndex(
                 b.Code,
                 b.Name,
                 b.Description,
@@ -135,7 +132,7 @@ public static class SearchPickerFactory
                     i.Sentimental ? "Sentimental" : "No sentimental",
                     i.Obsolete ? "Legacy" : "Activo"
                 ],
-                SearchText = BuildSearchIndexText(
+                SearchText = SearchText.BuildIndex(
                     i.Name,
                     i.Category,
                     i.BoxCode,
@@ -147,33 +144,5 @@ public static class SearchPickerFactory
                     i.Unit)
             };
         }).ToList();
-    }
-
-    private static string BuildSearchIndexText(params object?[] values)
-    {
-        var raw = string.Join(' ', values.Where(value => value is not null));
-        var aliasParts = new List<string>();
-        foreach (Match match in AcronymRegex.Matches(raw))
-        {
-            aliasParts.Add(match.Value);
-        }
-
-        return string.IsNullOrWhiteSpace(raw)
-            ? string.Join(' ', aliasParts)
-            : string.Join(' ', new[] { raw, string.Join(' ', aliasParts) }.Where(value => !string.IsNullOrWhiteSpace(value)));
-    }
-
-    private static string BuildSearchIndexText(IEnumerable<string?> values)
-    {
-        var raw = string.Join(' ', values.Where(value => !string.IsNullOrWhiteSpace(value)));
-        var aliasParts = new List<string>();
-        foreach (Match match in AcronymRegex.Matches(raw))
-        {
-            aliasParts.Add(match.Value);
-        }
-
-        return string.IsNullOrWhiteSpace(raw)
-            ? string.Join(' ', aliasParts)
-            : string.Join(' ', new[] { raw, string.Join(' ', aliasParts) }.Where(value => !string.IsNullOrWhiteSpace(value)));
     }
 }

@@ -37,6 +37,10 @@ interface LayoutOption {
   description: string;
 }
 
+interface InventoryGroupNode extends InventoryGroup {
+  children: InventoryGroupNode[];
+}
+
 const DEFAULT_STATE: InventoryQueryState = {
   q: '',
   box: '',
@@ -113,10 +117,14 @@ export class InventoryPageComponent {
   protected readonly drawerCollapsed = signal(false);
   protected readonly drawerOpen = signal(true);
   protected readonly handset = signal(false);
+  protected readonly expandedGroups = signal<Record<string, boolean>>({});
+  protected readonly groupPages = signal<Record<string, number>>({});
   protected readonly groups = computed(() => this.data()?.groups ?? []);
+  protected readonly groupTree = computed(() => this.buildGroupTree(this.groups()));
   protected readonly items = computed(() => this.data()?.items ?? []);
   protected readonly focusVisuals = computed(() => this.buildFocusVisuals());
   protected readonly layoutOptions = LAYOUT_OPTIONS;
+  protected readonly groupPageSize = 12;
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -305,7 +313,7 @@ export class InventoryPageComponent {
   }
 
   protected trackByGroup(_index: number, group: InventoryGroup): string {
-    return `${group.boxId ?? 'orphan'}:${group.code}`;
+    return this.groupKey(group);
   }
 
   protected trackByItem(_index: number, item: InventoryItem): number {
@@ -314,6 +322,75 @@ export class InventoryPageComponent {
 
   protected trackByFocusVisual(_index: number, visual: FocusVisual): string {
     return `${visual.kind}:${visual.title}:${visual.subtitle}`;
+  }
+
+  protected previewItems(group: InventoryGroup): InventoryItem[] {
+    return group.items.slice(0, 2);
+  }
+
+  protected remainingPreviewCount(group: InventoryGroup): number {
+    return Math.max(group.itemCount - this.previewItems(group).length, 0);
+  }
+
+  protected groupKey(group: InventoryGroup): string {
+    return `${group.boxId ?? 'orphan'}:${group.code}`;
+  }
+
+  protected isGroupExpanded(group: InventoryGroup): boolean {
+    return this.expandedGroups()[this.groupKey(group)] ?? false;
+  }
+
+  protected setGroupExpanded(group: InventoryGroup, expanded: boolean): void {
+    const key = this.groupKey(group);
+    this.expandedGroups.update((current) => ({ ...current, [key]: expanded }));
+
+    if (expanded && this.groupPages()[key] === undefined) {
+      this.groupPages.update((current) => ({ ...current, [key]: 0 }));
+    }
+  }
+
+  protected pagedGroupItems(group: InventoryGroup): InventoryItem[] {
+    const page = this.groupPage(group);
+    const start = page * this.groupPageSize;
+    return group.items.slice(start, start + this.groupPageSize);
+  }
+
+  protected groupPage(group: InventoryGroup): number {
+    return this.groupPages()[this.groupKey(group)] ?? 0;
+  }
+
+  protected groupPageCount(group: InventoryGroup): number {
+    return Math.max(1, Math.ceil(group.items.length / this.groupPageSize));
+  }
+
+  protected groupPageStart(group: InventoryGroup): number {
+    if (!group.items.length) {
+      return 0;
+    }
+
+    return this.groupPage(group) * this.groupPageSize + 1;
+  }
+
+  protected groupPageEnd(group: InventoryGroup): number {
+    return Math.min((this.groupPage(group) + 1) * this.groupPageSize, group.items.length);
+  }
+
+  protected setGroupPage(group: InventoryGroup, page: number): void {
+    const key = this.groupKey(group);
+    const boundedPage = Math.min(Math.max(page, 0), this.groupPageCount(group) - 1);
+    this.groupPages.update((current) => ({ ...current, [key]: boundedPage }));
+  }
+
+  protected hasPreviousGroupPage(group: InventoryGroup): boolean {
+    return this.groupPage(group) > 0;
+  }
+
+  protected hasNextGroupPage(group: InventoryGroup): boolean {
+    return this.groupPage(group) < this.groupPageCount(group) - 1;
+  }
+
+  protected hasGroupChildren(group: InventoryGroupNode): boolean {
+    return group.children.length > 0;
   }
 
   protected layoutGridClass(): string {
@@ -453,6 +530,46 @@ export class InventoryPageComponent {
     });
 
     return visuals.slice(0, 4);
+  }
+
+  private buildGroupTree(groups: InventoryGroup[]): InventoryGroupNode[] {
+    const nodes = new Map<number, InventoryGroupNode>();
+    const roots: InventoryGroupNode[] = [];
+
+    for (const group of groups) {
+      if (group.boxId === null) {
+        continue;
+      }
+
+      nodes.set(group.boxId, { ...group, children: [] });
+    }
+
+    for (const group of groups) {
+      if (group.boxId === null) {
+        roots.push({ ...group, children: [] });
+        continue;
+      }
+
+      const node = nodes.get(group.boxId);
+      if (!node) {
+        continue;
+      }
+
+      if (group.parentBoxId !== null && nodes.has(group.parentBoxId)) {
+        nodes.get(group.parentBoxId)!.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+
+    const sortNodes = (entries: InventoryGroupNode[]): InventoryGroupNode[] => entries
+      .sort((left, right) => left.path.localeCompare(right.path))
+      .map((entry) => ({
+        ...entry,
+        children: sortNodes(entry.children)
+      }));
+
+    return sortNodes(roots);
   }
 
   private describeError(error: unknown): string {

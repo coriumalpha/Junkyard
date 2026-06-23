@@ -36,6 +36,7 @@ builder.Services.AddDbContext<InventoryDbContext>(options =>
         sqlite => sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 builder.Services.AddScoped<PhotoStorage>();
 builder.Services.AddScoped<CsvInventoryService>();
+builder.Services.AddScoped<InventoryLiveQueryService>();
 builder.Services.AddSingleton<QrCodeService>();
 
 var app = builder.Build();
@@ -106,6 +107,35 @@ app.MapGet("/photo-derivatives/{variant}/{**filename}", async (
     {
         return Results.BadRequest();
     }
+});
+app.MapGet("/api/inventory/live", async (
+    HttpContext httpContext,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var query = httpContext.Request.Query;
+    var boxIds = query.TryGetValue("boxIds", out var rawBoxIds)
+        ? rawBoxIds
+            .Select(value => int.TryParse(value, out var parsed) ? parsed : (int?)null)
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToArray()
+        : [];
+
+    var response = await queryService.GetLiveAsync(
+        query["q"].ToString(),
+        query["category"].ToString(),
+        query["box"].ToString(),
+        boxIds,
+        int.TryParse(query["boxId"], out var boxId) ? boxId : (int?)null,
+        int.TryParse(query["locationId"], out var locationId) ? locationId : (int?)null,
+        string.Equals(query["includeChildren"], "true", StringComparison.OrdinalIgnoreCase),
+        string.Equals(query["onlyConsumable"], "true", StringComparison.OrdinalIgnoreCase),
+        string.Equals(query["onlyOrphans"], "true", StringComparison.OrdinalIgnoreCase),
+        query["view"].ToString(),
+        cancellationToken);
+
+    return Results.Json(response);
 });
 app.MapRazorPages();
 

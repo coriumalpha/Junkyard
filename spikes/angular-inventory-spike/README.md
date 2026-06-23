@@ -16,7 +16,7 @@ Spike para validar la futura SPA sobre Inventario sin tocar la app Razor princip
 npm start
 ```
 
-La app queda en `http://localhost:4200/inventory` y proxyea `/items` hacia el backend de Inventario en `http://127.0.0.1:8088`.
+La app queda en `http://0.0.0.0:8088/inventory` y también es accesible desde la IP de la máquina, por ejemplo `http://10.0.0.76:8088/inventory`. Proxyea `/api`, `/items`, `/uploads` y `/photo-derivatives` hacia el backend de Inventario en `http://127.0.0.1:8089`.
 
 ## Resultado del spike
 

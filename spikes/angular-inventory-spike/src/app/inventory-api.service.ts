@@ -65,6 +65,7 @@ export interface InventoryGroup {
   locationName: string | null;
   locationSourceLabel: string | null;
   path: string;
+  parentBoxId: number | null;
   isOrphanGroup: boolean;
   childCount: number;
   photoCount: number;
@@ -120,6 +121,6 @@ export class InventoryApiService {
 
     params = params.set('view', state.view);
 
-    return this.http.get<InventoryLiveResponse>('/items', { params });
+    return this.http.get<InventoryLiveResponse>('/api/inventory/live', { params });
   }
 }

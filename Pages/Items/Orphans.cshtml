@@ -9,7 +9,10 @@
         <p class="section-kicker">Reclasificación pendiente</p>
         <h1>Objetos sin clasificar</h1>
     </div>
-    <span class="chip danger">@Model.Items.Count</span>
+    <div class="actions">
+        <a class="btn" asp-page="/Items/Index" asp-route-onlyOrphans="true" asp-route-view="grouped">Abrir en Inventario</a>
+        <span class="chip danger">@Model.Items.Count</span>
+    </div>
 </div>
 
 <div class="list">

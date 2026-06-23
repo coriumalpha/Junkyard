@@ -277,33 +277,55 @@
       <section class="results-section" id="results" [ngClass]="layoutGridClass()">
         @switch (state().layout) {
           @case ('grouped') {
-            <div class="result-grid grouped-grid">
-              @for (group of groups(); track trackByGroup($index, group)) {
-                <mat-expansion-panel class="group-panel" [expanded]="group.itemCount <= 3">
+            <div class="grouped-list">
+              <ng-template #groupNode let-group let-depth="depth">
+                <mat-expansion-panel
+                  class="group-panel"
+                  [class.group-panel-child]="depth > 0"
+                  [style.--group-depth]="depth"
+                  [expanded]="isGroupExpanded(group)"
+                  (opened)="setGroupExpanded(group, true)"
+                  (closed)="setGroupExpanded(group, false)"
+                >
                   <mat-expansion-panel-header>
                     <mat-panel-title>
-                      <div class="group-head">
-                        @if (group.coverUrl) {
-                          <img
-                            class="group-thumb"
-                            [src]="assetUrl(group.coverUrl)!"
-                            [style.transform]="'rotate(' + group.rotationDegrees + 'deg)'"
-                            [alt]="group.name"
-                          />
-                        } @else {
-                          <div class="group-thumb placeholder">
-                            <span>{{ group.generatedLabel || group.code.slice(0, 1) }}</span>
-                          </div>
-                        }
+                      <div class="group-summary">
+                        <div class="group-head">
+                          @if (group.coverUrl) {
+                            <img
+                              class="group-thumb"
+                              [src]="assetUrl(group.coverUrl)!"
+                              [style.transform]="'rotate(' + group.rotationDegrees + 'deg)'"
+                              [alt]="group.name"
+                            />
+                          } @else {
+                            <div class="group-thumb placeholder">
+                              <span>{{ group.generatedLabel || group.code.slice(0, 1) }}</span>
+                            </div>
+                          }
 
-                        <div class="group-copy">
-                          <span class="eyebrow">{{ group.code }}</span>
-                          <strong>{{ group.name }}</strong>
-                          <span class="group-path">{{ group.path }}</span>
+                          <div class="group-copy">
+                            <span class="eyebrow">{{ group.code }}</span>
+                            <strong>{{ group.name }}</strong>
+                            <span class="group-path">{{ group.path }}</span>
+                          </div>
+                        </div>
+
+                        <div class="group-header-meta" aria-label="Resumen del contenedor">
+                          <span>{{ group.itemCount }} ítems</span>
+                          @if (group.photoCount) {
+                            <span>{{ group.photoCount }} fotos</span>
+                          }
+                          @if (group.childCount) {
+                            <span>{{ group.childCount }} hijos</span>
+                          }
                         </div>
                       </div>
                     </mat-panel-title>
-                    <mat-panel-description>
+                  </mat-expansion-panel-header>
+
+                  <div class="group-body">
+                    <div class="group-meta">
                       <div class="group-stats">
                         <span>{{ group.itemCount }} ítems</span>
                         <span>{{ group.photoCount }} fotos</span>
@@ -311,40 +333,124 @@
                       </div>
                       @if (group.locationName || group.locationSourceLabel) {
                         <p class="group-location">
-                          {{ group.locationName || 'Sin ubicación' }}
-                          @if (group.locationSourceLabel) {
-                            · {{ group.locationSourceLabel }}
-                          }
+                          <mat-icon>place</mat-icon>
+                          <span>
+                            {{ group.locationName || 'Sin ubicación' }}
+                            @if (group.locationSourceLabel) {
+                              · {{ group.locationSourceLabel }}
+                            }
+                          </span>
                         </p>
                       }
-                    </mat-panel-description>
-                  </mat-expansion-panel-header>
+                    </div>
 
-                  <div class="group-body">
-                    <div class="preview-grid">
-                      @for (item of group.items.slice(0, 3); track trackByItem($index, item)) {
-                        <article class="preview-card">
+                    <div class="group-items-head">
+                      <div>
+                        <p class="eyebrow">Inventario del contenedor</p>
+                        <strong>
+                          @if (group.items.length) {
+                            {{ groupPageStart(group) }}-{{ groupPageEnd(group) }} de {{ group.items.length }} ítems
+                          } @else {
+                            Sin ítems directos
+                          }
+                        </strong>
+                      </div>
+
+                      @if (group.items.length > groupPageSize) {
+                        <div class="group-pager" aria-label="Paginación del contenedor">
+                          <button
+                            mat-icon-button
+                            type="button"
+                            [disabled]="!hasPreviousGroupPage(group)"
+                            (click)="setGroupPage(group, groupPage(group) - 1)"
+                            aria-label="Página anterior"
+                          >
+                            <mat-icon>chevron_left</mat-icon>
+                          </button>
+                          <span>{{ groupPage(group) + 1 }} / {{ groupPageCount(group) }}</span>
+                          <button
+                            mat-icon-button
+                            type="button"
+                            [disabled]="!hasNextGroupPage(group)"
+                            (click)="setGroupPage(group, groupPage(group) + 1)"
+                            aria-label="Página siguiente"
+                          >
+                            <mat-icon>chevron_right</mat-icon>
+                          </button>
+                        </div>
+                      }
+                    </div>
+
+                    <div class="group-items-list">
+                      @for (item of pagedGroupItems(group); track trackByItem($index, item)) {
+                        <article class="group-item-row">
                           @if (item.coverUrl) {
                             <img
-                              class="preview-thumb"
+                              class="group-item-thumb"
                               [src]="assetUrl(item.coverUrl)!"
                               [style.transform]="'rotate(' + item.rotationDegrees + 'deg)'"
                               [alt]="item.name"
                             />
                           } @else {
-                            <div class="preview-thumb placeholder">
+                            <div class="group-item-thumb placeholder">
                               {{ item.generatedLabel || item.name.slice(0, 1) }}
                             </div>
                           }
 
-                          <div class="preview-copy">
+                          <div class="group-item-main">
                             <strong>{{ item.name }}</strong>
-                            <span>{{ item.quantityLabel }}</span>
                             <span>{{ item.category }}</span>
                           </div>
+
+                          <div class="group-item-meta">
+                            <span>{{ item.quantityLabel }}</span>
+                            @if (item.locationName) {
+                              <span>{{ item.locationName }}</span>
+                            }
+                          </div>
+
+                          <div class="group-item-flags">
+                            @if (item.consumable) {
+                              <span class="badge cool">Consumible</span>
+                            }
+                            @if (item.lowStock) {
+                              <span class="badge low">Bajo stock</span>
+                            }
+                            @if (item.sentimental) {
+                              <span class="badge warm">Sentimental</span>
+                            }
+                            @if (item.obsolete) {
+                              <span class="badge muted">Obsoleto</span>
+                            }
+                          </div>
+
+                          <a mat-button [href]="backendUrl(item.url)" target="_blank" rel="noreferrer">
+                            <mat-icon>edit</mat-icon>
+                            Editar
+                          </a>
                         </article>
+                      } @empty {
+                        <div class="group-empty">
+                          <mat-icon>inventory_2</mat-icon>
+                          <span>Este contenedor no tiene ítems directos en esta consulta.</span>
+                        </div>
                       }
                     </div>
+
+                    @if (group.children.length) {
+                      <section class="child-groups">
+                        <div class="child-groups-head">
+                          <p class="eyebrow">Subcontenedores</p>
+                          <span>{{ group.children.length }}</span>
+                        </div>
+
+                        <div class="child-groups-list">
+                          @for (child of group.children; track trackByGroup($index, child)) {
+                            <ng-container [ngTemplateOutlet]="groupNode" [ngTemplateOutletContext]="{ $implicit: child, depth: depth + 1 }"></ng-container>
+                          }
+                        </div>
+                      </section>
+                    }
 
                     <div class="panel-actions">
                       <a mat-stroked-button [href]="backendUrl(group.url)" target="_blank" rel="noreferrer">
@@ -354,6 +460,10 @@
                     </div>
                   </div>
                 </mat-expansion-panel>
+              </ng-template>
+
+              @for (group of groupTree(); track trackByGroup($index, group)) {
+                <ng-container [ngTemplateOutlet]="groupNode" [ngTemplateOutletContext]="{ $implicit: group, depth: 0 }"></ng-container>
               }
             </div>
           }
