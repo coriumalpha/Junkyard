@@ -55,7 +55,8 @@
     </div>
     <div class="field full">
         <label asp-for="Input.Notes">Descripción del ítem</label>
-        <textarea asp-for="Input.Notes" placeholder="Marca, modelo, número de serie, estado visible..."></textarea>
+        <p class="caption">Describe el objeto, modelo, características, estado o detalles útiles.</p>
+        <textarea asp-for="Input.Notes" rows="8" placeholder="Marca, modelo, número de serie, estado visible..."></textarea>
     </div>
     <div class="actions full">
         <button class="btn primary" type="submit">Crear ítem</button>
