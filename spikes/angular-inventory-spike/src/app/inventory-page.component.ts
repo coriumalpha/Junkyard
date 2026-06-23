@@ -109,7 +109,7 @@ const LAYOUT_TO_VIEW: Record<InventoryLayoutMode, InventoryViewMode> = {
   styleUrl: './inventory-page.component.scss'
 })
 export class InventoryPageComponent {
-  protected readonly backendOrigin = `${globalThis.location?.protocol ?? 'http:'}//${globalThis.location?.hostname ?? '127.0.0.1'}:8089`;
+  protected readonly legacyOrigin = `${globalThis.location?.protocol ?? 'https:'}//legacy-inventario.urdugrid.com`;
   protected readonly state = signal<InventoryQueryState>({ ...DEFAULT_STATE });
   protected readonly data = signal<InventoryLiveResponse | null>(null);
   protected readonly loading = signal(true);
@@ -222,14 +222,14 @@ export class InventoryPageComponent {
 
   protected backendUrl(path: string | null | undefined): string {
     if (!path) {
-      return this.backendOrigin;
+      return this.legacyOrigin;
     }
 
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
     }
 
-    return `${this.backendOrigin}${path.startsWith('/') ? '' : '/'}${path}`;
+    return `${this.legacyOrigin}${path.startsWith('/') ? '' : '/'}${path}`;
   }
 
   protected assetUrl(path: string | null | undefined): string | null {
