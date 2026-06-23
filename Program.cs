@@ -46,6 +46,7 @@ using (var scope = app.Services.CreateScope())
     db.Database.EnsureCreated();
     SchemaUpgrader.Apply(db);
     SeedData.EnsureSeeded(db);
+    await BoxHierarchyService.NormalizeInheritedLocationsAsync(db, CancellationToken.None);
 }
 
 if (args.Contains("--normalize-photo-rotations", StringComparer.OrdinalIgnoreCase))

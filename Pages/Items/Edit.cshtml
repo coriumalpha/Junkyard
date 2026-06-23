@@ -10,178 +10,497 @@
         <h1>@Model.Input.Name</h1>
         <p class="section-kicker">Ficha de catálogo, ubicación y estado del objeto.</p>
     </div>
-    @if (!string.IsNullOrWhiteSpace(Model.CurrentBoxCode))
-    {
-        <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.CurrentBoxCode">Volver a caja</a>
-    }
-</div>
-
-<div class="split">
-    <form class="item-profile" method="post" novalidate>
-        <input type="hidden" asp-for="Input.Id" />
-        <section class="item-profile-head">
-            <div class="chips">
-                <span class="chip">@Model.Input.Category</span>
-                @if (Model.Input.Consumable) { <span class="chip good">Consumible</span> }
-                @if (Model.Input.Obsolete) { <span class="chip warn">Legacy</span> }
-                @if (Model.Input.Sentimental) { <span class="chip good">Recuerdo</span> }
-            </div>
-            <div class="form-grid stack-top">
-                <div class="field full">
-                    <label asp-for="Input.Name">Nombre</label>
-                    <input asp-for="Input.Name" />
-                </div>
-                <div class="field">
-                    <partial name="_SearchPicker" model="Model.BoxPicker" />
-                </div>
-                <div class="field">
-                    <label asp-for="Input.Category">Categoría</label>
-                    <select asp-for="Input.Category">
-                        @foreach (var category in Model.Categories)
-                        {
-                            <option value="@category">@category</option>
-                        }
-                    </select>
-                </div>
-            </div>
-        </section>
-
-        <section class="panel form-grid">
-            <h2 class="full">Inventario</h2>
-            <div class="field">
-                <label asp-for="Input.Quantity">Cantidad</label>
-                <input asp-for="Input.Quantity" type="number" step="1" inputmode="decimal" />
-            </div>
-            <div class="field">
-                <label asp-for="Input.Unit">Unidad</label>
-                <input asp-for="Input.Unit" />
-            </div>
-            <div class="field">
-                <label asp-for="Input.MinQuantity">Mínimo</label>
-                <input asp-for="Input.MinQuantity" type="number" step="1" inputmode="decimal" />
-            </div>
-            <div class="field">
-                <label asp-for="Input.Condition">Estado</label>
-                <input asp-for="Input.Condition" />
-            </div>
-            <div class="field">
-                <label asp-for="Input.Retention">Retención</label>
-                <input asp-for="Input.Retention" />
-            </div>
-            <div class="toggles full">
-                <label><input asp-for="Input.Consumable" /> Consumible</label>
-                <label><input asp-for="Input.Sentimental" /> Sentimental</label>
-                <label><input asp-for="Input.Obsolete" /> Obsoleto</label>
-            </div>
-            <div class="field full">
-                <label asp-for="Input.Notes">Notas</label>
-                <textarea asp-for="Input.Notes"></textarea>
-            </div>
-            <div class="actions full">
-                <button class="btn primary" type="submit">Guardar cambios</button>
-            </div>
-        </section>
-
-        <section class="panel danger-zone">
-            <h2>Zona peligrosa</h2>
-            <p class="muted">Archiva el ítem. No se elimina físicamente y podrás restaurarlo desde Archivo.</p>
-            <button class="btn danger" type="submit" formaction="?handler=Delete&id=@Model.Input.Id">Archivar ítem</button>
-        </section>
-    </form>
-
-    <aside class="item-media-rail">
-        <section class="panel promotion-zone">
-            <div class="section-header compact">
-                <div>
-                    <p class="eyebrow">Contenedor</p>
-                    <h2>Promocionar a caja</h2>
-                </div>
-            </div>
-            @if (TempData["PromoteMessage"] is string promoteMessage)
-            {
-                <div class="notice stack-top">@promoteMessage</div>
-            }
-            <p class="muted">Crea una caja nueva con este ítem: conserva ubicación, fotos, portada y notas, y deja el ítem archivado.</p>
-            <form class="form-grid" method="post" asp-page-handler="PromoteToBox" asp-route-id="@Model.Input.Id">
-                <div class="field full">
-                    <label for="PromoteCode">Código de la nueva caja</label>
-                    <input id="PromoteCode" name="code" value="@Model.SuggestedBoxCode" maxlength="40" />
-                </div>
-                <button class="btn primary full" type="submit">Promocionar a caja</button>
-            </form>
-        </section>
-
-        @if (primaryPhoto is not null)
+    <div class="actions">
+        @if (!Model.IsEditMode)
         {
-            <section class="item-photo-hero panel">
-                <div class="section-header compact">
-                    <div>
-                        <p class="eyebrow">Imagen principal</p>
-                        <h2>Vista del objeto</h2>
-                    </div>
-                    <span class="badge">@Model.Gallery.Count foto@(Model.Gallery.Count == 1 ? "" : "s")</span>
-                </div>
-                <button class="item-photo-main" type="button" data-lightbox-src="@Model.PublicUrl(primaryPhoto)" data-lightbox-caption="@(primaryPhoto.Caption ?? Model.Input.Name)" aria-label="Ampliar fotografía principal">
-                    <img class="rotatable" style="@PhotoStorage.RotationStyle(primaryPhoto.RotationDegrees)" src="@Model.PreviewUrl(primaryPhoto)" alt="@(primaryPhoto.Caption ?? Model.Input.Name)" decoding="async" />
-                </button>
-                <p class="caption">Pulsa la imagen para verla ampliada.</p>
-            </section>
+            <a class="btn primary" asp-page="/Items/Edit" asp-route-id="@Model.Input.Id" asp-route-mode="edit">Editar ficha</a>
         }
         else
         {
-            <section class="item-photo-empty empty">
-                <strong>Sin fotografía principal</strong>
-                Sube una imagen para convertir esta ficha en una referencia visual.
-            </section>
+            <a class="btn" asp-page="/Items/Edit" asp-route-id="@Model.Input.Id">Ver ficha</a>
         }
-
-        <form class="panel form-grid" method="post" enctype="multipart/form-data" asp-page-handler="Photo">
-            <input type="hidden" asp-for="Input.Id" />
-            <div class="field full">
-                <label>Imagen</label>
-                <input type="file" asp-for="PhotoFile" accept="image/*" />
-            </div>
-            <div class="field full">
-                <label>Pie</label>
-                <input asp-for="Caption" />
-            </div>
-            <button class="btn primary full" type="submit">Subir foto</button>
-        </form>
-        @if (Model.Gallery.Count > 0)
+        @if (!string.IsNullOrWhiteSpace(Model.CurrentBoxCode))
         {
-            <section class="panel stack-top">
+            <a class="btn" asp-page="/Boxes/Details" asp-route-code="@Model.CurrentBoxCode">Volver a caja</a>
+        }
+    </div>
+</div>
+
+<div class="split item-detail-shell">
+    @if (!Model.IsEditMode)
+    {
+        <main class="item-view-main item-view-main-full">
+            <section class="panel item-view-hero item-view-stage">
                 <div class="section-header compact">
-                    <h2>Galería</h2>
-                    <span class="caption">@Model.Gallery.Count imagen@(Model.Gallery.Count == 1 ? "" : "es")</span>
+                    <div>
+                        <p class="eyebrow">Vista</p>
+                        <h2>Ficha visual</h2>
+                        <p class="section-kicker">Lee la foto, el contenedor y la descripción sin entrar en edición.</p>
+                    </div>
+                    <div class="actions">
+                        <a class="btn primary" asp-page="/Items/Edit" asp-route-id="@Model.Input.Id" asp-route-mode="edit">Editar ficha</a>
+                    </div>
                 </div>
-                <div class="gallery object-photo-gallery">
-                    @foreach (var photo in Model.Gallery)
+                <div class="item-view-grid">
+                    @if (Model.Gallery.Count > 0)
                     {
-                        var isCover = photo.Filename == Model.CoverPhotoFilename;
-                        <form class="photo-tile @(isCover ? "is-cover" : "")" method="post" asp-page-handler="ArchivePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">
-                            <button class="photo-preview-button" type="button" data-lightbox-src="@Model.PublicUrl(photo)" data-lightbox-caption="@(photo.Caption ?? Model.Input.Name)" aria-label="Ampliar fotografía">
-                                <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@Model.ThumbUrl(photo)" alt="@photo.Caption" loading="lazy" decoding="async" />
-                            </button>
-                            <div class="photo-tile-actions">
-                                @if (isCover)
+                        <div class="item-carousel" data-item-carousel tabindex="0" aria-label="Galería de fotos del ítem">
+                            <div class="item-carousel-viewport">
+                                @for (var index = 0; index < Model.Gallery.Count; index++)
                                 {
-                                    <span class="badge good cover-badge">Principal</span>
+                                    var photo = Model.Gallery[index];
+                                    var isCover = photo.Filename == Model.CoverPhotoFilename;
+                                    <article class="item-carousel-slide @(index == 0 ? "is-active" : "")" data-carousel-slide data-carousel-index="@index" aria-hidden="@(index == 0 ? "false" : "true")">
+                                        <div class="item-carousel-media">
+                                            <button class="item-carousel-zoom" type="button" data-lightbox-src="@Model.PublicUrl(photo)" data-lightbox-caption="@(photo.Caption ?? Model.Input.Name)" aria-label="Ampliar fotografía @(index + 1)">
+                                                <img class="item-carousel-image rotatable" data-photo-no-fit="true" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@Model.PreviewUrl(photo)" alt="@(photo.Caption ?? Model.Input.Name)" loading="@(index == 0 ? "eager" : "lazy")" decoding="async" />
+                                            </button>
+                                        </div>
+                                        <div class="item-carousel-caption">
+                                            <div class="item-carousel-caption-main">
+                                                <span class="badge @(isCover ? "good" : "")">@(isCover ? "Principal" : $"Foto {index + 1}")</span>
+                                                <strong>@(photo.Caption ?? Model.Input.Name)</strong>
+                                                <small>@photo.CreatedAt.ToString("dd MMM yyyy")</small>
+                                            </div>
+                                            <details class="photo-action-menu">
+                                                <summary class="btn icon-btn" aria-label="Acciones de la foto">⋮</summary>
+                                                <div class="photo-action-menu-panel">
+                                                    @if (isCover)
+                                                    {
+                                                        <span class="menu-hint">Ya es la principal.</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <form method="post" asp-page-handler="SetCoverPhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">
+                                                            <button class="menu-action" type="submit">Usar como principal</button>
+                                                        </form>
+                                                    }
+                                                    <form method="post" asp-page-handler="RotatePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id" asp-route-delta="-90">
+                                                        <button class="menu-action" type="submit">Girar izq.</button>
+                                                    </form>
+                                                    <form method="post" asp-page-handler="RotatePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id" asp-route-delta="90">
+                                                        <button class="menu-action" type="submit">Girar der.</button>
+                                                    </form>
+                                                    <form method="post" asp-page-handler="ReturnPhotoToInbox" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">
+                                                        <button class="menu-action" type="submit">Devolver a bandeja</button>
+                                                    </form>
+                                                    <form method="post" asp-page-handler="ArchivePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">
+                                                        <button class="menu-action danger" type="submit">Archivar</button>
+                                                    </form>
+                                                </div>
+                                            </details>
+                                        </div>
+                                    </article>
                                 }
-                                else
+                                @if (Model.Gallery.Count > 1)
                                 {
-                                    <button class="btn" type="submit" asp-page-handler="SetCoverPhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">Usar como principal</button>
+                                    <button class="item-carousel-nav prev" type="button" data-carousel-prev aria-label="Foto anterior">‹</button>
+                                    <button class="item-carousel-nav next" type="button" data-carousel-next aria-label="Foto siguiente">›</button>
                                 }
-                                <button class="btn" type="submit" asp-page-handler="RotatePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id" asp-route-delta="-90">Girar izq.</button>
-                                <button class="btn" type="submit" asp-page-handler="RotatePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id" asp-route-delta="90">Girar der.</button>
-                                <button class="btn" type="submit" asp-page-handler="ReturnPhotoToInbox" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">Devolver a bandeja</button>
-                                <button class="btn danger" type="submit">Archivar</button>
                             </div>
-                        </form>
+                            @if (Model.Gallery.Count > 1)
+                            {
+                                <div class="item-carousel-thumbs" aria-label="Miniaturas de la galería">
+                                    @for (var index = 0; index < Model.Gallery.Count; index++)
+                                    {
+                                        var photo = Model.Gallery[index];
+                                        var isCover = photo.Filename == Model.CoverPhotoFilename;
+                                        <button class="item-carousel-thumb @(index == 0 ? "is-active" : "")" type="button" data-carousel-thumb data-carousel-index="@index" aria-label="Ir a la foto @(index + 1)">
+                                            <img class="rotatable" data-photo-no-fit="true" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@Model.ThumbUrl(photo)" alt="@(photo.Caption ?? Model.Input.Name)" loading="lazy" decoding="async" />
+                                            <span class="item-carousel-thumb-label">@(isCover ? "Principal" : $"#{index + 1}")</span>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
                     }
+                    else
+                        {
+                            <section class="item-photo-empty item-photo-empty-large empty">
+                                <strong>Sin fotografías</strong>
+                                <span>Sube una imagen para convertir esta ficha en una referencia visual.</span>
+                            </section>
+                        }
+                    <aside class="item-view-summary item-view-summary-panel">
+                        <div class="item-summary-grid">
+                            <div class="item-summary-card">
+                                <span>Contenedor</span>
+                                <strong>@(Model.CurrentBoxCode is not null ? $"{Model.CurrentBoxCode} · {Model.CurrentBoxName}" : "Sin contenedor")</strong>
+                                <small>@(Model.CurrentBoxLocation ?? "Sin ubicación")</small>
+                            </div>
+                            <div class="item-summary-card">
+                                <span>Categoría</span>
+                                <strong>@Model.Input.Category</strong>
+                                <small>@(Model.CurrentBoxTypeLabel ?? "Objeto suelto")</small>
+                            </div>
+                            <div class="item-summary-card">
+                                <span>Cantidad</span>
+                                <strong>@Model.Input.Quantity @Model.Input.Unit</strong>
+                                <small>@(string.IsNullOrWhiteSpace(Model.Input.MinQuantity?.ToString()) ? "Sin mínimo" : $"Mínimo {Model.Input.MinQuantity}")</small>
+                            </div>
+                            <div class="item-summary-card">
+                                <span>Estado</span>
+                                <strong>@(string.IsNullOrWhiteSpace(Model.Input.Condition) ? "Sin estado" : Model.Input.Condition)</strong>
+                                <small>@(string.IsNullOrWhiteSpace(Model.Input.Retention) ? "Sin retención" : Model.Input.Retention)</small>
+                            </div>
+                        </div>
+
+                        <div class="chips item-flag-chips">
+                            @if (Model.Input.Consumable) { <span class="chip good">Consumible</span> }
+                            @if (Model.Input.Obsolete) { <span class="chip warn">Legacy</span> }
+                            @if (Model.Input.Sentimental) { <span class="chip good">Recuerdo</span> }
+                        </div>
+
+                        <section class="item-description-card">
+                            <div class="section-header compact">
+                                <div>
+                                    <p class="eyebrow">Descripción</p>
+                                    <h2>Cómo identificar este ítem</h2>
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(Model.Input.Notes))
+                            {
+                                <p class="item-description-text">@Model.Input.Notes</p>
+                            }
+                            else
+                            {
+                                <div class="empty item-description-empty">
+                                    <strong>Sin descripción todavía</strong>
+                                    Añade aquí modelo, estado, números de serie o cualquier detalle útil.
+                                </div>
+                            }
+                        </section>
+                    </aside>
                 </div>
             </section>
-        }
-    </aside>
+
+            <section class="item-view-support-grid">
+                <section class="panel promotion-zone">
+                    <div class="section-header compact">
+                        <div>
+                            <p class="eyebrow">Contenedor</p>
+                            <h2>Promocionar a caja</h2>
+                        </div>
+                    </div>
+                    @if (TempData["PromoteMessage"] is string promoteMessage)
+                    {
+                        <div class="notice stack-top">@promoteMessage</div>
+                    }
+                    <p class="muted">Crea una caja nueva con este ítem: conserva ubicación, fotos, portada y descripción, y deja el ítem archivado.</p>
+                    <form class="form-grid" method="post" asp-page-handler="PromoteToBox" asp-route-id="@Model.Input.Id">
+                        <div class="field full">
+                            <label for="PromoteCode">Código de la nueva caja</label>
+                            <input id="PromoteCode" name="code" value="@Model.SuggestedBoxCode" maxlength="40" />
+                        </div>
+                        <button class="btn primary full" type="submit">Promocionar a caja</button>
+                    </form>
+                </section>
+
+                <form class="panel form-grid" method="post" enctype="multipart/form-data" asp-page-handler="Photo">
+                    <input type="hidden" asp-for="Input.Id" />
+                    <div class="field full">
+                        <label>Imagen</label>
+                        <input type="file" asp-for="PhotoFile" accept="image/*" />
+                    </div>
+                    <div class="field full">
+                        <label>Pie</label>
+                        <input asp-for="Caption" />
+                    </div>
+                    <button class="btn primary full" type="submit">Subir foto</button>
+                </form>
+
+                <section class="panel inventory-actions-linked">
+                    <div class="section-header compact">
+                        <div>
+                            <p class="eyebrow">Pendientes</p>
+                            <h2>Acciones vinculadas</h2>
+                            <p class="section-kicker">Notas breves ligadas a este ítem.</p>
+                        </div>
+                        <div class="actions">
+                            <a class="btn" asp-page="/Pendientes" asp-route-itemId="@Model.Input.Id">Añadir acción</a>
+                            <a class="btn primary" asp-page="/Pendientes" asp-route-itemId="@Model.Input.Id" asp-route-showCompleted="true">Ver libreta</a>
+                        </div>
+                    </div>
+                    @if (TempData["InventoryActionMessage"] is string inventoryActionMessage)
+                    {
+                        <div class="notice toast stack-top">@inventoryActionMessage</div>
+                    }
+                    @if (Model.LinkedActions.Count == 0)
+                    {
+                        <div class="empty">
+                            <strong>No hay acciones abiertas.</strong>
+                            <span>Cuando aparezca una revisión para este objeto, saldrá aquí.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="inventory-actions-list">
+                            @foreach (var action in Model.LinkedActions)
+                            {
+                                <article class="panel inventory-action-card">
+                                    <div class="section-header compact">
+                                        <div>
+                                            <div class="chips">
+                                                <span class="chip good">P@action.Priority</span>
+                                                <span class="chip">@action.Status</span>
+                                            </div>
+                                            <h3>@action.Title</h3>
+                                            @if (!string.IsNullOrWhiteSpace(action.Description))
+                                            {
+                                                <p class="caption">@action.Description</p>
+                                            }
+                                        </div>
+                                        <div class="actions">
+                                            <a class="btn" asp-page="/Pendientes" asp-route-itemId="@Model.Input.Id">Abrir en libreta</a>
+                                            <form method="post" asp-page-handler="CompleteAction" asp-route-id="@Model.Input.Id" asp-route-actionId="@action.Id">
+                                                <button class="btn primary" type="submit">Completar</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    }
+                </section>
+
+                <section class="panel danger-zone">
+                    <h2>Zona peligrosa</h2>
+                    <p class="muted">Archiva el ítem. No se elimina físicamente y podrás restaurarlo desde Archivo.</p>
+                    <button class="btn danger" type="submit" formaction="?handler=Delete&id=@Model.Input.Id">Archivar ítem</button>
+                </section>
+            </section>
+        </main>
+    }
+    else
+    {
+        <form class="item-profile" method="post" novalidate>
+            <input type="hidden" asp-for="Input.Id" />
+            <section class="item-profile-head">
+                <div class="chips">
+                    <span class="chip">@Model.Input.Category</span>
+                    @if (Model.Input.Consumable) { <span class="chip good">Consumible</span> }
+                    @if (Model.Input.Obsolete) { <span class="chip warn">Legacy</span> }
+                    @if (Model.Input.Sentimental) { <span class="chip good">Recuerdo</span> }
+                </div>
+                <div class="form-grid stack-top">
+                    <div class="field full">
+                        <label asp-for="Input.Name">Nombre</label>
+                        <input asp-for="Input.Name" />
+                    </div>
+                    <div class="field">
+                        <partial name="_SearchPicker" model="Model.BoxPicker" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="Input.Category">Categoría</label>
+                        <select asp-for="Input.Category">
+                            @foreach (var category in Model.Categories)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel form-grid">
+                <h2 class="full">Inventario</h2>
+                <div class="field">
+                    <label asp-for="Input.Quantity">Cantidad</label>
+                    <input asp-for="Input.Quantity" type="number" step="1" inputmode="decimal" />
+                </div>
+                <div class="field">
+                    <label asp-for="Input.Unit">Unidad</label>
+                    <input asp-for="Input.Unit" />
+                </div>
+                <div class="field">
+                    <label asp-for="Input.MinQuantity">Mínimo</label>
+                    <input asp-for="Input.MinQuantity" type="number" step="1" inputmode="decimal" />
+                </div>
+                <div class="field">
+                    <label asp-for="Input.Condition">Estado</label>
+                    <input asp-for="Input.Condition" />
+                </div>
+                <div class="field">
+                    <label asp-for="Input.Retention">Retención</label>
+                    <input asp-for="Input.Retention" />
+                </div>
+                <div class="toggles full">
+                    <label><input asp-for="Input.Consumable" /> Consumible</label>
+                    <label><input asp-for="Input.Sentimental" /> Sentimental</label>
+                    <label><input asp-for="Input.Obsolete" /> Obsoleto</label>
+                </div>
+                <div class="field full item-description-field">
+                    <div class="section-header compact">
+                        <div>
+                            <p class="eyebrow">Descripción</p>
+                            <h2>Cómo identificar este ítem</h2>
+                            <p class="section-kicker">Describe modelo, estado, detalles útiles o cualquier rasgo distintivo.</p>
+                        </div>
+                    </div>
+                    <label asp-for="Input.Notes">Descripción del ítem</label>
+                    <textarea asp-for="Input.Notes" placeholder="Marca, modelo, número de serie, estado visible..."></textarea>
+                </div>
+                <div class="actions full">
+                    <button class="btn primary" type="submit">Guardar cambios</button>
+                </div>
+            </section>
+
+            <section class="panel danger-zone">
+                <h2>Zona peligrosa</h2>
+                <p class="muted">Archiva el ítem. No se elimina físicamente y podrás restaurarlo desde Archivo.</p>
+                <button class="btn danger" type="submit" formaction="?handler=Delete&id=@Model.Input.Id">Archivar ítem</button>
+            </section>
+        </form>
+
+        <aside class="item-media-rail">
+            <section class="panel promotion-zone">
+                <div class="section-header compact">
+                    <div>
+                        <p class="eyebrow">Contenedor</p>
+                        <h2>Promocionar a caja</h2>
+                    </div>
+                </div>
+                @if (TempData["PromoteMessage"] is string promoteMessage)
+                {
+                    <div class="notice stack-top">@promoteMessage</div>
+                }
+                <p class="muted">Crea una caja nueva con este ítem: conserva ubicación, fotos, portada y descripción, y deja el ítem archivado.</p>
+                <form class="form-grid" method="post" asp-page-handler="PromoteToBox" asp-route-id="@Model.Input.Id">
+                    <div class="field full">
+                        <label for="PromoteCode">Código de la nueva caja</label>
+                        <input id="PromoteCode" name="code" value="@Model.SuggestedBoxCode" maxlength="40" />
+                    </div>
+                    <button class="btn primary full" type="submit">Promocionar a caja</button>
+                </form>
+            </section>
+
+            <section class="panel inventory-actions-linked">
+                <div class="section-header compact">
+                    <div>
+                        <p class="eyebrow">Pendientes</p>
+                        <h2>Acciones vinculadas</h2>
+                        <p class="section-kicker">Notas breves ligadas a este ítem.</p>
+                    </div>
+                    <div class="actions">
+                        <a class="btn" asp-page="/Pendientes" asp-route-itemId="@Model.Input.Id">Añadir acción</a>
+                        <a class="btn primary" asp-page="/Pendientes" asp-route-itemId="@Model.Input.Id" asp-route-showCompleted="true">Ver libreta</a>
+                    </div>
+                </div>
+                @if (TempData["InventoryActionMessage"] is string inventoryActionMessage)
+                {
+                    <div class="notice toast stack-top">@inventoryActionMessage</div>
+                }
+                @if (Model.LinkedActions.Count == 0)
+                {
+                    <div class="empty">
+                        <strong>No hay acciones abiertas.</strong>
+                        <span>Cuando aparezca una revisión para este objeto, saldrá aquí.</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="inventory-actions-list">
+                        @foreach (var action in Model.LinkedActions)
+                        {
+                            <article class="panel inventory-action-card">
+                                <div class="section-header compact">
+                                    <div>
+                                        <div class="chips">
+                                            <span class="chip good">Prioridad @action.Priority</span>
+                                            <span class="chip">@action.Status</span>
+                                        </div>
+                                        <h3>@action.Title</h3>
+                                        @if (!string.IsNullOrWhiteSpace(action.Description))
+                                        {
+                                            <p class="caption">@action.Description</p>
+                                        }
+                                    </div>
+                                    <div class="actions">
+                                        <a class="btn" asp-page="/Pendientes" asp-route-itemId="@Model.Input.Id">Abrir en libreta</a>
+                                        <form method="post" asp-page-handler="CompleteAction" asp-route-id="@Model.Input.Id" asp-route-actionId="@action.Id">
+                                            <button class="btn primary" type="submit">Completar</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+            </section>
+
+            @if (primaryPhoto is not null)
+            {
+                <section class="item-photo-hero panel">
+                    <div class="section-header compact">
+                        <div>
+                            <p class="eyebrow">Imagen principal</p>
+                            <h2>Vista del objeto</h2>
+                        </div>
+                        <span class="badge">@Model.Gallery.Count foto@(Model.Gallery.Count == 1 ? "" : "s")</span>
+                    </div>
+                    <button class="item-photo-main" type="button" data-photo-zoom-stage data-lightbox-src="@Model.PublicUrl(primaryPhoto)" data-lightbox-caption="@(primaryPhoto.Caption ?? Model.Input.Name)" aria-label="Ampliar fotografía principal">
+                        <img class="rotatable" style="@PhotoStorage.RotationStyle(primaryPhoto.RotationDegrees)" src="@Model.PreviewUrl(primaryPhoto)" alt="@(primaryPhoto.Caption ?? Model.Input.Name)" decoding="async" />
+                    </button>
+                    <p class="caption">Pulsa la imagen para verla ampliada.</p>
+                </section>
+            }
+            else
+            {
+                <section class="item-photo-empty empty">
+                    <strong>Sin fotografía principal</strong>
+                    Sube una imagen para convertir esta ficha en una referencia visual.
+                </section>
+            }
+
+            <form class="panel form-grid" method="post" enctype="multipart/form-data" asp-page-handler="Photo">
+                <input type="hidden" asp-for="Input.Id" />
+                <div class="field full">
+                    <label>Imagen</label>
+                    <input type="file" asp-for="PhotoFile" accept="image/*" />
+                </div>
+                <div class="field full">
+                    <label>Pie</label>
+                    <input asp-for="Caption" />
+                </div>
+                <button class="btn primary full" type="submit">Subir foto</button>
+            </form>
+
+            @if (Model.Gallery.Count > 0)
+            {
+                <section class="panel stack-top">
+                    <div class="section-header compact">
+                        <h2>Galería</h2>
+                        <span class="caption">@Model.Gallery.Count imagen@(Model.Gallery.Count == 1 ? "" : "es")</span>
+                    </div>
+                    <div class="gallery object-photo-gallery">
+                        @foreach (var photo in Model.Gallery)
+                        {
+                            var isCover = photo.Filename == Model.CoverPhotoFilename;
+                            <form class="photo-tile @(isCover ? "is-cover" : "")" method="post" asp-page-handler="ArchivePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">
+                                <button class="photo-preview-button" type="button" data-lightbox-src="@Model.PublicUrl(photo)" data-lightbox-caption="@(photo.Caption ?? Model.Input.Name)" aria-label="Ampliar fotografía">
+                                    <img class="rotatable" style="@PhotoStorage.RotationStyle(photo.RotationDegrees)" src="@Model.ThumbUrl(photo)" alt="@photo.Caption" loading="lazy" decoding="async" />
+                                </button>
+                                <div class="photo-tile-actions">
+                                    @if (isCover)
+                                    {
+                                        <span class="badge good cover-badge">Principal</span>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn" type="submit" asp-page-handler="SetCoverPhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">Usar como principal</button>
+                                    }
+                                    <button class="btn" type="submit" asp-page-handler="RotatePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id" asp-route-delta="-90">Girar izq.</button>
+                                    <button class="btn" type="submit" asp-page-handler="RotatePhoto" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id" asp-route-delta="90">Girar der.</button>
+                                    <button class="btn" type="submit" asp-page-handler="ReturnPhotoToInbox" asp-route-id="@Model.Input.Id" asp-route-photoId="@photo.Id">Devolver a bandeja</button>
+                                    <button class="btn danger" type="submit">Archivar</button>
+                                </div>
+                            </form>
+                        }
+                    </div>
+                </section>
+            }
+        </aside>
+    }
 </div>
 
 <dialog id="photoLightbox" class="lightbox-dialog">

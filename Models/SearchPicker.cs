@@ -16,6 +16,7 @@ public class SearchPickerModel
     public string NoneOptionIcon { get; init; } = "—";
     public bool SubmitOnEnter { get; init; }
     public string? SubmitButtonSelector { get; init; }
+    public bool Compact { get; set; }
     public List<SearchPickerOption> Options { get; init; } = [];
 }
 

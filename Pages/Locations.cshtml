@@ -48,6 +48,7 @@
                     </span>
                     <span class="actions">
                         <span class="chip">@(location.Boxes.Count == 1 ? "1 caja" : $"{location.Boxes.Count} cajas")</span>
+                        <a class="btn" asp-page="/Items/Index" asp-route-locationId="@location.Id" asp-route-view="grouped">Ver inventario</a>
                         <button class="btn" type="button" onclick="document.getElementById('@dialogId').showModal()">Editar</button>
                     </span>
                 </article>

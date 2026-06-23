@@ -4,6 +4,7 @@ using Inventario.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inventario.Pages.Items;
@@ -18,6 +19,8 @@ public class IndexModel(InventoryDbContext db) : PageModel
     public string Category { get; private set; } = "";
     public int? BoxId { get; private set; }
     public string BoxCode { get; private set; } = "";
+    public List<int> BoxIds { get; private set; } = [];
+    public List<SelectedBoxView> SelectedBoxes { get; private set; } = [];
     public int? LocationId { get; private set; }
     public bool IncludeChildren { get; private set; }
     public bool OnlyConsumable { get; private set; }
@@ -28,25 +31,34 @@ public class IndexModel(InventoryDbContext db) : PageModel
     public string ViewMode { get; private set; } = "grouped";
     public List<string> Categories { get; private set; } = [];
 
-    public async Task OnGetAsync(string? q, string? category, string? box, int? boxId, int? locationId, bool includeChildren, bool onlyConsumable, bool onlyOrphans, string? view, CancellationToken cancellationToken)
+    public async Task OnGetAsync(string? q, string? category, string? box, int[]? boxIds, int? boxId, int? locationId, bool includeChildren, bool onlyConsumable, bool onlyOrphans, string? view, CancellationToken cancellationToken)
     {
-        var data = await LoadInventoryDataAsync(q, category, box, boxId, locationId, includeChildren, onlyConsumable, onlyOrphans, view, cancellationToken);
+        var data = await LoadInventoryDataAsync(q, category, box, boxIds, boxId, locationId, includeChildren, onlyConsumable, onlyOrphans, view, cancellationToken);
         Apply(data);
     }
 
-    public async Task<IActionResult> OnGetLiveAsync(string? q, string? category, string? box, int? boxId, int? locationId, bool includeChildren, bool onlyConsumable, bool onlyOrphans, string? view, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnGetLiveAsync(string? q, string? category, string? box, int[]? boxIds, int? boxId, int? locationId, bool includeChildren, bool onlyConsumable, bool onlyOrphans, string? view, CancellationToken cancellationToken)
     {
-        var data = await LoadInventoryDataAsync(q, category, box, boxId, locationId, includeChildren, onlyConsumable, onlyOrphans, view, cancellationToken);
+        var data = await LoadInventoryDataAsync(q, category, box, boxIds, boxId, locationId, includeChildren, onlyConsumable, onlyOrphans, view, cancellationToken);
         return new JsonResult(new InventoryLiveDto(
             data.Query,
             data.Category,
             data.BoxCode,
             data.BoxId,
+            data.BoxIds,
             data.LocationId,
             data.IncludeChildren,
             data.OnlyConsumable,
             data.OnlyOrphans,
             data.ViewMode,
+            data.SelectedBoxes.Select(box => new InventorySelectedBoxDto(
+                box.Id,
+                box.Code,
+                box.Name,
+                box.Path,
+                box.LocationDisplay,
+                box.EffectiveLocationSourceLabel,
+                box.ContainerTypeLabel)).ToList(),
             data.SelectedBox is null
                 ? (string.IsNullOrWhiteSpace(data.BoxCode)
                     ? null
@@ -92,6 +104,8 @@ public class IndexModel(InventoryDbContext db) : PageModel
         Category = data.Category;
         BoxId = data.BoxId;
         BoxCode = data.BoxCode;
+        BoxIds = data.BoxIds;
+        SelectedBoxes = data.SelectedBoxes;
         LocationId = data.LocationId;
         IncludeChildren = data.IncludeChildren;
         OnlyConsumable = data.OnlyConsumable;
@@ -106,7 +120,7 @@ public class IndexModel(InventoryDbContext db) : PageModel
         BoxPicker = data.BoxPicker;
     }
 
-    private async Task<InventoryData> LoadInventoryDataAsync(string? q, string? category, string? box, int? boxId, int? locationId, bool includeChildren, bool onlyConsumable, bool onlyOrphans, string? view, CancellationToken cancellationToken)
+    private async Task<InventoryData> LoadInventoryDataAsync(string? q, string? category, string? box, int[]? boxIds, int? boxId, int? locationId, bool includeChildren, bool onlyConsumable, bool onlyOrphans, string? view, CancellationToken cancellationToken)
     {
         var queryValue = (q ?? "").Trim();
         var categoryValue = (category ?? "").Trim();
@@ -116,13 +130,20 @@ public class IndexModel(InventoryDbContext db) : PageModel
         var locations = await LoadLocationsAsync(cancellationToken);
 
         Box? selectedBox = null;
+        var selectedBoxIds = new List<int>();
         var query = db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
             .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
             .AsQueryable();
 
+        if (boxIds is { Length: > 0 })
+        {
+            selectedBoxIds.AddRange(boxIds.Where(id => id > 0));
+        }
+
         if (boxId is int selectedBoxId)
         {
+            selectedBoxIds.Add(selectedBoxId);
             selectedBox = await db.Boxes.AsNoTracking()
                 .Include(b => b.Location)
                 .Include(b => b.ParentBox)
@@ -134,32 +155,67 @@ public class IndexModel(InventoryDbContext db) : PageModel
                 .Include(b => b.Location)
                 .Include(b => b.ParentBox)
                 .FirstOrDefaultAsync(b => b.Code == boxCode, cancellationToken);
+            if (selectedBox is not null)
+            {
+                selectedBoxIds.Add(selectedBox.Id);
+            }
         }
 
-        if (selectedBox is not null)
+        if (selectedBoxIds.Count == 0 && selectedBox is not null)
         {
+            selectedBoxIds.Add(selectedBox.Id);
+        }
+
+        selectedBoxIds = selectedBoxIds.Distinct().ToList();
+
+        var selectedBoxes = selectedBoxIds.Count == 0
+            ? []
+            : await db.Boxes.AsNoTracking()
+                .Include(b => b.Location)
+                .Include(b => b.ParentBox)
+                .Where(b => selectedBoxIds.Contains(b.Id))
+                .OrderBy(b => b.Code)
+                .ToListAsync(cancellationToken);
+
+        if (selectedBoxes.Count == 1)
+        {
+            selectedBox = selectedBoxes[0];
             boxCode = selectedBox.Code;
             boxId = selectedBox.Id;
         }
-
-        if (selectedBox is not null)
+        else
         {
-            if (locationLookup.TryGetValue(selectedBox.Id, out var selectedLocation))
+            selectedBox = null;
+            boxCode = "";
+            boxId = null;
+        }
+
+        if (selectedBoxes.Count > 0)
+        {
+            foreach (var boxSelection in selectedBoxes)
             {
-                selectedBox.EffectiveLocationName = selectedLocation.LocationName;
-                selectedBox.EffectiveLocationSourceLabel = selectedLocation.SourceLabel;
+                if (locationLookup.TryGetValue(boxSelection.Id, out var selectedLocation))
+                {
+                    boxSelection.EffectiveLocationName = selectedLocation.LocationName;
+                    boxSelection.EffectiveLocationSourceLabel = selectedLocation.SourceLabel;
+                }
             }
 
-            if (includeChildren)
+            var allowedBoxIds = new HashSet<int>();
+            foreach (var selectedBoxSelection in selectedBoxes)
             {
-                var allowedBoxIds = await BoxHierarchyService.GetDescendantIdsAsync(db, selectedBox.Id, cancellationToken);
-                allowedBoxIds.Add(selectedBox.Id);
-                query = query.Where(i => i.BoxId != null && allowedBoxIds.Contains(i.BoxId.Value));
+                if (includeChildren)
+                {
+                    var descendantIds = await BoxHierarchyService.GetDescendantIdsAsync(db, selectedBoxSelection.Id, cancellationToken);
+                    foreach (var descendantId in descendantIds)
+                    {
+                        allowedBoxIds.Add(descendantId);
+                    }
+                }
+                allowedBoxIds.Add(selectedBoxSelection.Id);
             }
-            else
-            {
-                query = query.Where(i => i.BoxId == selectedBox.Id);
-            }
+
+            query = query.Where(i => i.BoxId != null && allowedBoxIds.Contains(i.BoxId.Value));
         }
 
         if (locationId is int selectedLocationId)
@@ -250,22 +306,48 @@ public class IndexModel(InventoryDbContext db) : PageModel
         var photoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
         var boxPicker = new SearchPickerModel
         {
-            InputName = "boxId",
-            InputId = "boxId",
-            Label = "Contenedor",
-            Placeholder = "Buscar por CT, nombre, tipo, ubicación o padre...",
-            SelectedValue = boxId?.ToString(),
-            EmptyLabel = "Todos los contenedores",
-            EmptyHint = "Sin contenedor activo: verás todo el inventario.",
+            InputName = "boxAdder",
+            InputId = "boxAdder",
+            Label = "Añadir contenedor",
+            Placeholder = "Buscar CT, nombre, ubicación o padre para añadir...",
+            SelectedValue = null,
+            EmptyLabel = "Sin contenedores adicionales",
+            EmptyHint = "Busca un CT para sumarlo al alcance actual.",
             ClearValue = "",
-            NoneOptionLabel = "Todos los contenedores",
-            NoneOptionHint = "No filtra por contenedor.",
-            NoneOptionValue = "",
-            NoneOptionIcon = "∞",
-            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)
+            NoneOptionLabel = null,
+            NoneOptionHint = null,
+            Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken, selectedBoxIds.ToHashSet())
         };
+        boxPicker.Compact = true;
 
-        return new InventoryData(queryValue, categoryValue, boxId, boxCode, locationId, includeChildren, onlyConsumable, onlyOrphans, viewMode, selectedBox, items, groups, itemPhotoCounts, categories, locations, photoStates, locationLookup, boxPicker);
+        return new InventoryData(
+            queryValue,
+            categoryValue,
+            boxId,
+            boxCode,
+            selectedBoxIds,
+            selectedBoxes.Select(box => new SelectedBoxView(
+                box.Id,
+                box.Code,
+                box.Name,
+                BuildBoxPath(box),
+                box.LocationDisplay,
+                box.EffectiveLocationSourceLabel,
+                box.ContainerTypeLabel)).ToList(),
+            locationId,
+            includeChildren,
+            onlyConsumable,
+            onlyOrphans,
+            viewMode,
+            selectedBox,
+            items,
+            groups,
+            itemPhotoCounts,
+            categories,
+            locations,
+            photoStates,
+            locationLookup,
+            boxPicker);
     }
 
     private async Task<List<string>> LoadCategoriesAsync(CancellationToken cancellationToken) =>
@@ -288,6 +370,98 @@ public class IndexModel(InventoryDbContext db) : PageModel
         filename is not null && PhotoStates.TryGetValue(filename, out var state)
             ? PhotoStorage.ThumbUrl(filename, state.UpdatedAt)
             : "";
+
+    public string BuildInventoryUrl(
+        string? q = null,
+        string? category = null,
+        IEnumerable<int>? boxIds = null,
+        int? locationId = null,
+        bool clearLocation = false,
+        bool? includeChildren = null,
+        bool? onlyConsumable = null,
+        bool? onlyOrphans = null,
+        string? view = null)
+    {
+        var parts = new List<string>();
+
+        void Add(string key, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            parts.Add($"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(value)}");
+        }
+
+        if (q is null)
+        {
+            if (!string.IsNullOrWhiteSpace(Query))
+            {
+                Add("q", Query);
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(q))
+        {
+            Add("q", q);
+        }
+
+        if (category is null)
+        {
+            if (!string.IsNullOrWhiteSpace(Category))
+            {
+                Add("category", Category);
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(category))
+        {
+            Add("category", category);
+        }
+
+        var ids = boxIds ?? BoxIds;
+        foreach (var id in ids)
+        {
+            if (id > 0)
+            {
+                Add("boxIds", id.ToString());
+            }
+        }
+
+        if (!clearLocation)
+        {
+            var resolvedLocationId = locationId ?? LocationId;
+            if (resolvedLocationId is int value)
+            {
+                Add("locationId", value.ToString());
+            }
+        }
+
+        var resolvedIncludeChildren = includeChildren ?? IncludeChildren;
+        if (resolvedIncludeChildren)
+        {
+            Add("includeChildren", "true");
+        }
+
+        var resolvedOnlyConsumable = onlyConsumable ?? OnlyConsumable;
+        if (resolvedOnlyConsumable)
+        {
+            Add("onlyConsumable", "true");
+        }
+
+        var resolvedOnlyOrphans = onlyOrphans ?? OnlyOrphans;
+        if (resolvedOnlyOrphans)
+        {
+            Add("onlyOrphans", "true");
+        }
+
+        var resolvedView = view ?? ViewMode;
+        if (!string.IsNullOrWhiteSpace(resolvedView))
+        {
+            Add("view", resolvedView);
+        }
+
+        return parts.Count == 0 ? "/items" : $"/items?{string.Join("&", parts)}";
+    }
 
     public static string BuildBoxPath(Box? box)
     {
@@ -356,6 +530,8 @@ public class IndexModel(InventoryDbContext db) : PageModel
         string Category,
         int? BoxId,
         string BoxCode,
+        List<int> BoxIds,
+        List<SelectedBoxView> SelectedBoxes,
         int? LocationId,
         bool IncludeChildren,
         bool OnlyConsumable,
@@ -388,22 +564,44 @@ public class IndexModel(InventoryDbContext db) : PageModel
                 : null;
     }
 
+    public record SelectedBoxView(
+        int Id,
+        string Code,
+        string Name,
+        string Path,
+        string? LocationDisplay,
+        string? EffectiveLocationSourceLabel,
+        string ContainerTypeLabel)
+    {
+    }
+
     private record InventoryLiveDto(
         string Query,
         string Category,
         string BoxCode,
         int? BoxId,
+        List<int> BoxIds,
         int? LocationId,
         bool IncludeChildren,
         bool OnlyConsumable,
         bool OnlyOrphans,
         string ViewMode,
+        List<InventorySelectedBoxDto> SelectedBoxes,
         InventoryContextDto? SelectedBox,
         string? SelectedLocationName,
         int ItemsCount,
         int GroupsCount,
         List<InventoryGroupDto> Groups,
         List<InventoryItemDto> Items);
+
+    private record InventorySelectedBoxDto(
+        int Id,
+        string Code,
+        string Name,
+        string Path,
+        string? LocationDisplay,
+        string? EffectiveLocationSourceLabel,
+        string ContainerTypeLabel);
 
     private record InventoryContextDto(
         string Code,

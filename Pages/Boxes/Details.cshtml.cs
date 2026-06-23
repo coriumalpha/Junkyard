@@ -15,6 +15,7 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
     public List<SelectListItem> Boxes { get; private set; } = [];
     public SearchPickerModel BulkBoxPicker { get; private set; } = new();
     public SearchPickerModel MoveBoxPicker { get; private set; } = new();
+    public List<InventoryAction> LinkedActions { get; private set; } = [];
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
     public List<BoxBreadcrumbSegment> Breadcrumb { get; private set; } = [];
     public int DescendantBoxCount { get; private set; }
@@ -117,6 +118,30 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
         return RedirectToPage(new { code });
     }
 
+    public async Task<IActionResult> OnPostCompleteActionAsync(string code, int actionId, CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes.AsNoTracking().FirstOrDefaultAsync(b => b.Code == code, cancellationToken);
+        if (box is null)
+        {
+            return NotFound();
+        }
+
+        var action = await db.InventoryActions.FirstOrDefaultAsync(a =>
+            a.Id == actionId &&
+            a.LinkedEntityType == InventoryActionLinkedEntityType.Box &&
+            a.LinkedEntityId == box.Id, cancellationToken);
+        if (action is null)
+        {
+            return NotFound();
+        }
+
+        action.Status = InventoryActionStatus.Completed;
+        action.CompletedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        TempData["InventoryActionMessage"] = "Acción completada.";
+        return RedirectToPage(new { code });
+    }
+
     public async Task<IActionResult> OnPostMoveAsync(string code, CancellationToken cancellationToken)
     {
         var box = await db.Boxes.FirstOrDefaultAsync(b => b.Code == code, cancellationToken);
@@ -164,6 +189,14 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
             return RedirectToPage(new { code });
         }
 
+        var resolution = await BoxHierarchyService.ResolveLocationAsync(db, box.Id, cancellationToken);
+        if (resolution?.LocationId is not int locationId)
+        {
+            TempData["HierarchyError"] = "No se pudo resolver la ubicación efectiva del contenedor.";
+            return RedirectToPage(new { code });
+        }
+
+        box.LocationId = locationId;
         box.ParentBoxId = null;
         await db.SaveChangesAsync(cancellationToken);
         TempData["HierarchyMessage"] = "Contenedor sacado a raíz.";
@@ -397,6 +430,11 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
             .Distinct()
             .ToList();
         PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
+        LinkedActions = await db.InventoryActions.AsNoTracking()
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Box && action.LinkedEntityId == Box.Id && action.Status == InventoryActionStatus.Open)
+            .OrderByDescending(action => action.Priority)
+            .ThenByDescending(action => action.CreatedAt)
+            .ToListAsync(cancellationToken);
         return true;
     }
 

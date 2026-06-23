@@ -9,9 +9,52 @@
     .trim()
     .toLowerCase();
 
+  const tokenizeSearch = value => normalizeSearch(value)
+    .split(/\s+/)
+    .map(token => token.trim())
+    .filter(token => token.length > 0);
+
+  const scoreSearchMatch = (state, needle) => {
+    const terms = tokenizeSearch(needle);
+    if (terms.length === 0) {
+      return 0;
+    }
+
+    const normalizedHaystack = state.combined;
+    let score = 0;
+    for (const term of terms) {
+      if (!normalizedHaystack.includes(term)) {
+        return -1;
+      }
+      if (state.title === term) {
+        score += 120;
+      }
+      if (state.title.startsWith(term)) {
+        score += 70;
+      }
+      if (state.title.includes(term)) {
+        score += 40;
+      }
+      if (state.search.includes(term)) {
+        score += 20;
+      }
+      if (state.meta.includes(term)) {
+        score += 12;
+      }
+      if (state.detail.includes(term)) {
+        score += 8;
+      }
+      if (state.tags.includes(term)) {
+        score += 6;
+      }
+    }
+
+    return score;
+  };
+
   const enhanceRotatedPhotos = scope => {
     (scope || document).querySelectorAll('img.rotatable').forEach(image => {
-      if (image.closest('.photo-fit')) return;
+      if (image.closest('.photo-fit') || image.dataset.photoNoFit === 'true') return;
 
       const wrapper = document.createElement('span');
       const originalClasses = [...image.classList].filter(className => className !== 'rotatable');
@@ -26,10 +69,198 @@
     });
   };
 
+  const initItemViewCarousels = scope => {
+    (scope || document).querySelectorAll('[data-item-carousel]').forEach(root => {
+      const slides = [...root.querySelectorAll('[data-carousel-slide]')];
+      if (slides.length === 0) return;
+
+      const thumbs = [...root.querySelectorAll('[data-carousel-thumb]')];
+      const zoomButtons = [...root.querySelectorAll('.item-carousel-zoom')];
+      const prev = root.querySelector('[data-carousel-prev]');
+      const next = root.querySelector('[data-carousel-next]');
+      const menus = [...root.querySelectorAll('details.photo-action-menu')];
+      let activeIndex = Math.max(0, slides.findIndex(slide => slide.classList.contains('is-active')));
+
+      const applyPhotoFitRatio = button => {
+        if (!(button instanceof HTMLButtonElement)) return;
+        const image = button.querySelector('img');
+        if (!(image instanceof HTMLImageElement)) return;
+
+        const rotation = Number.parseInt((image.style.getPropertyValue('--rotation') || '0').replace('deg', ''), 10) || 0;
+        const naturalWidth = image.naturalWidth || image.clientWidth || 1;
+        const naturalHeight = image.naturalHeight || image.clientHeight || 1;
+        const effectiveWidth = Math.max(1, Math.round(Math.abs(rotation % 180) === 90 ? naturalHeight : naturalWidth));
+        const effectiveHeight = Math.max(1, Math.round(Math.abs(rotation % 180) === 90 ? naturalWidth : naturalHeight));
+        button.style.setProperty('--photo-fit-ratio', `${effectiveWidth} / ${effectiveHeight}`);
+      };
+
+      const resetPan = button => {
+        if (!(button instanceof HTMLButtonElement)) return;
+        button.style.setProperty('--carousel-pan-x', '0px');
+        button.style.setProperty('--carousel-pan-y', '0px');
+      };
+
+      const updatePan = (button, event) => {
+        if (!(button instanceof HTMLButtonElement) || !(event instanceof MouseEvent)) return;
+        const rect = button.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        const x = (event.clientX - rect.left) / rect.width;
+        const y = (event.clientY - rect.top) / rect.height;
+        const panX = ((x - 0.5) * -28).toFixed(1);
+        const panY = ((y - 0.5) * -18).toFixed(1);
+        button.style.setProperty('--carousel-pan-x', `${panX}px`);
+        button.style.setProperty('--carousel-pan-y', `${panY}px`);
+      };
+
+      const sync = index => {
+        activeIndex = ((index % slides.length) + slides.length) % slides.length;
+        slides.forEach((slide, slideIndex) => {
+          const active = slideIndex === activeIndex;
+          slide.classList.toggle('is-active', active);
+          slide.hidden = !active;
+          slide.setAttribute('aria-hidden', active ? 'false' : 'true');
+        });
+        thumbs.forEach((thumb, thumbIndex) => {
+          thumb.classList.toggle('is-active', thumbIndex === activeIndex);
+          thumb.setAttribute('aria-current', thumbIndex === activeIndex ? 'true' : 'false');
+        });
+      };
+
+      const show = index => {
+        sync(index);
+        menus.forEach(menu => {
+          menu.open = false;
+        });
+      };
+
+      prev?.addEventListener('click', () => show(activeIndex - 1));
+      next?.addEventListener('click', () => show(activeIndex + 1));
+      thumbs.forEach((thumb, index) => {
+        thumb.addEventListener('click', () => show(index));
+      });
+
+      root.addEventListener('keydown', event => {
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          show(activeIndex - 1);
+        }
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          show(activeIndex + 1);
+        }
+      });
+
+      menus.forEach(menu => {
+        menu.addEventListener('toggle', () => {
+          if (!menu.open) return;
+          menus.forEach(other => {
+            if (other !== menu) {
+              other.open = false;
+            }
+          });
+        });
+      });
+
+      zoomButtons.forEach(button => {
+        const image = button.querySelector('img');
+        if (image instanceof HTMLImageElement) {
+          const ready = () => applyPhotoFitRatio(button);
+          if (image.complete) {
+            ready();
+          } else {
+            image.addEventListener('load', ready, { once: true });
+          }
+        }
+        button.addEventListener('mouseenter', () => applyPhotoFitRatio(button));
+        button.addEventListener('mousemove', event => updatePan(button, event));
+        button.addEventListener('mouseleave', () => resetPan(button));
+        button.addEventListener('blur', () => resetPan(button));
+        button.addEventListener('focus', () => applyPhotoFitRatio(button));
+      });
+
+      sync(activeIndex);
+    });
+  };
+
+  const initItemPhotoZoom = scope => {
+    (scope || document).querySelectorAll('[data-photo-zoom-stage]').forEach(stage => {
+      if (!(stage instanceof HTMLButtonElement)) return;
+      const image = stage.querySelector('img');
+      if (!(image instanceof HTMLImageElement)) return;
+
+      const resetZoom = () => {
+        stage.style.setProperty('--photo-origin-x', '50%');
+        stage.style.setProperty('--photo-origin-y', '50%');
+        stage.style.setProperty('--photo-pan-x', '0px');
+        stage.style.setProperty('--photo-pan-y', '0px');
+        stage.style.setProperty('--photo-zoom', '1');
+      };
+
+      const fitZoom = () => {
+        const rotation = Number.parseInt((image.style.getPropertyValue('--rotation') || '0').replace('deg', ''), 10) || 0;
+        const naturalWidth = image.naturalWidth || image.clientWidth || 1;
+        const naturalHeight = image.naturalHeight || image.clientHeight || 1;
+        const rotated = Math.abs(rotation % 180) === 90;
+        const effectiveWidth = Math.max(1, rotated ? naturalHeight : naturalWidth);
+        const effectiveHeight = Math.max(1, rotated ? naturalWidth : naturalHeight);
+        const maxWidth = stage.parentElement?.clientWidth || stage.clientWidth || effectiveWidth;
+        const maxHeight = Math.round(window.innerHeight * 0.62) || stage.clientHeight || effectiveHeight;
+        const scale = Math.min(maxWidth / effectiveWidth, maxHeight / effectiveHeight);
+        const width = Math.max(1, Math.round(effectiveWidth * scale));
+        const height = Math.max(1, Math.round(effectiveHeight * scale));
+        stage.style.width = `${width}px`;
+        stage.style.height = `${height}px`;
+      };
+
+      const updatePointer = event => {
+        if (!(event instanceof PointerEvent)) return;
+        const rect = stage.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+        const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+        stage.style.setProperty('--photo-origin-x', `${(x * 100).toFixed(2)}%`);
+        stage.style.setProperty('--photo-origin-y', `${(y * 100).toFixed(2)}%`);
+        stage.style.setProperty('--photo-pan-x', `${((x - 0.5) * -72).toFixed(1)}px`);
+        stage.style.setProperty('--photo-pan-y', `${((y - 0.5) * -58).toFixed(1)}px`);
+      };
+
+      const activate = event => {
+        stage.dataset.zoomActive = 'true';
+        stage.style.setProperty('--photo-zoom', '1.85');
+        if (event) updatePointer(event);
+      };
+
+      const deactivate = () => {
+        stage.dataset.zoomActive = 'false';
+        resetZoom();
+      };
+
+      if (image.complete) {
+        fitZoom();
+      } else {
+        image.addEventListener('load', fitZoom, { once: true });
+      }
+      window.addEventListener('resize', fitZoom);
+
+      stage.addEventListener('pointerenter', activate);
+      stage.addEventListener('pointermove', updatePointer);
+      stage.addEventListener('pointerleave', deactivate);
+      stage.addEventListener('focus', activate);
+      stage.addEventListener('blur', deactivate);
+      resetZoom();
+    });
+  };
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => enhanceRotatedPhotos(document), { once: true });
+    document.addEventListener('DOMContentLoaded', () => {
+      enhanceRotatedPhotos(document);
+      initItemViewCarousels(document);
+      initItemPhotoZoom(document);
+    }, { once: true });
   } else {
     enhanceRotatedPhotos(document);
+    initItemViewCarousels(document);
+    initItemPhotoZoom(document);
   }
 
   const initSearchPickers = () => {
@@ -38,9 +269,37 @@
       const current = picker.querySelector('[data-picker-current]');
       const search = picker.querySelector('[data-picker-search]');
       const clear = picker.querySelector('[data-picker-clear]');
+      const toggles = [...picker.querySelectorAll('[data-picker-toggle]')];
+      const compact = picker.dataset.pickerCompact === 'true';
       const options = [...picker.querySelectorAll('[data-picker-option]')];
       const empty = picker.querySelector('[data-picker-empty]');
-      if (!(hidden instanceof HTMLInputElement) || !(current instanceof HTMLElement) || !(search instanceof HTMLInputElement)) return;
+      const panel = picker.querySelector('[data-picker-panel]');
+      if (!(hidden instanceof HTMLInputElement) || !(current instanceof HTMLElement) || !(search instanceof HTMLInputElement) || !(panel instanceof HTMLElement)) return;
+      const optionState = options.map((option, index) => {
+        let tags = [];
+        try {
+          tags = JSON.parse(option.dataset.tags || '[]');
+        } catch {
+          tags = [];
+        }
+        return {
+          option,
+          index,
+          title: normalizeSearch(option.dataset.title || ''),
+          meta: normalizeSearch(option.dataset.meta || ''),
+          detail: normalizeSearch(option.dataset.detail || ''),
+          search: normalizeSearch(option.dataset.search || ''),
+          tags: normalizeSearch((Array.isArray(tags) ? tags : []).join(' ')),
+          combined: [
+            option.dataset.search || '',
+            option.dataset.title || '',
+            option.dataset.meta || '',
+            option.dataset.detail || '',
+            (Array.isArray(tags) ? tags : []).join(' ')
+          ].join(' ')
+        };
+      });
+      let isOpen = !compact;
 
       const renderCurrent = option => {
         const title = option?.dataset.title || picker.dataset.emptyLabel || 'Sin seleccionar';
@@ -74,6 +333,39 @@
         }
       };
 
+      const syncToggleState = () => {
+        toggles.forEach(toggle => {
+          if (toggle instanceof HTMLElement) {
+            toggle.setAttribute('aria-expanded', compact && isOpen ? 'true' : 'false');
+          }
+        });
+      };
+
+      const openPanel = () => {
+        if (!compact || isOpen) return;
+        panel.hidden = false;
+        isOpen = true;
+        syncToggleState();
+        window.requestAnimationFrame(() => {
+          try {
+            search.focus({ preventScroll: true });
+          } catch {
+            search.focus();
+          }
+        });
+      };
+
+      const closePanel = ({ clearSearch = false } = {}) => {
+        if (!compact || !isOpen) return;
+        if (clearSearch) {
+          search.value = '';
+          filterOptions();
+        }
+        panel.hidden = true;
+        isOpen = false;
+        syncToggleState();
+      };
+
       const updateSelectedState = selectedValue => {
         let selectedOption = null;
         options.forEach(option => {
@@ -90,18 +382,34 @@
         updateSelectedState(hidden.value);
         hidden.dispatchEvent(new Event('input', { bubbles: true }));
         hidden.dispatchEvent(new Event('change', { bubbles: true }));
+        if (compact) {
+          search.value = '';
+          filterOptions();
+          closePanel();
+        }
       };
 
       const filterOptions = () => {
-        const needle = normalizeSearch(search.value);
+        const needle = search.value;
+        const rankedVisible = [];
         let visible = 0;
-        options.forEach(option => {
-          const tags = JSON.parse(option.dataset.tags || '[]');
-          const haystack = normalizeSearch(`${option.dataset.search || ''} ${option.dataset.title || ''} ${option.dataset.meta || ''} ${option.dataset.detail || ''} ${(tags || []).join(' ')}`);
-          const show = !needle || haystack.includes(needle);
-          option.hidden = !show;
-          if (show) visible += 1;
+
+        optionState.forEach(state => {
+          const score = scoreSearchMatch(state, needle);
+          const show = score >= 0;
+          state.option.hidden = !show;
+          if (show) {
+            visible += 1;
+            rankedVisible.push({ ...state, score });
+          }
         });
+
+        rankedVisible
+          .sort((a, b) => b.score - a.score || a.index - b.index)
+          .forEach(({ option }) => {
+            option.parentNode?.appendChild(option);
+          });
+
         if (empty instanceof HTMLElement) {
           empty.hidden = visible > 0;
         }
@@ -109,6 +417,15 @@
 
       options.forEach(option => option.addEventListener('click', () => chooseOption(option)));
       search.addEventListener('input', filterOptions);
+      if (compact) {
+        search.addEventListener('focus', openPanel);
+        search.addEventListener('click', openPanel);
+        toggles.forEach(toggle => toggle.addEventListener('click', () => (isOpen ? closePanel() : openPanel())));
+        document.addEventListener('pointerdown', event => {
+          if (!isOpen || !(event.target instanceof Node) || picker.contains(event.target)) return;
+          closePanel();
+        });
+      }
       search.addEventListener('keydown', event => {
         const firstVisibleOption = () => options.find(option => !option.hidden);
         if (event.key === 'Enter') {
@@ -131,7 +448,9 @@
               }
             }
           }
-          search.focus();
+          if (!compact) {
+            search.focus();
+          }
         }
         if (event.key === 'ArrowDown') {
           const option = firstVisibleOption();
@@ -139,10 +458,14 @@
           event.preventDefault();
           option.focus();
         }
-        if (event.key === 'Escape' && search.value) {
+        if (event.key === 'Escape') {
           event.preventDefault();
-          search.value = '';
-          filterOptions();
+          if (compact) {
+            closePanel({ clearSearch: true });
+          } else if (search.value) {
+            search.value = '';
+            filterOptions();
+          }
         }
       });
       clear?.addEventListener('click', () => {
@@ -150,11 +473,214 @@
         updateSelectedState(hidden.value);
         hidden.dispatchEvent(new Event('input', { bubbles: true }));
         hidden.dispatchEvent(new Event('change', { bubbles: true }));
-        search.focus();
+        if (compact) {
+          closePanel({ clearSearch: true });
+        } else {
+          search.focus();
+        }
       });
 
       updateSelectedState(hidden.value);
       filterOptions();
+      syncToggleState();
+      if (compact) {
+        panel.hidden = true;
+      }
+    });
+  };
+
+  const initPendingActionLinkers = () => {
+    document.querySelectorAll('.inventory-actions-create').forEach(panel => {
+      const typeSelect = panel.querySelector('[data-action-link-type]');
+      const boxPicker = panel.querySelector('[data-action-link-picker="box"]');
+      const itemPicker = panel.querySelector('[data-action-link-picker="item"]');
+      if (!(typeSelect instanceof HTMLSelectElement) || !(boxPicker instanceof HTMLElement) || !(itemPicker instanceof HTMLElement)) return;
+
+      const clearPickerValue = picker => {
+        const hidden = picker.querySelector('input[type="hidden"]');
+        if (!(hidden instanceof HTMLInputElement)) return;
+        hidden.value = '';
+        hidden.dispatchEvent(new Event('input', { bubbles: true }));
+        hidden.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+
+      const sync = () => {
+        const selected = typeSelect.value;
+        const showBox = selected === 'Box';
+        const showItem = selected === 'Item';
+
+        boxPicker.hidden = !showBox;
+        itemPicker.hidden = !showItem;
+
+        if (!showBox) clearPickerValue(boxPicker);
+        if (!showItem) clearPickerValue(itemPicker);
+      };
+
+      typeSelect.addEventListener('change', sync);
+      sync();
+    });
+  };
+
+  const initInventoryBoxMultiFilters = () => {
+    document.querySelectorAll('.inventory-box-scope').forEach(panel => {
+      const pickerRoot = panel.querySelector('[data-search-picker]');
+      const selectedList = panel.querySelector('[data-box-selected-list]');
+      const form = panel.closest('form');
+      if (!(pickerRoot instanceof HTMLElement) || !(selectedList instanceof HTMLElement) || !(form instanceof HTMLFormElement)) return;
+
+      const hiddenAdder = pickerRoot.querySelector('input[type="hidden"]');
+      const clearButton = pickerRoot.querySelector('[data-picker-clear]');
+      if (!(hiddenAdder instanceof HTMLInputElement)) return;
+
+      const findHiddenInputs = id => [...form.querySelectorAll('input[name="boxIds"]')].filter(input => input instanceof HTMLInputElement && input.value === String(id));
+      const findSelectionChip = id => panel.querySelector(`[data-box-selection="${CSS.escape(String(id))}"]`);
+      const updateEmptyState = () => {
+        const hasSelections = form.querySelectorAll('input[name="boxIds"]').length > 0;
+        const caption = selectedList.querySelector('.caption');
+        if (caption instanceof HTMLElement) {
+          caption.hidden = hasSelections;
+        }
+      };
+
+      const triggerRefresh = () => {
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+          return;
+        }
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      };
+
+      const removeSelection = id => {
+        findHiddenInputs(id).forEach(input => input.remove());
+        findSelectionChip(id)?.remove();
+        updateEmptyState();
+        triggerRefresh();
+      };
+
+      const clearAllSelections = () => {
+        [...form.querySelectorAll('input[name="boxIds"]')].forEach(input => {
+          if (input instanceof HTMLInputElement) {
+            input.remove();
+          }
+        });
+        [...panel.querySelectorAll('[data-box-selection]')].forEach(node => {
+          if (node instanceof HTMLElement && node.dataset.boxSelection) {
+            node.remove();
+          }
+        });
+        if (hiddenAdder instanceof HTMLInputElement) {
+          hiddenAdder.value = '';
+        }
+        updateEmptyState();
+        triggerRefresh();
+      };
+
+      const appendSelection = ({ id, code, name, locationDisplay, containerTypeLabel }) => {
+        const existing = findHiddenInputs(id);
+        if (existing.length > 0 || findSelectionChip(id)) return;
+
+        const chip = document.createElement('span');
+        chip.className = 'chip chip-box-selected';
+        chip.dataset.boxSelection = String(id);
+
+        const label = document.createElement('span');
+        label.textContent = `${code} · ${name}`;
+        chip.appendChild(label);
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'chip-remove';
+        remove.setAttribute('aria-label', `Quitar ${code}`);
+        remove.textContent = '×';
+        remove.addEventListener('click', () => removeSelection(id));
+        chip.appendChild(remove);
+
+        const meta = document.createElement('small');
+        meta.className = 'chip-box-meta';
+        meta.textContent = [containerTypeLabel, locationDisplay].filter(Boolean).join(' · ');
+        chip.appendChild(meta);
+
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'boxIds';
+        hidden.value = String(id);
+        hidden.dataset.boxHidden = 'true';
+        hidden.dataset.boxSelection = String(id);
+
+        selectedList.append(chip, hidden);
+        updateEmptyState();
+      };
+
+      panel.querySelectorAll('[data-box-remove]').forEach(button => {
+        if (!(button instanceof HTMLButtonElement)) return;
+        button.addEventListener('click', () => {
+          const id = Number.parseInt(button.dataset.boxRemove || '', 10);
+          if (Number.isNaN(id)) return;
+          removeSelection(id);
+        });
+      });
+
+      panel.querySelectorAll('[data-box-clear-all]').forEach(button => {
+        if (!(button instanceof HTMLButtonElement)) return;
+        button.addEventListener('click', clearAllSelections);
+      });
+
+      hiddenAdder.addEventListener('change', () => {
+        if (!hiddenAdder.value) return;
+        const option = pickerRoot.querySelector('.search-picker-option.is-selected');
+        if (!(option instanceof HTMLElement)) return;
+        const id = Number.parseInt(hiddenAdder.value, 10);
+        if (Number.isNaN(id)) return;
+        const title = option.dataset.title || '';
+        const [code = '', ...rest] = title.split('·').map(part => part.trim());
+        const name = rest.join(' · ') || title;
+
+        appendSelection({
+          id,
+          code,
+          name,
+          locationDisplay: option.dataset.meta || option.dataset.detail || '',
+          containerTypeLabel: option.dataset.tags ? (() => {
+            try {
+              const tags = JSON.parse(option.dataset.tags || '[]');
+              return Array.isArray(tags) ? tags[0] || '' : '';
+            } catch {
+              return '';
+            }
+          })() : ''
+        });
+
+        if (clearButton instanceof HTMLElement) {
+          clearButton.click();
+        } else {
+          hiddenAdder.value = '';
+          hiddenAdder.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        updateEmptyState();
+        triggerRefresh();
+      });
+
+      updateEmptyState();
+    });
+  };
+
+  const initInventoryGroupToggles = () => {
+    document.querySelectorAll('[data-inventory-expand-groups]').forEach(button => {
+      button.addEventListener('click', () => {
+        const board = button.closest('.inventory-board');
+        board?.querySelectorAll('details.inventory-group').forEach(group => {
+          group.open = true;
+        });
+      });
+    });
+
+    document.querySelectorAll('[data-inventory-collapse-groups]').forEach(button => {
+      button.addEventListener('click', () => {
+        const board = button.closest('.inventory-board');
+        board?.querySelectorAll('details.inventory-group').forEach(group => {
+          group.open = false;
+        });
+      });
     });
   };
 
@@ -489,10 +1015,11 @@
   };
 
   const buildInventoryGroupCard = group => {
-    const section = document.createElement('section');
+    const section = document.createElement('details');
     section.className = `inventory-group${group.isOrphanGroup ? ' orphan-group' : ''}`;
+    section.open = false;
 
-    const head = document.createElement('div');
+    const head = document.createElement('summary');
     head.className = 'inventory-group-head';
 
     const cover = document.createElement('div');
@@ -550,14 +1077,15 @@
       title.appendChild(source);
     }
     head.appendChild(title);
+    section.appendChild(head);
 
     const actions = document.createElement('div');
-    actions.className = 'actions';
+    actions.className = 'inventory-group-actions actions';
     if (group.boxId && !group.isOrphanGroup) {
       const inventoryLink = document.createElement('a');
       inventoryLink.className = 'btn';
       inventoryLink.href = `/items?box=${encodeURIComponent(group.code)}&includeChildren=true&view=flat`;
-      inventoryLink.textContent = 'Inventario directo';
+      inventoryLink.textContent = 'Inventario + subcontenedores';
       actions.appendChild(inventoryLink);
 
       const boxLink = document.createElement('a');
@@ -566,8 +1094,7 @@
       boxLink.textContent = 'Abrir caja';
       actions.appendChild(boxLink);
     }
-    head.appendChild(actions);
-    section.appendChild(head);
+    section.appendChild(actions);
 
     const grid = document.createElement('div');
     grid.className = 'inventory-photo-grid';
@@ -601,8 +1128,9 @@
 
   const buildInventoryContextMarkup = payload => {
     const root = document.createDocumentFragment();
+    const selectedBoxes = payload.selectedBoxes || [];
     const context = payload.selectedBox;
-    if (!payload.boxCode) return root;
+    if (!payload.boxCode || selectedBoxes.length !== 1) return root;
 
     const section = document.createElement('section');
     section.className = 'panel stack-top inventory-context';
@@ -722,6 +1250,13 @@
     clear.href = '/items';
     clear.textContent = 'Limpiar filtros';
     header.appendChild(clear);
+
+    const createBox = document.createElement('a');
+    createBox.className = 'btn primary';
+    createBox.href = '/Boxes/Create';
+    createBox.textContent = 'Nuevo contenedor';
+    header.appendChild(createBox);
+
     section.appendChild(header);
 
     const chips = document.createElement('div');
@@ -734,14 +1269,27 @@
       chips.appendChild(chip);
     };
 
-    if (payload.query) addChip(`Texto: ${payload.query}`, 'chip good');
-    if (payload.category) addChip(`Categoría: ${payload.category}`, 'chip good');
-    if (payload.boxId && payload.selectedBox && !payload.selectedBox.missing) addChip(`Contenedor: ${payload.selectedBox.code} · ${payload.selectedBox.name}`, 'chip good');
-    if (payload.locationId && payload.selectedLocationName) addChip(`Ubicación: ${payload.selectedLocationName}`, 'chip good');
-    if (payload.includeChildren) addChip('Incluye subcontenedores');
-    if (payload.onlyConsumable) addChip('Solo consumibles');
-    if (payload.onlyOrphans) addChip('Solo huérfanos');
-    addChip(payload.viewMode === 'flat' ? 'Vista plana' : 'Agrupado por contenedor');
+    const addChipLink = (text, href, className = 'chip chip-link') => {
+      const link = document.createElement('a');
+      link.className = className;
+      link.href = href;
+      link.textContent = text;
+      chips.appendChild(link);
+    };
+
+    const selectedBoxes = payload.selectedBoxes || [];
+    if (payload.query) addChipLink(`Texto: ${payload.query} ×`, buildInventoryQueryUrl(payload, { query: '' }), 'chip chip-link good');
+    if (payload.category) addChipLink(`Categoría: ${payload.category} ×`, buildInventoryQueryUrl(payload, { category: '' }), 'chip chip-link good');
+    if (selectedBoxes.length > 0) addChipLink(`Contenedores: ${selectedBoxes.length} ×`, buildInventoryQueryUrl(payload, { boxIds: [] }), 'chip chip-link good');
+    if (payload.locationId && payload.selectedLocationName) addChipLink(`Ubicación: ${payload.selectedLocationName} ×`, buildInventoryQueryUrl(payload, { locationId: null }), 'chip chip-link good');
+    if (payload.includeChildren) addChipLink('Incluye subcontenedores ×', buildInventoryQueryUrl(payload, { includeChildren: false }), 'chip chip-link');
+    if (payload.onlyConsumable) addChipLink('Solo consumibles ×', buildInventoryQueryUrl(payload, { onlyConsumable: false }), 'chip chip-link');
+    if (payload.onlyOrphans) addChipLink('Solo huérfanos ×', buildInventoryQueryUrl(payload, { onlyOrphans: false }), 'chip chip-link');
+    addChipLink(
+      payload.viewMode === 'flat' ? 'Vista plana ×' : 'Agrupado por contenedor ×',
+      buildInventoryQueryUrl(payload, { view: payload.viewMode === 'flat' ? 'grouped' : 'flat' }),
+      'chip chip-link'
+    );
 
     section.appendChild(chips);
     root.appendChild(section);
@@ -750,18 +1298,21 @@
 
   const buildInventoryQueryUrl = (payload, overrides = {}) => {
     const params = new URLSearchParams();
-    const boxId = overrides.boxId ?? payload.boxId;
-    const locationId = overrides.locationId ?? payload.locationId;
-    const includeChildren = overrides.includeChildren ?? payload.includeChildren;
-    const view = overrides.view ?? payload.viewMode;
-    const query = overrides.query ?? payload.query;
-    const category = overrides.category ?? payload.category;
-    const onlyConsumable = overrides.onlyConsumable ?? payload.onlyConsumable;
-    const onlyOrphans = overrides.onlyOrphans ?? payload.onlyOrphans;
+    const has = key => Object.prototype.hasOwnProperty.call(overrides, key);
+    const boxIds = has('boxIds') ? overrides.boxIds : (payload.boxIds ?? (payload.boxId ? [payload.boxId] : []));
+    const locationId = has('locationId') ? overrides.locationId : payload.locationId;
+    const includeChildren = has('includeChildren') ? overrides.includeChildren : payload.includeChildren;
+    const view = has('view') ? overrides.view : payload.viewMode;
+    const query = has('query') ? overrides.query : payload.query;
+    const category = has('category') ? overrides.category : payload.category;
+    const onlyConsumable = has('onlyConsumable') ? overrides.onlyConsumable : payload.onlyConsumable;
+    const onlyOrphans = has('onlyOrphans') ? overrides.onlyOrphans : payload.onlyOrphans;
 
     if (query) params.set('q', query);
     if (category) params.set('category', category);
-    if (boxId) params.set('boxId', boxId);
+    for (const boxId of boxIds || []) {
+      if (boxId) params.append('boxIds', boxId);
+    }
     if (locationId) params.set('locationId', locationId);
     if (includeChildren) params.set('includeChildren', 'true');
     if (onlyConsumable) params.set('onlyConsumable', 'true');
@@ -1010,8 +1561,6 @@
       const queryInput = form.querySelector('input[name="q"]');
       if (queryInput instanceof HTMLInputElement && queryInput.value.trim()) {
         schedule();
-      } else if (mode === 'suggest') {
-        panel.hidden = true;
       }
     });
   };
@@ -1057,8 +1606,18 @@
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initSearchPickers, { once: true });
+    document.addEventListener('DOMContentLoaded', initPendingActionLinkers, { once: true });
+    document.addEventListener('DOMContentLoaded', initInventoryBoxMultiFilters, { once: true });
   } else {
     initSearchPickers();
+    initPendingActionLinkers();
+    initInventoryBoxMultiFilters();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initInventoryGroupToggles, { once: true });
+  } else {
+    initInventoryGroupToggles();
   }
 
   if (document.readyState === 'loading') {

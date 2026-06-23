@@ -11,6 +11,11 @@
     </div>
 </div>
 
+@if (TempData["ArchiveMessage"] is string archiveMessage)
+{
+    <div class="notice stack-top">@archiveMessage</div>
+}
+
 <div class="split">
     <section>
         <h2>Cajas archivadas</h2>

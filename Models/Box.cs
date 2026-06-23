@@ -95,6 +95,27 @@ public class Box
         return int.TryParse(compact, out sequence) && sequence > 0;
     }
 
+    public static bool TryParseCanonicalCtSequence(string? value, out int sequence)
+    {
+        sequence = 0;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var compact = new string(value.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToUpperInvariant();
+        if (!compact.StartsWith(CtPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var digits = compact[CtPrefix.Length..];
+        return digits.Length == 6
+            && digits.All(char.IsDigit)
+            && int.TryParse(digits, out sequence)
+            && sequence > 0;
+    }
+
     public static string NormalizePublicCode(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))

@@ -40,6 +40,7 @@ public class CreateModel(InventoryDbContext db) : PageModel
 
         await LoadSelects(cancellationToken);
         SuggestedCode = await BoxCodeService.GetNextCtCodeAsync(db, cancellationToken);
+        Input.Code = SuggestedCode;
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
@@ -83,6 +84,10 @@ public class CreateModel(InventoryDbContext db) : PageModel
         {
             await LoadSelects(cancellationToken);
             SuggestedCode = await BoxCodeService.GetNextCtCodeAsync(db, cancellationToken);
+            if (string.IsNullOrWhiteSpace(Input.Code))
+            {
+                Input.Code = SuggestedCode;
+            }
             return Page();
         }
 
@@ -106,6 +111,10 @@ public class CreateModel(InventoryDbContext db) : PageModel
             ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.Code)}", "Ese CT ya existe.");
             await LoadSelects(cancellationToken);
             SuggestedCode = await BoxCodeService.GetNextCtCodeAsync(db, cancellationToken);
+            if (string.IsNullOrWhiteSpace(Input.Code))
+            {
+                Input.Code = SuggestedCode;
+            }
             return Page();
         }
 
@@ -153,7 +162,7 @@ public class CreateModel(InventoryDbContext db) : PageModel
     public class BoxInput
     {
         [MaxLength(40)]
-        public string Code { get; set; } = "";
+        public string? Code { get; set; }
 
         [Required, MaxLength(160)]
         public string Name { get; set; } = "";

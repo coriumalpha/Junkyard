@@ -58,11 +58,18 @@ public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageMode
         }
 
         var ids = SelectedIds();
+        var box = await db.Boxes.FirstOrDefaultAsync(b => b.Id == Input.BoxId.Value, cancellationToken);
+        if (box is null)
+        {
+            return NotFound();
+        }
+
         var photos = await db.PhotoInboxes.Where(p => ids.Contains(p.Id)).ToListAsync(cancellationToken);
         var now = DateTime.UtcNow;
         foreach (var inbox in photos)
         {
             db.Photos.Add(new Photo { EntityType = PhotoEntityType.Box, EntityId = Input.BoxId.Value, SourceInboxId = inbox.Id, Filename = inbox.Filename, Caption = inbox.OriginalFilename, RotationDegrees = inbox.RotationDegrees });
+            box.CoverPhoto ??= inbox.Filename;
             inbox.Status = PhotoInboxStatus.Assigned;
             inbox.ProcessedAt = now;
         }

@@ -36,7 +36,7 @@
             <input id="selectedIds" type="hidden" asp-for="Input.SelectedIds" />
             <section class="review-stage">
                 <div class="review-photo-frame">
-                    <img class="review-photo rotatable" data-photo-id="@Model.Current.Id" data-photo-variant="preview" style="@PhotoStorage.RotationStyle(Model.Current.RotationDegrees)" src="@Model.PreviewUrl(Model.Current)" alt="@Model.Current.OriginalFilename" decoding="async" />
+                    <img class="review-photo rotatable" data-photo-id="@Model.Current.Id" data-photo-variant="preview" data-photo-no-fit="true" style="@PhotoStorage.RotationStyle(Model.Current.RotationDegrees)" src="@Model.PreviewUrl(Model.Current)" alt="@Model.Current.OriginalFilename" decoding="async" />
                 </div>
                 <aside class="review-side">
                     <div class="review-actions panel">
@@ -77,7 +77,7 @@
                                 <input asp-for="Input.Name" autocomplete="off" />
                             </div>
                             <div class="field full">
-                                <label>Notas</label>
+                                <label>Descripción del ítem</label>
                                 <textarea asp-for="Input.Notes" placeholder="Marca, modelo, número de serie, estado visible..."></textarea>
                             </div>
                             <div class="field">
@@ -160,6 +160,13 @@
     }
     return Boolean(target.closest('input, textarea, select, button'));
   };
+  const syncReviewFrame = image => {
+    if (!(image instanceof HTMLImageElement)) return;
+    const frame = image.closest('.review-photo-frame');
+    if (!(frame instanceof HTMLElement)) return;
+    if (!image.naturalWidth || !image.naturalHeight) return;
+    frame.style.setProperty('--review-photo-ratio', `${image.naturalWidth} / ${image.naturalHeight}`);
+  };
   const setImageSource = (image, src) => {
     image.src = src;
     image.removeAttribute('srcset');
@@ -170,6 +177,7 @@
       document.querySelectorAll(`img[data-photo-id="${photo.id}"]`).forEach(image => {
         const nextSrc = image.dataset.photoVariant === 'thumb' ? photo.thumbUrl : photo.previewUrl;
         setImageSource(image, nextSrc);
+        syncReviewFrame(image);
       });
     });
   };
@@ -217,6 +225,13 @@
     setTimeout(() => assignDialog.querySelector('[data-picker-search]')?.focus(), 0);
   };
   document.querySelector('.film.current')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  document.querySelectorAll('.review-photo-frame img.review-photo').forEach(image => {
+    const onLoad = () => syncReviewFrame(image);
+    image.addEventListener('load', onLoad);
+    if (image.complete) {
+      onLoad();
+    }
+  });
   document.querySelector('[data-open="create"]').addEventListener('click', openCreate);
   document.querySelector('[data-open="assign"]').addEventListener('click', openAssign);
   document.querySelectorAll('[data-rotate]').forEach(button => button.addEventListener('click', event => {

@@ -177,6 +177,48 @@ public static class BoxHierarchyService
             ? BoxParentValidationResult.Valid()
             : BoxParentValidationResult.Invalid("El contenedor destino ya no existe.");
     }
+
+    public static async Task<int> NormalizeInheritedLocationsAsync(
+        InventoryDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var lookup = await BuildLocationLookupAsync(db, cancellationToken);
+        var boxes = await db.Boxes.ToListAsync(cancellationToken);
+        var changes = 0;
+
+        foreach (var box in boxes)
+        {
+            if (box.ParentBoxId is null)
+            {
+                continue;
+            }
+
+            if (!lookup.TryGetValue(box.Id, out var resolution))
+            {
+                continue;
+            }
+
+            if (resolution.LocationId is not int effectiveLocationId)
+            {
+                continue;
+            }
+
+            if (box.LocationId == effectiveLocationId)
+            {
+                continue;
+            }
+
+            box.LocationId = effectiveLocationId;
+            changes++;
+        }
+
+        if (changes > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return changes;
+    }
 }
 
 public sealed record BoxBreadcrumbSegment(int? BoxId, string? Code, string Label, bool IsLocation);

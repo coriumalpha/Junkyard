@@ -10,7 +10,8 @@ public static class SchemaUpgrader
         AddColumn(db, "Boxes", "ContainerType", $"TEXT NOT NULL DEFAULT '{Models.Box.DefaultContainerType}'");
         AddColumn(db, "Boxes", "ArchivedAt", "TEXT NULL");
         AddColumn(db, "Boxes", "ParentBoxId", "INTEGER NULL");
-        db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Boxes_Code" ON "Boxes" ("Code");""");
+        db.Database.ExecuteSqlRaw("""DROP INDEX IF EXISTS "IX_Boxes_Code";""");
+        db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Boxes_Code_Active" ON "Boxes" ("Code") WHERE "ArchivedAt" IS NULL;""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Boxes_ParentBoxId" ON "Boxes" ("ParentBoxId");""");
         AddColumn(db, "Photos", "Status", "TEXT NOT NULL DEFAULT 'Active'");
         AddColumn(db, "Photos", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");
@@ -19,12 +20,15 @@ public static class SchemaUpgrader
         AddColumn(db, "Photos", "SourceInboxId", "INTEGER NULL");
         AddColumn(db, "Items", "ArchivedAt", "TEXT NULL");
         EnsureNullableItemBoxId(db);
+        EnsureInventoryActions(db);
         EnsurePhotoInbox(db);
         AddColumn(db, "PhotoInboxes", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");
         AddColumn(db, "PhotoInboxes", "UpdatedAt", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'");
         AddColumn(db, "PhotoInboxes", "ProcessedAt", "TEXT NULL");
         NormalizeContainerTypes(db);
         BackfillTimestamps(db);
+        BackfillBoxCoverPhotos(db);
+        NormalizeChildBoxLocations(db);
     }
 
     private static void AddColumn(InventoryDbContext db, string table, string column, string definition)
@@ -55,6 +59,28 @@ public static class SchemaUpgrader
             );
             """);
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_PhotoInboxes_Status" ON "PhotoInboxes" ("Status");""");
+    }
+
+    private static void EnsureInventoryActions(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "InventoryActions" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_InventoryActions" PRIMARY KEY AUTOINCREMENT,
+                "Title" TEXT NOT NULL,
+                "Description" TEXT NULL,
+                "Status" TEXT NOT NULL,
+                "Priority" INTEGER NOT NULL DEFAULT 3,
+                "LinkedEntityType" TEXT NOT NULL DEFAULT 'None',
+                "LinkedEntityId" INTEGER NULL,
+                "CreatedAt" TEXT NOT NULL,
+                "CompletedAt" TEXT NULL,
+                "UpdatedAt" TEXT NOT NULL,
+                CONSTRAINT "CK_InventoryActions_Priority" CHECK ("Priority" BETWEEN 1 AND 5)
+            );
+            """);
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_Status" ON "InventoryActions" ("Status");""");
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_LinkedEntityType_LinkedEntityId" ON "InventoryActions" ("LinkedEntityType", "LinkedEntityId");""");
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_Priority_CreatedAt" ON "InventoryActions" ("Priority", "CreatedAt");""");
     }
 
     private static void EnsureNullableItemBoxId(InventoryDbContext db)
@@ -129,6 +155,59 @@ public static class SchemaUpgrader
                   SELECT 1
                   FROM "PhotoInboxes"
                   WHERE "PhotoInboxes"."Filename" = "Photos"."Filename"
+              );
+            """);
+    }
+
+    private static void BackfillBoxCoverPhotos(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            UPDATE "Boxes"
+            SET "CoverPhoto" = (
+                SELECT p."Filename"
+                FROM "Photos" p
+                WHERE p."EntityType" = 'Box'
+                  AND p."EntityId" = "Boxes"."Id"
+                  AND p."Status" = 'Active'
+                ORDER BY p."CreatedAt" DESC, p."Id" DESC
+                LIMIT 1
+            )
+            WHERE ("CoverPhoto" IS NULL OR trim("CoverPhoto") = '')
+              AND EXISTS (
+                  SELECT 1
+                  FROM "Photos" p
+                  WHERE p."EntityType" = 'Box'
+                    AND p."EntityId" = "Boxes"."Id"
+                    AND p."Status" = 'Active'
+              );
+            """);
+    }
+
+    private static void NormalizeChildBoxLocations(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            WITH RECURSIVE box_roots AS (
+                SELECT "Id", "Id" AS "RootId", "LocationId" AS "RootLocationId"
+                FROM "Boxes"
+                WHERE "ParentBoxId" IS NULL
+                UNION ALL
+                SELECT child."Id", box_roots."RootId", box_roots."RootLocationId"
+                FROM "Boxes" child
+                JOIN box_roots ON child."ParentBoxId" = box_roots."Id"
+            )
+            UPDATE "Boxes"
+            SET "LocationId" = (
+                SELECT "RootLocationId"
+                FROM box_roots
+                WHERE box_roots."Id" = "Boxes"."Id"
+                LIMIT 1
+            )
+            WHERE "ParentBoxId" IS NOT NULL
+              AND "LocationId" <> (
+                  SELECT "RootLocationId"
+                  FROM box_roots
+                  WHERE box_roots."Id" = "Boxes"."Id"
+                  LIMIT 1
               );
             """);
     }
