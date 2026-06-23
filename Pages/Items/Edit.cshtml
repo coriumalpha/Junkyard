@@ -150,28 +150,28 @@
                             @if (Model.Input.Obsolete) { <span class="chip warn">Legacy</span> }
                             @if (Model.Input.Sentimental) { <span class="chip good">Recuerdo</span> }
                         </div>
-
-                        <section class="item-description-card">
-                            <div class="section-header compact">
-                                <div>
-                                    <p class="eyebrow">Descripción</p>
-                                    <h2>Cómo identificar este ítem</h2>
-                                </div>
-                            </div>
-                            @if (!string.IsNullOrWhiteSpace(Model.Input.Notes))
-                            {
-                                <p class="item-description-text">@Model.Input.Notes</p>
-                            }
-                            else
-                            {
-                                <div class="empty item-description-empty">
-                                    <strong>Sin descripción todavía</strong>
-                                    Añade aquí modelo, estado, números de serie o cualquier detalle útil.
-                                </div>
-                            }
-                        </section>
                     </aside>
                 </div>
+                <section class="panel item-description-card item-description-panel">
+                    <div class="section-header compact">
+                        <div>
+                            <p class="eyebrow">Descripción</p>
+                            <h2>Cómo identificar este ítem</h2>
+                            <p class="section-kicker">Aquí vive la información que de verdad ayuda a reconocer el objeto.</p>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.Input.Notes))
+                    {
+                        <p class="item-description-text item-description-text-prominent">@Model.Input.Notes</p>
+                    }
+                    else
+                    {
+                        <div class="empty item-description-empty">
+                            <strong>Sin descripción todavía</strong>
+                            Añade aquí modelo, estado, números de serie o cualquier detalle útil.
+                        </div>
+                    }
+                </section>
             </section>
 
             <section class="item-view-support-grid">
@@ -338,7 +338,8 @@
                         </div>
                     </div>
                     <label asp-for="Input.Notes">Descripción del ítem</label>
-                    <textarea asp-for="Input.Notes" placeholder="Marca, modelo, número de serie, estado visible..."></textarea>
+                    <p class="caption">Describe el objeto, modelo, características, estado o detalles útiles.</p>
+                    <textarea asp-for="Input.Notes" rows="8" placeholder="Marca, modelo, número de serie, estado visible..."></textarea>
                 </div>
                 <div class="actions full">
                     <button class="btn primary" type="submit">Guardar cambios</button>

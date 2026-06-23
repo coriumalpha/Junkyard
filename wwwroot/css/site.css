@@ -847,6 +847,17 @@ a.box-breadcrumb-node:hover {
   overflow-wrap: anywhere;
   line-height: 1.55;
 }
+.item-description-panel {
+  padding: 20px;
+}
+.item-description-panel .item-description-text-prominent {
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 18px 20px;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(143,225,255,.08), transparent 34%),
+    rgba(255,255,255,.045);
+}
 .item-description-empty {
   padding: 16px;
 }
