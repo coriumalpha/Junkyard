@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 export type InventoryViewMode = 'grouped' | 'flat';
+export type InventoryLayoutMode = 'grouped' | 'flat' | 'gallery' | 'table';
 
 export interface InventoryQueryState {
   q: string;
@@ -10,6 +11,7 @@ export interface InventoryQueryState {
   includeChildren: boolean;
   onlyConsumable: boolean;
   onlyOrphans: boolean;
+  layout: InventoryLayoutMode;
   view: InventoryViewMode;
 }
 
