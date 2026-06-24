@@ -53,7 +53,7 @@
           <span matListItemLine>Miniaturas y covers útiles</span>
         }
       </a>
-      <a mat-list-item [href]="backendUrl('/items')" target="_blank" rel="noreferrer">
+      <a mat-list-item [href]="currentScopeBackendUrl()" target="_blank" rel="noreferrer">
         <mat-icon matListItemIcon>open_in_new</mat-icon>
         <span matListItemTitle>Razor</span>
         @if (!drawerCollapsed() || handset()) {
@@ -115,7 +115,7 @@
             Menú
           }
         </button>
-        <a mat-stroked-button class="ghost-link" [href]="backendUrl('/items')" target="_blank" rel="noreferrer">
+        <a mat-stroked-button class="ghost-link" [href]="currentScopeBackendUrl()" target="_blank" rel="noreferrer">
           <mat-icon>open_in_new</mat-icon>
           Abrir Razor
         </a>
