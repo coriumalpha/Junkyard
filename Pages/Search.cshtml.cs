@@ -31,7 +31,7 @@ public class SearchModel(InventoryDbContext db) : PageModel
             data.Boxes.Select(box => new SearchBoxDto(
                 box.Code,
                 box.Name,
-                $"/Boxes/Details?code={Uri.EscapeDataString(box.Code)}",
+                BuildInventoryUrl(box.Code),
                 data.ThumbUrl(box.CoverPhoto),
                 data.RotationFor(box.CoverPhoto),
                 data.LocationLookup.TryGetValue(box.Id, out var boxLocation) ? boxLocation.LocationName : box.Location?.Name,
@@ -55,6 +55,9 @@ public class SearchModel(InventoryDbContext db) : PageModel
             )).ToList()
         ));
     }
+
+    private string BuildInventoryUrl(string boxCode) =>
+        Url.Page("/Items/Index", null, new { box = boxCode, includeChildren = true, view = "grouped" }) ?? $"/items?box={Uri.EscapeDataString(boxCode)}&includeChildren=true&view=grouped";
 
     public int RotationFor(string? filename) =>
         filename is not null && PhotoStates.TryGetValue(filename, out var state) ? state.RotationDegrees : 0;
