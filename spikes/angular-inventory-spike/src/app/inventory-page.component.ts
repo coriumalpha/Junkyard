@@ -248,8 +248,24 @@ export class InventoryPageComponent {
     const state = this.state();
     const params = new URLSearchParams();
 
+    if (state.q.trim()) {
+      params.set('q', state.q.trim());
+    }
+
     if (state.box.trim()) {
       params.set('box', state.box.trim());
+    }
+
+    if (state.includeChildren) {
+      params.set('includeChildren', 'true');
+    }
+
+    if (state.onlyConsumable) {
+      params.set('onlyConsumable', 'true');
+    }
+
+    if (state.onlyOrphans) {
+      params.set('onlyOrphans', 'true');
     }
 
     params.set('view', state.view);
