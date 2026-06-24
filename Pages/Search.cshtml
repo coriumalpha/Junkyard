@@ -29,7 +29,7 @@ else
                 @foreach (var box in Model.Boxes)
                 {
                     var itemLabel = box.Items.Count == 1 ? "1 ítem" : $"{box.Items.Count} ítems";
-                    <a class="card box-card" asp-page="/Boxes/Details" asp-route-code="@box.Code">
+                    <a class="card box-card" asp-page="/Items/Index" asp-route-box="@box.Code" asp-route-includeChildren="true" asp-route-view="grouped">
                         @if (!string.IsNullOrWhiteSpace(box.CoverPhoto))
                         {
                             <img class="box-cover rotatable" style="@PhotoStorage.RotationStyle(Model.RotationFor(box.CoverPhoto))" src="@Model.ThumbUrl(box.CoverPhoto)" alt="@box.Name" loading="lazy" decoding="async" />
