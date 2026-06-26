@@ -185,6 +185,21 @@ export interface InventoryItemDetail {
   photos: InventoryPhoto[];
 }
 
+export interface InventoryItemUpdate {
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  minQuantity: number | null;
+  condition: string;
+  retention: string;
+  consumable: boolean;
+  sentimental: boolean;
+  obsolete: boolean;
+  notes: string;
+  boxId: number | null;
+}
+
 export interface InventoryItemBox {
   id: number;
   code: string;
@@ -199,10 +214,12 @@ export interface InventoryBoxDetail {
   id: number;
   code: string;
   name: string;
+  containerType: string;
   containerTypeLabel: string;
   status: string;
   description: string | null;
   path: string;
+  locationId: number;
   locationName: string | null;
   locationSourceLabel: string | null;
   parent: InventoryBoxLink | null;
@@ -212,6 +229,16 @@ export interface InventoryBoxDetail {
   photos: InventoryPhoto[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InventoryBoxUpdate {
+  code: string;
+  name: string;
+  containerType: string;
+  description: string;
+  locationId: number;
+  parentBoxId: number | null;
+  status: string;
 }
 
 export interface InventoryBoxLink {
@@ -307,12 +334,28 @@ export class InventoryApiService {
     return this.http.get<InventoryItemDetail>(`/api/items/${id}`);
   }
 
+  updateItem(id: number, input: InventoryItemUpdate): Observable<InventoryItemDetail> {
+    return this.http.put<InventoryItemDetail>(`/api/items/${id}`, input);
+  }
+
   fetchBox(code: string): Observable<InventoryBoxDetail> {
     return this.http.get<InventoryBoxDetail>(`/api/boxes/${encodeURIComponent(code)}`);
+  }
+
+  updateBox(id: number, input: InventoryBoxUpdate): Observable<InventoryBoxDetail> {
+    return this.http.put<InventoryBoxDetail>(`/api/boxes/${id}`, input);
   }
 
   fetchPhotoInbox(status: PhotoInboxStatus): Observable<PhotoInboxResponse> {
     const params = new HttpParams().set('status', status);
     return this.http.get<PhotoInboxResponse>('/api/photos/inbox', { params });
+  }
+
+  discardInboxPhoto(id: number): Observable<PhotoInboxItem> {
+    return this.http.post<PhotoInboxItem>(`/api/photos/inbox/${id}/discard`, {});
+  }
+
+  restoreInboxPhoto(id: number): Observable<PhotoInboxItem> {
+    return this.http.post<PhotoInboxItem>(`/api/photos/inbox/${id}/pending`, {});
   }
 }

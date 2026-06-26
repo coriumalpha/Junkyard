@@ -67,7 +67,8 @@
 .hero-card,
 .info-card,
 .items-panel,
-.state-panel {
+.state-panel,
+.edit-card {
   border: 1px solid var(--app-border);
   border-radius: 18px;
   background: var(--app-surface-raised);
@@ -105,6 +106,51 @@
   align-content: start;
   gap: 14px;
   padding: 18px;
+}
+
+.edit-card {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 12px 14px;
+}
+
+.edit-grid .wide,
+.toggle-row.wide {
+  grid-column: 1 / -1;
+}
+
+.toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  min-height: 48px;
+}
+
+.form-actions,
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.form-actions {
+  justify-content: flex-end;
+}
+
+.inline-error {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 182, 108, 0.14);
+  color: #ffd39f;
 }
 
 .info-card h2 {
@@ -207,6 +253,10 @@
   color: #ffd39f;
 }
 
+.state-panel.success mat-icon {
+  color: #c8f8d2;
+}
+
 .empty {
   padding: 16px;
   color: var(--app-muted);
@@ -223,5 +273,9 @@
 
   .item-row small {
     grid-column: 2;
+  }
+
+  .edit-grid {
+    grid-template-columns: 1fr;
   }
 }

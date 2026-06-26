@@ -1,4 +1,5 @@
 using Inventario.Data;
+using Inventario.Models;
 using Inventario.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
@@ -152,6 +153,20 @@ app.MapGet("/api/items/{id:int}", async (
     var response = await queryService.GetItemDetailAsync(id, cancellationToken);
     return response is null ? Results.NotFound() : Results.Json(response);
 });
+app.MapPut("/api/items/{id:int}", async (
+    int id,
+    InventoryItemUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (item, error) = await queryService.UpdateItemAsync(id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return item is null ? Results.NotFound() : Results.Json(item);
+});
 app.MapGet("/api/boxes/{code}", async (
     string code,
     InventoryLiveQueryService queryService,
@@ -160,6 +175,20 @@ app.MapGet("/api/boxes/{code}", async (
     var response = await queryService.GetBoxDetailAsync(code, cancellationToken);
     return response is null ? Results.NotFound() : Results.Json(response);
 });
+app.MapPut("/api/boxes/{id:int}", async (
+    int id,
+    InventoryBoxUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (box, error) = await queryService.UpdateBoxAsync(id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return box is null ? Results.NotFound() : Results.Json(box);
+});
 app.MapGet("/api/photos/inbox", async (
     HttpContext httpContext,
     InventoryLiveQueryService queryService,
@@ -167,6 +196,32 @@ app.MapGet("/api/photos/inbox", async (
 {
     var response = await queryService.GetPhotoInboxAsync(httpContext.Request.Query["status"].ToString(), cancellationToken);
     return Results.Json(response);
+});
+app.MapPost("/api/photos/inbox/{id:int}/discard", async (
+    int id,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (photo, error) = await queryService.UpdatePhotoInboxStatusAsync(id, PhotoInboxStatus.Discarded, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return photo is null ? Results.NotFound() : Results.Json(photo);
+});
+app.MapPost("/api/photos/inbox/{id:int}/pending", async (
+    int id,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (photo, error) = await queryService.UpdatePhotoInboxStatusAsync(id, PhotoInboxStatus.Pending, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return photo is null ? Results.NotFound() : Results.Json(photo);
 });
 app.MapGet("/api/dashboard", async (
     InventoryLiveQueryService queryService,

@@ -44,7 +44,10 @@ export class PhotoInboxPageComponent {
   protected readonly data = signal<PhotoInboxResponse | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+  protected readonly actionMessage = signal<string | null>(null);
+  protected readonly busyPhotoId = signal<number | null>(null);
   protected readonly statusOptions = STATUS_OPTIONS;
+  private readonly currentStatus = signal<PhotoInboxStatus>('Pending');
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -55,7 +58,8 @@ export class PhotoInboxPageComponent {
     this.route.queryParamMap.pipe(
       map((params) => this.parseStatus(params.get('status'))),
       distinctUntilChanged(),
-      tap(() => {
+      tap((status) => {
+        this.currentStatus.set(status);
         this.loading.set(true);
         this.error.set(null);
       }),
@@ -120,7 +124,57 @@ export class PhotoInboxPageComponent {
     return `status status-${photo.status.toLowerCase()}`;
   }
 
+  protected discard(photo: PhotoInboxItem): void {
+    if (this.busyPhotoId()) {
+      return;
+    }
+
+    this.busyPhotoId.set(photo.id);
+    this.actionMessage.set(null);
+    this.api.discardInboxPhoto(photo.id).pipe(
+      tap(() => {
+        this.actionMessage.set('Foto descartada.');
+        this.reload();
+      }),
+      catchError((error: unknown) => {
+        this.error.set(error instanceof Error ? error.message : 'No se pudo descartar la foto.');
+        return EMPTY;
+      }),
+      finalize(() => this.busyPhotoId.set(null)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected restore(photo: PhotoInboxItem): void {
+    if (this.busyPhotoId()) {
+      return;
+    }
+
+    this.busyPhotoId.set(photo.id);
+    this.actionMessage.set(null);
+    this.api.restoreInboxPhoto(photo.id).pipe(
+      tap(() => {
+        this.actionMessage.set('Foto devuelta a pendientes.');
+        this.reload();
+      }),
+      catchError((error: unknown) => {
+        this.error.set(error instanceof Error ? error.message : 'No se pudo restaurar la foto.');
+        return EMPTY;
+      }),
+      finalize(() => this.busyPhotoId.set(null)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
   private parseStatus(value: string | null): PhotoInboxStatus {
     return value === 'Assigned' || value === 'Discarded' || value === 'All' ? value : 'Pending';
+  }
+
+  private reload(): void {
+    this.api.fetchPhotoInbox(this.currentStatus()).pipe(
+      tap((response) => this.data.set(response)),
+      catchError(() => EMPTY),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
   }
 }

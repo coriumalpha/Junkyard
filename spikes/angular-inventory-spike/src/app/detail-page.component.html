@@ -16,15 +16,23 @@
         Inventario
       </a>
       @if (kind() === 'item' && item()) {
-        <a mat-flat-button [href]="itemLegacyUrl()" target="_blank" rel="noreferrer">
+        <button mat-flat-button type="button" (click)="startItemEdit()">
           <mat-icon>edit</mat-icon>
-          Editar legacy
+          Editar
+        </button>
+        <a mat-stroked-button [href]="itemLegacyUrl()" target="_blank" rel="noreferrer">
+          <mat-icon>open_in_new</mat-icon>
+          Legacy
         </a>
       }
       @if (kind() === 'box' && box()) {
-        <a mat-flat-button [href]="boxLegacyUrl()" target="_blank" rel="noreferrer">
+        <button mat-flat-button type="button" (click)="startBoxEdit()">
+          <mat-icon>edit</mat-icon>
+          Editar
+        </button>
+        <a mat-stroked-button [href]="boxLegacyUrl()" target="_blank" rel="noreferrer">
           <mat-icon>open_in_new</mat-icon>
-          Abrir legacy
+          Legacy
         </a>
       }
     </nav>
@@ -41,6 +49,13 @@
       <span>{{ error() }}</span>
     </section>
   } @else if (item()) {
+    @if (saveMessage()) {
+      <section class="state-panel success">
+        <mat-icon>check_circle</mat-icon>
+        <span>{{ saveMessage() }}</span>
+      </section>
+    }
+
     <section class="detail-grid">
       <mat-card class="hero-card">
         @if (item()!.photos.length) {
@@ -72,6 +87,94 @@
         }
       </mat-card>
 
+      @if (editingItem()) {
+        <mat-card class="edit-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Edición Angular</p>
+              <h2>Ficha editable</h2>
+            </div>
+            <button mat-icon-button type="button" (click)="cancelItemEdit()" aria-label="Cerrar edición">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          @if (formError()) {
+            <div class="inline-error">{{ formError() }}</div>
+          }
+
+          <div class="edit-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre</mat-label>
+              <input matInput [ngModel]="itemForm().name" (ngModelChange)="patchItemForm({ name: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Categoría</mat-label>
+              <mat-select [ngModel]="itemForm().category" (ngModelChange)="patchItemForm({ category: $event })">
+                @for (category of options().categories; track category) {
+                  <mat-option [value]="category">{{ category }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Contenedor</mat-label>
+              <mat-select [ngModel]="itemForm().boxId" (ngModelChange)="patchItemForm({ boxId: $event })">
+                <mat-option [value]="null">Sin caja</mat-option>
+                @for (boxOption of options().boxes; track boxOption.id) {
+                  <mat-option [value]="boxOption.id">{{ boxOption.code }} · {{ boxOption.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Cantidad</mat-label>
+              <input matInput type="number" [ngModel]="itemForm().quantity" (ngModelChange)="patchItemForm({ quantity: +$event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Unidad</mat-label>
+              <input matInput [ngModel]="itemForm().unit" (ngModelChange)="patchItemForm({ unit: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Mínimo</mat-label>
+              <input matInput type="number" [ngModel]="itemForm().minQuantity" (ngModelChange)="patchItemForm({ minQuantity: $event === '' ? null : +$event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Estado</mat-label>
+              <input matInput [ngModel]="itemForm().condition" (ngModelChange)="patchItemForm({ condition: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Retención</mat-label>
+              <input matInput [ngModel]="itemForm().retention" (ngModelChange)="patchItemForm({ retention: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="wide">
+              <mat-label>Notas</mat-label>
+              <textarea matInput rows="4" [ngModel]="itemForm().notes" (ngModelChange)="patchItemForm({ notes: $event })"></textarea>
+            </mat-form-field>
+
+            <div class="toggle-row wide">
+              <mat-slide-toggle [checked]="itemForm().consumable" (change)="patchItemForm({ consumable: $event.checked })">Consumible</mat-slide-toggle>
+              <mat-slide-toggle [checked]="itemForm().sentimental" (change)="patchItemForm({ sentimental: $event.checked })">Sentimental</mat-slide-toggle>
+              <mat-slide-toggle [checked]="itemForm().obsolete" (change)="patchItemForm({ obsolete: $event.checked })">Obsoleto</mat-slide-toggle>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button type="button" (click)="cancelItemEdit()">Cancelar</button>
+            <button mat-flat-button type="button" (click)="saveItem()" [disabled]="saving()">
+              <mat-icon>save</mat-icon>
+              {{ saving() ? 'Guardando...' : 'Guardar' }}
+            </button>
+          </div>
+        </mat-card>
+      }
+
       <mat-card class="info-card">
         <p class="eyebrow">Ubicación</p>
         @if (item()!.box) {
@@ -95,6 +198,13 @@
       }
     </section>
   } @else if (box()) {
+    @if (saveMessage()) {
+      <section class="state-panel success">
+        <mat-icon>check_circle</mat-icon>
+        <span>{{ saveMessage() }}</span>
+      </section>
+    }
+
     <section class="detail-grid">
       <mat-card class="hero-card">
         @if (box()!.photos.length) {
@@ -103,6 +213,88 @@
           <div class="hero-placeholder">{{ box()!.code }}</div>
         }
       </mat-card>
+
+      @if (editingBox()) {
+        <mat-card class="edit-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Edición Angular</p>
+              <h2>Contenedor editable</h2>
+            </div>
+            <button mat-icon-button type="button" (click)="cancelBoxEdit()" aria-label="Cerrar edición">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          @if (formError()) {
+            <div class="inline-error">{{ formError() }}</div>
+          }
+
+          <div class="edit-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>CT público</mat-label>
+              <input matInput [ngModel]="boxForm().code" (ngModelChange)="patchBoxForm({ code: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre</mat-label>
+              <input matInput [ngModel]="boxForm().name" (ngModelChange)="patchBoxForm({ name: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Tipo</mat-label>
+              <mat-select [ngModel]="boxForm().containerType" (ngModelChange)="patchBoxForm({ containerType: $event })">
+                @for (type of containerTypes; track type.value) {
+                  <mat-option [value]="type.value">{{ type.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Ubicación raíz</mat-label>
+              <mat-select [ngModel]="boxForm().locationId" (ngModelChange)="patchBoxForm({ locationId: $event })" [disabled]="boxForm().parentBoxId !== null">
+                @for (location of options().locations; track location.id) {
+                  <mat-option [value]="location.id">{{ location.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Dentro de</mat-label>
+              <mat-select [ngModel]="boxForm().parentBoxId" (ngModelChange)="patchBoxForm({ parentBoxId: $event })">
+                <mat-option [value]="null">Primer nivel</mat-option>
+                @for (boxOption of options().boxes; track boxOption.id) {
+                  @if (boxOption.id !== box()!.id) {
+                    <mat-option [value]="boxOption.id">{{ boxOption.code }} · {{ boxOption.name }}</mat-option>
+                  }
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Estado</mat-label>
+              <mat-select [ngModel]="boxForm().status" (ngModelChange)="patchBoxForm({ status: $event })">
+                @for (status of boxStatuses; track status) {
+                  <mat-option [value]="status">{{ status }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="wide">
+              <mat-label>Descripción</mat-label>
+              <textarea matInput rows="4" [ngModel]="boxForm().description" (ngModelChange)="patchBoxForm({ description: $event })"></textarea>
+            </mat-form-field>
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button type="button" (click)="cancelBoxEdit()">Cancelar</button>
+            <button mat-flat-button type="button" (click)="saveBox()" [disabled]="saving()">
+              <mat-icon>save</mat-icon>
+              {{ saving() ? 'Guardando...' : 'Guardar' }}
+            </button>
+          </div>
+        </mat-card>
+      }
 
       <mat-card class="info-card">
         <p class="eyebrow">Contenedor</p>

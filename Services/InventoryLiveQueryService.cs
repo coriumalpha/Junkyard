@@ -58,6 +58,52 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             ToPhotoDtos(photos, photoStates));
     }
 
+    public async Task<(InventoryItemDetailDto? Item, string? Error)> UpdateItemAsync(
+        int id,
+        InventoryItemUpdateDto input,
+        CancellationToken cancellationToken)
+    {
+        var item = await db.Items.FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        if (item is null)
+        {
+            return (null, null);
+        }
+
+        var name = (input.Name ?? "").Trim();
+        var category = (input.Category ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return (null, "El nombre es obligatorio.");
+        }
+
+        if (string.IsNullOrWhiteSpace(category))
+        {
+            return (null, "La categoría es obligatoria.");
+        }
+
+        if (input.BoxId is int boxId && boxId > 0 && !await db.Boxes.AnyAsync(box => box.Id == boxId, cancellationToken))
+        {
+            return (null, "El contenedor seleccionado no existe.");
+        }
+
+        item.BoxId = input.BoxId is > 0 ? input.BoxId : null;
+        item.Name = name;
+        item.Category = category;
+        item.Quantity = input.Quantity;
+        item.Unit = string.IsNullOrWhiteSpace(input.Unit) ? null : input.Unit.Trim();
+        item.MinQuantity = input.MinQuantity;
+        item.Condition = string.IsNullOrWhiteSpace(input.Condition) ? null : input.Condition.Trim();
+        item.Retention = string.IsNullOrWhiteSpace(input.Retention) ? null : input.Retention.Trim();
+        item.Consumable = input.Consumable;
+        item.Sentimental = input.Sentimental;
+        item.Obsolete = input.Obsolete;
+        item.Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim();
+        item.UpdatedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetItemDetailAsync(id, cancellationToken), null);
+    }
+
     public async Task<InventoryBoxDetailDto?> GetBoxDetailAsync(string code, CancellationToken cancellationToken)
     {
         var normalizedCode = Box.NormalizePublicCode(code);
@@ -105,10 +151,12 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             box.Id,
             box.Code,
             box.Name,
+            box.ContainerType,
             box.ContainerTypeLabel,
             box.Status.ToString(),
             box.Description,
             BuildBoxPath(box),
+            box.LocationId,
             box.LocationDisplay,
             box.EffectiveLocationSourceLabel,
             box.ParentBox is null ? null : new InventoryBoxLinkDto(box.ParentBox.Id, box.ParentBox.Code, box.ParentBox.Name),
@@ -122,6 +170,76 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             ToPhotoDtos(photos, photoStates),
             box.CreatedAt,
             box.UpdatedAt);
+    }
+
+    public async Task<(InventoryBoxDetailDto? Box, string? Error)> UpdateBoxAsync(
+        int id,
+        InventoryBoxUpdateDto input,
+        CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes.FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
+        if (box is null)
+        {
+            return (null, null);
+        }
+
+        var normalizedCode = Box.NormalizePublicCode(input.Code);
+        var name = (input.Name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            return (null, "El CT es obligatorio.");
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return (null, "El nombre es obligatorio.");
+        }
+
+        if (await BoxCodeService.IsDuplicateAsync(db, normalizedCode, id, cancellationToken))
+        {
+            return (null, "Ese CT ya existe.");
+        }
+
+        var parentBoxId = input.ParentBoxId is > 0 ? input.ParentBoxId : null;
+        var parentValidation = await BoxHierarchyService.ValidateParentAssignmentAsync(db, id, parentBoxId, cancellationToken);
+        if (!parentValidation.IsValid)
+        {
+            return (null, parentValidation.ErrorMessage);
+        }
+
+        var locationId = input.LocationId;
+        if (parentBoxId is int parentId)
+        {
+            var location = await BoxHierarchyService.ResolveLocationAsync(db, parentId, cancellationToken);
+            if (location?.LocationId is int inheritedLocationId)
+            {
+                locationId = inheritedLocationId;
+            }
+        }
+        else if (locationId <= 0 || !await db.Locations.AnyAsync(location => location.Id == locationId, cancellationToken))
+        {
+            return (null, "La ubicación es obligatoria para contenedores raíz.");
+        }
+
+        box.Code = normalizedCode;
+        box.Name = name;
+        box.ContainerType = Box.NormalizeContainerType(input.ContainerType);
+        box.Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim();
+        box.LocationId = locationId;
+        box.ParentBoxId = parentBoxId;
+        box.Status = Enum.TryParse<BoxStatus>(input.Status, true, out var status) ? status : BoxStatus.Active;
+        box.UpdatedAt = DateTime.UtcNow;
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return (null, "Ese CT ya existe.");
+        }
+
+        return (await GetBoxDetailAsync(box.Code, cancellationToken), null);
     }
 
     public async Task<PhotoInboxResponseDto> GetPhotoInboxAsync(string? status, CancellationToken cancellationToken)
@@ -166,6 +284,40 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
                 photo.Notes,
                 $"/Photos/Review?id={photo.Id}"))
                 .ToList());
+    }
+
+    public async Task<(PhotoInboxItemDto? Photo, string? Error)> UpdatePhotoInboxStatusAsync(
+        int id,
+        PhotoInboxStatus status,
+        CancellationToken cancellationToken)
+    {
+        var photo = await db.PhotoInboxes.Include(p => p.SourceBox).FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (photo is null)
+        {
+            return (null, null);
+        }
+
+        if (photo.Status == PhotoInboxStatus.Assigned && status == PhotoInboxStatus.Pending)
+        {
+            return (null, "Una foto ya asignada debe gestionarse desde revisión legacy.");
+        }
+
+        photo.Status = status;
+        photo.ProcessedAt = status == PhotoInboxStatus.Pending ? null : DateTime.UtcNow;
+        photo.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return (new PhotoInboxItemDto(
+            photo.Id,
+            PhotoStorage.ThumbUrl(photo.Filename, photo.UpdatedAt),
+            photo.RotationDegrees,
+            photo.OriginalFilename,
+            photo.Status.ToString(),
+            photo.ImportedAt,
+            photo.ProcessedAt,
+            photo.SourceBox is null ? null : new InventoryBoxLinkDto(photo.SourceBox.Id, photo.SourceBox.Code, photo.SourceBox.Name),
+            photo.Notes,
+            $"/Photos/Review?id={photo.Id}"), null);
     }
 
     public async Task<DashboardDto> GetDashboardAsync(CancellationToken cancellationToken)
@@ -675,6 +827,20 @@ public record InventoryItemDetailDto(
     string LegacyUrl,
     List<InventoryPhotoDto> Photos);
 
+public record InventoryItemUpdateDto(
+    string? Name,
+    string? Category,
+    decimal Quantity,
+    string? Unit,
+    decimal? MinQuantity,
+    string? Condition,
+    string? Retention,
+    bool Consumable,
+    bool Sentimental,
+    bool Obsolete,
+    string? Notes,
+    int? BoxId);
+
 public record InventoryItemBoxDto(
     int Id,
     string Code,
@@ -688,10 +854,12 @@ public record InventoryBoxDetailDto(
     int Id,
     string Code,
     string Name,
+    string ContainerType,
     string ContainerTypeLabel,
     string Status,
     string? Description,
     string Path,
+    int LocationId,
     string? LocationName,
     string? LocationSourceLabel,
     InventoryBoxLinkDto? Parent,
@@ -701,6 +869,15 @@ public record InventoryBoxDetailDto(
     List<InventoryPhotoDto> Photos,
     DateTime CreatedAt,
     DateTime UpdatedAt);
+
+public record InventoryBoxUpdateDto(
+    string? Code,
+    string? Name,
+    string? ContainerType,
+    string? Description,
+    int LocationId,
+    int? ParentBoxId,
+    string? Status);
 
 public record InventoryBoxLinkDto(
     int Id,

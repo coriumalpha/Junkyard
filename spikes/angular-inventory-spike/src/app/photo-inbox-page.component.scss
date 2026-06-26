@@ -180,6 +180,10 @@
   color: #ffd39f;
 }
 
+.state-panel.success mat-icon {
+  color: #c8f8d2;
+}
+
 @media (max-width: 720px) {
   .photo-inbox-shell {
     width: min(100% - 20px, 1540px);
