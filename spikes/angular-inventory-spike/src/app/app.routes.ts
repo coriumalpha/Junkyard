@@ -4,7 +4,11 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    redirectTo: 'inventory'
+    redirectTo: 'dashboard'
+  },
+  {
+    path: 'dashboard',
+    loadComponent: () => import('./dashboard-page.component').then((m) => m.DashboardPageComponent)
   },
   {
     path: 'inventory',

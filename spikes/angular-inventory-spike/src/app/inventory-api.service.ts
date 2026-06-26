@@ -115,6 +115,53 @@ export interface InventoryItem {
   obsolete: boolean;
 }
 
+export interface DashboardResponse {
+  locationCount: number;
+  boxCount: number;
+  itemCount: number;
+  lowStockCount: number;
+  orphanCount: number;
+  photoInboxPendingCount: number;
+  recentBoxes: DashboardBox[];
+  lowStockItems: DashboardItem[];
+  recentPhotos: DashboardPhoto[];
+}
+
+export interface DashboardBox {
+  id: number;
+  code: string;
+  name: string;
+  url: string;
+  containerTypeLabel: string;
+  status: string;
+  locationName: string | null;
+  itemCount: number;
+  coverUrl: string | null;
+  rotationDegrees: number;
+}
+
+export interface DashboardItem {
+  id: number;
+  name: string;
+  url: string;
+  boxCode: string | null;
+  category: string;
+  quantity: number;
+  minQuantity: number | null;
+  unit: string;
+  coverUrl: string | null;
+  rotationDegrees: number;
+}
+
+export interface DashboardPhoto {
+  id: number;
+  url: string;
+  rotationDegrees: number;
+  caption: string | null;
+  entityType: string;
+  entityId: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class InventoryApiService {
   private readonly http = inject(HttpClient);
@@ -161,5 +208,9 @@ export class InventoryApiService {
 
   fetchOptions(): Observable<InventoryOptionsResponse> {
     return this.http.get<InventoryOptionsResponse>('/api/inventory/options');
+  }
+
+  fetchDashboard(): Observable<DashboardResponse> {
+    return this.http.get<DashboardResponse>('/api/dashboard');
   }
 }

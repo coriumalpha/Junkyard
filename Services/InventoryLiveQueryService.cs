@@ -6,6 +6,83 @@ namespace Inventario.Services;
 
 public sealed class InventoryLiveQueryService(InventoryDbContext db)
 {
+    public async Task<DashboardDto> GetDashboardAsync(CancellationToken cancellationToken)
+    {
+        var locationCount = await db.Locations.CountAsync(cancellationToken);
+        var boxCount = await db.Boxes.CountAsync(cancellationToken);
+        var itemCount = await db.Items.CountAsync(cancellationToken);
+        var orphanCount = await db.Items.CountAsync(item => item.BoxId == null, cancellationToken);
+        var photoInboxPendingCount = await db.PhotoInboxes.CountAsync(photo => photo.Status == PhotoInboxStatus.Pending, cancellationToken);
+
+        var lowStockItems = await db.Items
+            .AsNoTracking()
+            .Include(item => item.Box)
+            .Where(item => item.Consumable && item.MinQuantity != null && item.Quantity <= item.MinQuantity)
+            .OrderBy(item => item.Name)
+            .Take(8)
+            .ToListAsync(cancellationToken);
+
+        var recentBoxes = await db.Boxes
+            .AsNoTracking()
+            .Include(box => box.Location)
+            .Include(box => box.Items)
+            .OrderByDescending(box => box.UpdatedAt)
+            .Take(6)
+            .ToListAsync(cancellationToken);
+
+        var recentPhotos = await db.Photos
+            .AsNoTracking()
+            .OrderByDescending(photo => photo.CreatedAt)
+            .Take(8)
+            .ToListAsync(cancellationToken);
+
+        var filenames = recentBoxes.Select(box => box.CoverPhoto)
+            .Concat(lowStockItems.Select(item => item.CoverPhoto))
+            .Concat(recentPhotos.Select(photo => photo.Filename))
+            .Where(filename => !string.IsNullOrWhiteSpace(filename))
+            .Select(filename => filename!)
+            .Distinct()
+            .ToList();
+        var photoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
+
+        return new DashboardDto(
+            locationCount,
+            boxCount,
+            itemCount,
+            lowStockItems.Count,
+            orphanCount,
+            photoInboxPendingCount,
+            recentBoxes.Select(box => new DashboardBoxDto(
+                box.Id,
+                box.Code,
+                box.Name,
+                $"/Boxes/Details?code={Uri.EscapeDataString(box.Code)}",
+                box.ContainerTypeLabel,
+                box.Status.ToString(),
+                box.Location?.Name,
+                box.Items.Count,
+                ThumbUrl(photoStates, box.CoverPhoto),
+                RotationFor(photoStates, box.CoverPhoto))).ToList(),
+            lowStockItems.Select(item => new DashboardItemDto(
+                item.Id,
+                item.Name,
+                $"/Items/Edit?id={item.Id}",
+                item.Box?.Code,
+                item.Category,
+                item.Quantity,
+                item.MinQuantity,
+                item.Unit ?? "",
+                ThumbUrl(photoStates, item.CoverPhoto),
+                RotationFor(photoStates, item.CoverPhoto))).ToList(),
+            recentPhotos.Select(photo => new DashboardPhotoDto(
+                photo.Id,
+                PhotoStorage.ThumbUrl(photo.Filename, photoStates.GetValueOrDefault(photo.Filename)?.UpdatedAt ?? photo.UpdatedAt),
+                photoStates.TryGetValue(photo.Filename, out var state) ? state.RotationDegrees : photo.RotationDegrees,
+                photo.Caption,
+                photo.EntityType.ToString(),
+                photo.EntityId)).ToList());
+    }
+
     public async Task<InventoryOptionsDto> GetOptionsAsync(CancellationToken cancellationToken)
     {
         var categories = await db.Items.AsNoTracking()
@@ -380,6 +457,49 @@ public record InventoryLiveResponseDto(
     int GroupsCount,
     List<InventoryGroupDto> Groups,
     List<InventoryItemDto> Items);
+
+public record DashboardDto(
+    int LocationCount,
+    int BoxCount,
+    int ItemCount,
+    int LowStockCount,
+    int OrphanCount,
+    int PhotoInboxPendingCount,
+    List<DashboardBoxDto> RecentBoxes,
+    List<DashboardItemDto> LowStockItems,
+    List<DashboardPhotoDto> RecentPhotos);
+
+public record DashboardBoxDto(
+    int Id,
+    string Code,
+    string Name,
+    string Url,
+    string ContainerTypeLabel,
+    string Status,
+    string? LocationName,
+    int ItemCount,
+    string? CoverUrl,
+    int RotationDegrees);
+
+public record DashboardItemDto(
+    int Id,
+    string Name,
+    string Url,
+    string? BoxCode,
+    string Category,
+    decimal Quantity,
+    decimal? MinQuantity,
+    string Unit,
+    string? CoverUrl,
+    int RotationDegrees);
+
+public record DashboardPhotoDto(
+    int Id,
+    string Url,
+    int RotationDegrees,
+    string? Caption,
+    string EntityType,
+    int EntityId);
 
 public record InventoryOptionsDto(
     List<string> Categories,

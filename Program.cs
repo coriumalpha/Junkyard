@@ -144,6 +144,13 @@ app.MapGet("/api/inventory/options", async (
     var response = await queryService.GetOptionsAsync(cancellationToken);
     return Results.Json(response);
 });
+app.MapGet("/api/dashboard", async (
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetDashboardAsync(cancellationToken);
+    return Results.Json(response);
+});
 app.MapRazorPages();
 
 app.Run();
