@@ -10,6 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
 
 import { DashboardResponse, InventoryApiService } from './inventory-api.service';
+import { legacyUrl } from './legacy-url';
 
 @Component({
   selector: 'app-dashboard-page',
@@ -30,7 +31,6 @@ export class DashboardPageComponent {
   protected readonly data = signal<DashboardResponse | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
-  protected readonly backendOrigin = `${globalThis.location?.protocol ?? 'http:'}//${globalThis.location?.hostname ?? '127.0.0.1'}:8089`;
 
   private readonly api = inject(InventoryApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -48,7 +48,7 @@ export class DashboardPageComponent {
   }
 
   protected backendUrl(path: string): string {
-    return `${this.backendOrigin}${path.startsWith('/') ? '' : '/'}${path}`;
+    return legacyUrl(path);
   }
 
   protected assetUrl(path: string | null | undefined): string | null {

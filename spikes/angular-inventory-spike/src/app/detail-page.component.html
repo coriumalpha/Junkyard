@@ -1,0 +1,171 @@
+<main class="detail-shell">
+  <header class="detail-header">
+    <div>
+      <p class="eyebrow">Inventario / Angular SPA</p>
+      <h1>{{ title() }}</h1>
+      <p>{{ subtitle() }}</p>
+    </div>
+
+    <nav class="detail-actions" aria-label="Acciones de detalle">
+      <a mat-stroked-button routerLink="/dashboard">
+        <mat-icon>dashboard</mat-icon>
+        Dashboard
+      </a>
+      <a mat-stroked-button routerLink="/inventory">
+        <mat-icon>inventory_2</mat-icon>
+        Inventario
+      </a>
+      @if (kind() === 'item' && item()) {
+        <a mat-flat-button [href]="itemLegacyUrl()" target="_blank" rel="noreferrer">
+          <mat-icon>edit</mat-icon>
+          Editar legacy
+        </a>
+      }
+      @if (kind() === 'box' && box()) {
+        <a mat-flat-button [href]="boxLegacyUrl()" target="_blank" rel="noreferrer">
+          <mat-icon>open_in_new</mat-icon>
+          Abrir legacy
+        </a>
+      }
+    </nav>
+  </header>
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="48" />
+      <span>Cargando detalle...</span>
+    </section>
+  } @else if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  } @else if (item()) {
+    <section class="detail-grid">
+      <mat-card class="hero-card">
+        @if (item()!.photos.length) {
+          <img [src]="assetUrl(item()!.photos[0].url)!" [style.transform]="'rotate(' + item()!.photos[0].rotationDegrees + 'deg)'" [alt]="item()!.name" />
+        } @else {
+          <div class="hero-placeholder">{{ firstLetter(item()!.name) }}</div>
+        }
+      </mat-card>
+
+      <mat-card class="info-card">
+        <p class="eyebrow">Ítem</p>
+        <h2>{{ item()!.name }}</h2>
+        <div class="meta-grid">
+          <span>Categoría</span><strong>{{ item()!.category }}</strong>
+          <span>Cantidad</span><strong>{{ item()!.quantityLabel }}</strong>
+          <span>Mínimo</span><strong>{{ item()!.minQuantity ?? 'Sin mínimo' }}</strong>
+          <span>Estado</span><strong>{{ item()!.condition || 'Sin estado' }}</strong>
+          <span>Retención</span><strong>{{ item()!.retention || 'Sin retención' }}</strong>
+          <span>Actualizado</span><strong>{{ item()!.updatedAt | date:'short' }}</strong>
+        </div>
+        <mat-chip-set>
+          @for (flag of itemFlags(item()!); track flag) {
+            <mat-chip>{{ flag }}</mat-chip>
+          }
+        </mat-chip-set>
+        @if (item()!.notes) {
+          <mat-divider />
+          <p class="notes">{{ item()!.notes }}</p>
+        }
+      </mat-card>
+
+      <mat-card class="info-card">
+        <p class="eyebrow">Ubicación</p>
+        @if (item()!.box) {
+          <h2>{{ item()!.box!.code }} · {{ item()!.box!.name }}</h2>
+          <p>{{ item()!.box!.path }}</p>
+          <p>{{ item()!.box!.locationName || 'Sin ubicación' }} @if (item()!.box!.locationSourceLabel) { · {{ item()!.box!.locationSourceLabel }} }</p>
+          <a mat-stroked-button [routerLink]="['/boxes', item()!.box!.code]">
+            <mat-icon>inventory_2</mat-icon>
+            Ver contenedor
+          </a>
+        } @else {
+          <h2>Sin caja</h2>
+          <p>Ítem pendiente de clasificar.</p>
+        }
+      </mat-card>
+    </section>
+
+    <section class="photo-section">
+      @for (photo of item()!.photos; track photoTrack($index, photo)) {
+        <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || item()!.name" />
+      }
+    </section>
+  } @else if (box()) {
+    <section class="detail-grid">
+      <mat-card class="hero-card">
+        @if (box()!.photos.length) {
+          <img [src]="assetUrl(box()!.photos[0].url)!" [style.transform]="'rotate(' + box()!.photos[0].rotationDegrees + 'deg)'" [alt]="box()!.name" />
+        } @else {
+          <div class="hero-placeholder">{{ box()!.code }}</div>
+        }
+      </mat-card>
+
+      <mat-card class="info-card">
+        <p class="eyebrow">Contenedor</p>
+        <h2>{{ box()!.code }} · {{ box()!.name }}</h2>
+        <div class="meta-grid">
+          <span>Tipo</span><strong>{{ box()!.containerTypeLabel }}</strong>
+          <span>Estado</span><strong>{{ box()!.status }}</strong>
+          <span>Ítems</span><strong>{{ box()!.items.length }}</strong>
+          <span>Hijos</span><strong>{{ box()!.children.length }}</strong>
+          <span>Ubicación</span><strong>{{ box()!.locationName || 'Sin ubicación' }}</strong>
+          <span>Actualizado</span><strong>{{ box()!.updatedAt | date:'short' }}</strong>
+        </div>
+        @if (box()!.description) {
+          <mat-divider />
+          <p class="notes">{{ box()!.description }}</p>
+        }
+      </mat-card>
+
+      <mat-card class="info-card">
+        <p class="eyebrow">Jerarquía</p>
+        <h2>{{ box()!.path }}</h2>
+        @if (box()!.parent) {
+          <a mat-stroked-button [routerLink]="['/boxes', box()!.parent!.code]">
+            <mat-icon>arrow_upward</mat-icon>
+            {{ box()!.parent!.code }}
+          </a>
+        }
+        <mat-chip-set>
+          @for (child of box()!.children; track child.id) {
+            <mat-chip>
+              <a [routerLink]="['/boxes', child.code]">{{ child.code }} · {{ child.name }}</a>
+            </mat-chip>
+          }
+        </mat-chip-set>
+      </mat-card>
+    </section>
+
+    <section class="items-panel">
+      <div class="section-head">
+        <p class="eyebrow">Ítems directos</p>
+        <strong>{{ box()!.items.length }}</strong>
+      </div>
+      <div class="item-list">
+        @for (item of box()!.items; track item.id) {
+          <a class="item-row" [routerLink]="['/item', item.id]">
+            @if (item.coverUrl) {
+              <img [src]="assetUrl(item.coverUrl)!" [style.transform]="'rotate(' + item.rotationDegrees + 'deg)'" [alt]="item.name" />
+            } @else {
+              <span>{{ firstLetter(item.name) }}</span>
+            }
+            <strong>{{ item.name }}</strong>
+            <small>{{ item.category }} · {{ item.quantityLabel }}</small>
+          </a>
+        } @empty {
+          <div class="empty">Sin ítems directos.</div>
+        }
+      </div>
+    </section>
+
+    <section class="photo-section">
+      @for (photo of box()!.photos; track photoTrack($index, photo)) {
+        <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || box()!.name" />
+      }
+    </section>
+  }
+</main>

@@ -15,6 +15,14 @@ export const routes: Routes = [
     loadComponent: () => import('./inventory-page.component').then((m) => m.InventoryPageComponent)
   },
   {
+    path: 'item/:id',
+    loadComponent: () => import('./detail-page.component').then((m) => m.DetailPageComponent)
+  },
+  {
+    path: 'boxes/:code',
+    loadComponent: () => import('./detail-page.component').then((m) => m.DetailPageComponent)
+  },
+  {
     path: '**',
     redirectTo: 'inventory'
   }

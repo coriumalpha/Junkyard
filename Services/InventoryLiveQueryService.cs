@@ -6,6 +6,124 @@ namespace Inventario.Services;
 
 public sealed class InventoryLiveQueryService(InventoryDbContext db)
 {
+    public async Task<InventoryItemDetailDto?> GetItemDetailAsync(int id, CancellationToken cancellationToken)
+    {
+        var item = await db.Items.AsNoTracking()
+            .Include(i => i.Box)!.ThenInclude(b => b!.Location)
+            .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
+            .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            return null;
+        }
+
+        var locationLookup = await BoxHierarchyService.BuildLocationLookupAsync(db, cancellationToken);
+        var photos = await EntityPhotosAsync(PhotoEntityType.Item, item.Id, cancellationToken);
+        var photoStates = await PhotoStorage.LoadViewStatesAsync(db, photos.Select(photo => photo.Filename).ToList(), cancellationToken);
+        var locationName = item.Box is not null && locationLookup.TryGetValue(item.Box.Id, out var location)
+            ? location.LocationName
+            : item.Box?.Location?.Name;
+        var locationSourceLabel = item.Box is not null && locationLookup.TryGetValue(item.Box.Id, out var locationDetail)
+            ? locationDetail.SourceLabel
+            : null;
+
+        return new InventoryItemDetailDto(
+            item.Id,
+            item.Name,
+            item.Category,
+            $"{item.Quantity} {item.Unit}",
+            item.Quantity,
+            item.Unit ?? "",
+            item.MinQuantity,
+            item.Condition,
+            item.Retention,
+            item.Notes,
+            item.Consumable,
+            item.MinQuantity != null && item.Quantity <= item.MinQuantity,
+            item.Sentimental,
+            item.Obsolete,
+            item.ArchivedAt is not null,
+            item.CreatedAt,
+            item.UpdatedAt,
+            item.Box is null ? null : new InventoryItemBoxDto(
+                item.Box.Id,
+                item.Box.Code,
+                item.Box.Name,
+                BuildBoxPath(item.Box),
+                locationName,
+                locationSourceLabel,
+                item.Box.ContainerTypeLabel),
+            $"/Items/Edit?id={item.Id}",
+            ToPhotoDtos(photos, photoStates));
+    }
+
+    public async Task<InventoryBoxDetailDto?> GetBoxDetailAsync(string code, CancellationToken cancellationToken)
+    {
+        var normalizedCode = Box.NormalizePublicCode(code);
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            return null;
+        }
+
+        var box = await db.Boxes.AsNoTracking()
+            .Include(b => b.Location)
+            .Include(b => b.ParentBox)
+            .Include(b => b.ChildBoxes)
+            .Include(b => b.Items)
+            .FirstOrDefaultAsync(b => b.Code == normalizedCode, cancellationToken);
+
+        if (box is null)
+        {
+            return null;
+        }
+
+        var locationLookup = await BoxHierarchyService.BuildLocationLookupAsync(db, cancellationToken);
+        if (locationLookup.TryGetValue(box.Id, out var location))
+        {
+            box.EffectiveLocationName = location.LocationName;
+            box.EffectiveLocationSourceLabel = location.SourceLabel;
+        }
+
+        var itemIds = box.Items.Select(item => item.Id).ToList();
+        var itemPhotoCounts = itemIds.Count == 0
+            ? new Dictionary<int, int>()
+            : await db.Photos.AsNoTracking()
+                .Where(photo => photo.EntityType == PhotoEntityType.Item && itemIds.Contains(photo.EntityId))
+                .GroupBy(photo => photo.EntityId)
+                .Select(group => new { ItemId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(entry => entry.ItemId, entry => entry.Count, cancellationToken);
+
+        var photos = await EntityPhotosAsync(PhotoEntityType.Box, box.Id, cancellationToken);
+        var filenames = photos.Select(photo => photo.Filename)
+            .Concat(box.Items.Select(item => item.CoverPhoto).Where(filename => !string.IsNullOrWhiteSpace(filename)).Select(filename => filename!))
+            .Distinct()
+            .ToList();
+        var photoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
+
+        return new InventoryBoxDetailDto(
+            box.Id,
+            box.Code,
+            box.Name,
+            box.ContainerTypeLabel,
+            box.Status.ToString(),
+            box.Description,
+            BuildBoxPath(box),
+            box.LocationDisplay,
+            box.EffectiveLocationSourceLabel,
+            box.ParentBox is null ? null : new InventoryBoxLinkDto(box.ParentBox.Id, box.ParentBox.Code, box.ParentBox.Name),
+            box.ChildBoxes.OrderBy(child => child.Code)
+                .Select(child => new InventoryBoxLinkDto(child.Id, child.Code, child.Name))
+                .ToList(),
+            box.Items.OrderBy(item => item.Category).ThenBy(item => item.Name)
+                .Select(item => ToItemDto(item, locationLookup, itemPhotoCounts, photoStates))
+                .ToList(),
+            $"/Boxes/Details?code={Uri.EscapeDataString(box.Code)}",
+            ToPhotoDtos(photos, photoStates),
+            box.CreatedAt,
+            box.UpdatedAt);
+    }
+
     public async Task<DashboardDto> GetDashboardAsync(CancellationToken cancellationToken)
     {
         var locationCount = await db.Locations.CountAsync(cancellationToken);
@@ -396,6 +514,28 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             item.Obsolete);
     }
 
+    private async Task<List<Photo>> EntityPhotosAsync(PhotoEntityType entityType, int entityId, CancellationToken cancellationToken)
+    {
+        return await db.Photos.AsNoTracking()
+            .Where(photo => photo.EntityType == entityType && photo.EntityId == entityId && photo.Status == PhotoStatus.Active)
+            .OrderByDescending(photo => photo.CreatedAt)
+            .Take(24)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static List<InventoryPhotoDto> ToPhotoDtos(
+        IReadOnlyList<Photo> photos,
+        IReadOnlyDictionary<string, PhotoViewState> photoStates)
+    {
+        return photos.Select(photo => new InventoryPhotoDto(
+                photo.Id,
+                PhotoStorage.ThumbUrl(photo.Filename, photoStates.GetValueOrDefault(photo.Filename)?.UpdatedAt ?? photo.UpdatedAt),
+                photoStates.TryGetValue(photo.Filename, out var state) ? state.RotationDegrees : photo.RotationDegrees,
+                photo.Caption,
+                photo.CreatedAt))
+            .ToList();
+    }
+
     private static string? ThumbUrl(IReadOnlyDictionary<string, PhotoViewState> photoStates, string? filename)
     {
         if (string.IsNullOrWhiteSpace(filename))
@@ -468,6 +608,67 @@ public record DashboardDto(
     List<DashboardBoxDto> RecentBoxes,
     List<DashboardItemDto> LowStockItems,
     List<DashboardPhotoDto> RecentPhotos);
+
+public record InventoryItemDetailDto(
+    int Id,
+    string Name,
+    string Category,
+    string QuantityLabel,
+    decimal Quantity,
+    string Unit,
+    decimal? MinQuantity,
+    string? Condition,
+    string? Retention,
+    string? Notes,
+    bool Consumable,
+    bool LowStock,
+    bool Sentimental,
+    bool Obsolete,
+    bool Archived,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    InventoryItemBoxDto? Box,
+    string LegacyUrl,
+    List<InventoryPhotoDto> Photos);
+
+public record InventoryItemBoxDto(
+    int Id,
+    string Code,
+    string Name,
+    string Path,
+    string? LocationName,
+    string? LocationSourceLabel,
+    string ContainerTypeLabel);
+
+public record InventoryBoxDetailDto(
+    int Id,
+    string Code,
+    string Name,
+    string ContainerTypeLabel,
+    string Status,
+    string? Description,
+    string Path,
+    string? LocationName,
+    string? LocationSourceLabel,
+    InventoryBoxLinkDto? Parent,
+    List<InventoryBoxLinkDto> Children,
+    List<InventoryItemDto> Items,
+    string LegacyUrl,
+    List<InventoryPhotoDto> Photos,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+public record InventoryBoxLinkDto(
+    int Id,
+    string Code,
+    string Name);
+
+public record InventoryPhotoDto(
+    int Id,
+    string Url,
+    int RotationDegrees,
+    string? Caption,
+    DateTime CreatedAt);
 
 public record DashboardBoxDto(
     int Id,

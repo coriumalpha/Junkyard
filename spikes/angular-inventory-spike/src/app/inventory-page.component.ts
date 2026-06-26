@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, ParamMap, Router } from '@angular/router';
+import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { catchError, distinctUntilChanged, EMPTY, finalize, map, switchMap, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -21,6 +21,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 
 import { InventoryApiService, InventoryBoxOption, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
+import { legacyUrl } from './legacy-url';
 
 interface FocusVisual {
   kind: 'group' | 'item' | 'summary';
@@ -108,13 +109,13 @@ const LAYOUT_TO_VIEW: Record<InventoryLayoutMode, InventoryViewMode> = {
     MatSelectModule,
     MatSlideToggleModule,
     MatSidenavModule,
-    MatToolbarModule
+    MatToolbarModule,
+    RouterLink
   ],
   templateUrl: './inventory-page.component.html',
   styleUrl: './inventory-page.component.scss'
 })
 export class InventoryPageComponent {
-  protected readonly backendOrigin = `${globalThis.location?.protocol ?? 'http:'}//${globalThis.location?.hostname ?? '127.0.0.1'}:8089`;
   protected readonly state = signal<InventoryQueryState>({ ...DEFAULT_STATE });
   protected readonly data = signal<InventoryLiveResponse | null>(null);
   protected readonly options = signal<InventoryOptionsResponse>({ categories: [], locations: [], boxes: [] });
@@ -257,15 +258,7 @@ export class InventoryPageComponent {
   }
 
   protected backendUrl(path: string | null | undefined): string {
-    if (!path) {
-      return this.backendOrigin;
-    }
-
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
-    }
-
-    return `${this.backendOrigin}${path.startsWith('/') ? '' : '/'}${path}`;
+    return legacyUrl(path);
   }
 
   protected assetUrl(path: string | null | undefined): string | null {

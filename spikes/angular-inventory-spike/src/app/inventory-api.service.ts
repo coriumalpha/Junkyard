@@ -162,6 +162,72 @@ export interface DashboardPhoto {
   entityId: number;
 }
 
+export interface InventoryItemDetail {
+  id: number;
+  name: string;
+  category: string;
+  quantityLabel: string;
+  quantity: number;
+  unit: string;
+  minQuantity: number | null;
+  condition: string | null;
+  retention: string | null;
+  notes: string | null;
+  consumable: boolean;
+  lowStock: boolean;
+  sentimental: boolean;
+  obsolete: boolean;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  box: InventoryItemBox | null;
+  legacyUrl: string;
+  photos: InventoryPhoto[];
+}
+
+export interface InventoryItemBox {
+  id: number;
+  code: string;
+  name: string;
+  path: string;
+  locationName: string | null;
+  locationSourceLabel: string | null;
+  containerTypeLabel: string;
+}
+
+export interface InventoryBoxDetail {
+  id: number;
+  code: string;
+  name: string;
+  containerTypeLabel: string;
+  status: string;
+  description: string | null;
+  path: string;
+  locationName: string | null;
+  locationSourceLabel: string | null;
+  parent: InventoryBoxLink | null;
+  children: InventoryBoxLink[];
+  items: InventoryItem[];
+  legacyUrl: string;
+  photos: InventoryPhoto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventoryBoxLink {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface InventoryPhoto {
+  id: number;
+  url: string;
+  rotationDegrees: number;
+  caption: string | null;
+  createdAt: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class InventoryApiService {
   private readonly http = inject(HttpClient);
@@ -212,5 +278,13 @@ export class InventoryApiService {
 
   fetchDashboard(): Observable<DashboardResponse> {
     return this.http.get<DashboardResponse>('/api/dashboard');
+  }
+
+  fetchItem(id: number): Observable<InventoryItemDetail> {
+    return this.http.get<InventoryItemDetail>(`/api/items/${id}`);
+  }
+
+  fetchBox(code: string): Observable<InventoryBoxDetail> {
+    return this.http.get<InventoryBoxDetail>(`/api/boxes/${encodeURIComponent(code)}`);
   }
 }

@@ -53,7 +53,7 @@
 
         <div class="box-grid">
           @for (box of data()!.recentBoxes; track box.id) {
-            <a class="box-card" [href]="backendUrl(box.url)" target="_blank" rel="noreferrer">
+            <a class="box-card" [routerLink]="['/boxes', box.code]">
               @if (box.coverUrl) {
                 <img [src]="assetUrl(box.coverUrl)!" [style.transform]="'rotate(' + box.rotationDegrees + 'deg)'" [alt]="box.name" />
               } @else {
@@ -86,7 +86,7 @@
 
           <div class="list">
             @for (item of data()!.lowStockItems; track item.id) {
-              <a class="list-row" [href]="backendUrl(item.url)" target="_blank" rel="noreferrer">
+              <a class="list-row" [routerLink]="['/item', item.id]">
                 @if (item.coverUrl) {
                   <img [src]="assetUrl(item.coverUrl)!" [style.transform]="'rotate(' + item.rotationDegrees + 'deg)'" [alt]="item.name" />
                 } @else {

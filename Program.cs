@@ -144,6 +144,22 @@ app.MapGet("/api/inventory/options", async (
     var response = await queryService.GetOptionsAsync(cancellationToken);
     return Results.Json(response);
 });
+app.MapGet("/api/items/{id:int}", async (
+    int id,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetItemDetailAsync(id, cancellationToken);
+    return response is null ? Results.NotFound() : Results.Json(response);
+});
+app.MapGet("/api/boxes/{code}", async (
+    string code,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetBoxDetailAsync(code, cancellationToken);
+    return response is null ? Results.NotFound() : Results.Json(response);
+});
 app.MapGet("/api/dashboard", async (
     InventoryLiveQueryService queryService,
     CancellationToken cancellationToken) =>

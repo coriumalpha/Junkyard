@@ -485,9 +485,9 @@
                             }
                           </div>
 
-                          <a mat-button [href]="backendUrl(item.url)" target="_blank" rel="noreferrer">
-                            <mat-icon>edit</mat-icon>
-                            Editar
+                          <a mat-button [routerLink]="['/item', item.id]">
+                            <mat-icon>visibility</mat-icon>
+                            Ver
                           </a>
                         </article>
                       } @empty {
@@ -514,8 +514,8 @@
                     }
 
                     <div class="panel-actions">
-                      <a mat-stroked-button [href]="backendUrl(group.url)" target="_blank" rel="noreferrer">
-                        <mat-icon>open_in_new</mat-icon>
+                      <a mat-stroked-button [routerLink]="['/boxes', group.code]">
+                        <mat-icon>inventory_2</mat-icon>
                         Abrir contenedor
                       </a>
                     </div>
@@ -570,9 +570,9 @@
                   </div>
 
                   <mat-card-actions align="end">
-                    <a mat-button [href]="backendUrl(item.url)" target="_blank" rel="noreferrer">
-                      <mat-icon>edit</mat-icon>
-                      Editar ítem
+                    <a mat-button [routerLink]="['/item', item.id]">
+                      <mat-icon>visibility</mat-icon>
+                      Ver ítem
                     </a>
                   </mat-card-actions>
                 </mat-card>
@@ -664,9 +664,9 @@
                   </div>
 
                   <div class="table-actions">
-                    <a mat-button [href]="backendUrl(item.url)" target="_blank" rel="noreferrer">
-                      <mat-icon>edit</mat-icon>
-                      Editar
+                    <a mat-button [routerLink]="['/item', item.id]">
+                      <mat-icon>visibility</mat-icon>
+                      Ver
                     </a>
                   </div>
                 </article>
