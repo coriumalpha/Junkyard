@@ -228,6 +228,29 @@ export interface InventoryPhoto {
   createdAt: string;
 }
 
+export type PhotoInboxStatus = 'Pending' | 'Assigned' | 'Discarded' | 'All';
+
+export interface PhotoInboxResponse {
+  currentStatus: PhotoInboxStatus;
+  pendingCount: number;
+  assignedCount: number;
+  discardedCount: number;
+  photos: PhotoInboxItem[];
+}
+
+export interface PhotoInboxItem {
+  id: number;
+  url: string;
+  rotationDegrees: number;
+  originalFilename: string;
+  status: Exclude<PhotoInboxStatus, 'All'>;
+  importedAt: string;
+  processedAt: string | null;
+  sourceBox: InventoryBoxLink | null;
+  notes: string | null;
+  legacyReviewUrl: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class InventoryApiService {
   private readonly http = inject(HttpClient);
@@ -286,5 +309,10 @@ export class InventoryApiService {
 
   fetchBox(code: string): Observable<InventoryBoxDetail> {
     return this.http.get<InventoryBoxDetail>(`/api/boxes/${encodeURIComponent(code)}`);
+  }
+
+  fetchPhotoInbox(status: PhotoInboxStatus): Observable<PhotoInboxResponse> {
+    const params = new HttpParams().set('status', status);
+    return this.http.get<PhotoInboxResponse>('/api/photos/inbox', { params });
   }
 }

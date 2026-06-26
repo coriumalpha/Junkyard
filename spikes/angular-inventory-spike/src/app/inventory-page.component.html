@@ -53,11 +53,11 @@
           <span matListItemLine>Contenedores, ítems y galería</span>
         }
       </a>
-      <a mat-list-item href="#photos" (click)="closeDrawer()">
+      <a mat-list-item routerLink="/photos/inbox" (click)="closeDrawer()">
         <mat-icon matListItemIcon>photo_library</mat-icon>
         <span matListItemTitle>Fotos</span>
         @if (!drawerCollapsed() || handset()) {
-          <span matListItemLine>Miniaturas y covers útiles</span>
+          <span matListItemLine>Bandeja SPA</span>
         }
       </a>
       <a mat-list-item [href]="currentScopeBackendUrl()" target="_blank" rel="noreferrer">

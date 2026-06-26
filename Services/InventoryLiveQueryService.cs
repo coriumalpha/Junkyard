@@ -124,6 +124,50 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             box.UpdatedAt);
     }
 
+    public async Task<PhotoInboxResponseDto> GetPhotoInboxAsync(string? status, CancellationToken cancellationToken)
+    {
+        var currentStatus = string.IsNullOrWhiteSpace(status) ? "Pending" : status.Trim();
+        var pendingCount = await db.PhotoInboxes.CountAsync(photo => photo.Status == PhotoInboxStatus.Pending, cancellationToken);
+        var assignedCount = await db.PhotoInboxes.CountAsync(photo => photo.Status == PhotoInboxStatus.Assigned, cancellationToken);
+        var discardedCount = await db.PhotoInboxes.CountAsync(photo => photo.Status == PhotoInboxStatus.Discarded, cancellationToken);
+
+        var query = db.PhotoInboxes.AsNoTracking()
+            .Include(photo => photo.SourceBox)
+            .AsQueryable();
+
+        if (Enum.TryParse<PhotoInboxStatus>(currentStatus, true, out var parsedStatus))
+        {
+            query = query.Where(photo => photo.Status == parsedStatus);
+        }
+        else
+        {
+            currentStatus = "All";
+        }
+
+        var photos = await query
+            .OrderByDescending(photo => photo.ImportedAt)
+            .Take(300)
+            .ToListAsync(cancellationToken);
+
+        return new PhotoInboxResponseDto(
+            currentStatus,
+            pendingCount,
+            assignedCount,
+            discardedCount,
+            photos.Select(photo => new PhotoInboxItemDto(
+                photo.Id,
+                PhotoStorage.ThumbUrl(photo.Filename, photo.UpdatedAt),
+                photo.RotationDegrees,
+                photo.OriginalFilename,
+                photo.Status.ToString(),
+                photo.ImportedAt,
+                photo.ProcessedAt,
+                photo.SourceBox is null ? null : new InventoryBoxLinkDto(photo.SourceBox.Id, photo.SourceBox.Code, photo.SourceBox.Name),
+                photo.Notes,
+                $"/Photos/Review?id={photo.Id}"))
+                .ToList());
+    }
+
     public async Task<DashboardDto> GetDashboardAsync(CancellationToken cancellationToken)
     {
         var locationCount = await db.Locations.CountAsync(cancellationToken);
@@ -669,6 +713,25 @@ public record InventoryPhotoDto(
     int RotationDegrees,
     string? Caption,
     DateTime CreatedAt);
+
+public record PhotoInboxResponseDto(
+    string CurrentStatus,
+    int PendingCount,
+    int AssignedCount,
+    int DiscardedCount,
+    List<PhotoInboxItemDto> Photos);
+
+public record PhotoInboxItemDto(
+    int Id,
+    string Url,
+    int RotationDegrees,
+    string OriginalFilename,
+    string Status,
+    DateTime ImportedAt,
+    DateTime? ProcessedAt,
+    InventoryBoxLinkDto? SourceBox,
+    string? Notes,
+    string LegacyReviewUrl);
 
 public record DashboardBoxDto(
     int Id,

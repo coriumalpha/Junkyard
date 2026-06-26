@@ -160,6 +160,14 @@ app.MapGet("/api/boxes/{code}", async (
     var response = await queryService.GetBoxDetailAsync(code, cancellationToken);
     return response is null ? Results.NotFound() : Results.Json(response);
 });
+app.MapGet("/api/photos/inbox", async (
+    HttpContext httpContext,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetPhotoInboxAsync(httpContext.Request.Query["status"].ToString(), cancellationToken);
+    return Results.Json(response);
+});
 app.MapGet("/api/dashboard", async (
     InventoryLiveQueryService queryService,
     CancellationToken cancellationToken) =>

@@ -23,6 +23,10 @@ export const routes: Routes = [
     loadComponent: () => import('./detail-page.component').then((m) => m.DetailPageComponent)
   },
   {
+    path: 'photos/inbox',
+    loadComponent: () => import('./photo-inbox-page.component').then((m) => m.PhotoInboxPageComponent)
+  },
+  {
     path: '**',
     redirectTo: 'inventory'
   }
