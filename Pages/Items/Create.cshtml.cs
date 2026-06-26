@@ -54,7 +54,7 @@ public class CreateModel(InventoryDbContext db) : PageModel
             var boxCode = await db.Boxes.Where(b => b.Id == boxId).Select(b => b.Code).FirstAsync(cancellationToken);
             return RedirectToPage("/Boxes/Details", new { code = boxCode });
         }
-        return RedirectToPage("/Items/Index");
+        return RedirectToPage("/Items/Orphans");
     }
 
     private async Task LoadBoxes(CancellationToken cancellationToken)

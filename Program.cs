@@ -137,6 +137,13 @@ app.MapGet("/api/inventory/live", async (
 
     return Results.Json(response);
 });
+app.MapGet("/api/inventory/options", async (
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetOptionsAsync(cancellationToken);
+    return Results.Json(response);
+});
 app.MapRazorPages();
 
 app.Run();

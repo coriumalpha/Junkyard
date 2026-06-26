@@ -216,6 +216,60 @@
         </mat-expansion-panel-header>
 
         <div class="advanced-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Categoría</mat-label>
+            <mat-select [value]="state().category" (selectionChange)="setCategory($event.value)">
+              <mat-option value="">Todas</mat-option>
+              @for (category of options().categories; track category) {
+                <mat-option [value]="category">{{ category }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Ubicación efectiva</mat-label>
+            <mat-select [value]="state().locationId" (selectionChange)="setLocationId($event.value)">
+              <mat-option [value]="null">Todas</mat-option>
+              @for (location of options().locations; track location.id) {
+                <mat-option [value]="location.id">{{ location.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="wide-control">
+            <mat-label>Contenedores múltiples</mat-label>
+            <mat-select [value]="state().boxIds" (selectionChange)="setBoxIds($event.value)" multiple>
+              @for (box of options().boxes; track box.id) {
+                <mat-option [value]="box.id">
+                  <span>{{ boxOptionLabel(box) }}</span>
+                  <small>{{ boxOptionHint(box) }}</small>
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          @if (selectedBoxOptions().length) {
+            <div class="selected-boxes wide-control">
+              <div class="selected-boxes-head">
+                <span>{{ selectedBoxOptions().length }} contenedores en alcance</span>
+                <button mat-button type="button" (click)="clearBoxIds()">
+                  <mat-icon>close</mat-icon>
+                  Limpiar
+                </button>
+              </div>
+              <mat-chip-set>
+                @for (box of selectedBoxOptions(); track box.id) {
+                  <mat-chip (removed)="removeBoxId(box.id)">
+                    {{ box.code }} · {{ box.name }}
+                    <button matChipRemove type="button" [attr.aria-label]="'Quitar ' + box.code">
+                      <mat-icon>cancel</mat-icon>
+                    </button>
+                  </mat-chip>
+                }
+              </mat-chip-set>
+            </div>
+          }
+
           <mat-slide-toggle [checked]="state().includeChildren" (change)="setIncludeChildren($event.checked)">
             Incluir hijos
           </mat-slide-toggle>

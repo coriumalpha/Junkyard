@@ -22,9 +22,16 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
     [BindProperty]
     public string? Caption { get; set; }
 
+    [BindProperty]
+    public string? CommentText { get; set; }
+
+    [BindProperty]
+    public string? ArchiveComment { get; set; }
+
     public List<SelectListItem> Boxes { get; private set; } = [];
     public SearchPickerModel BoxPicker { get; private set; } = new();
     public List<InventoryAction> LinkedActions { get; private set; } = [];
+    public List<InventoryAction> Comments { get; private set; } = [];
     public List<Photo> Gallery { get; private set; } = [];
     public Dictionary<string, PhotoViewState> PhotoStates { get; private set; } = [];
     public string[] Categories => CsvInventoryService.Categories;
@@ -110,11 +117,60 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
             return NotFound();
         }
 
+        var archiveComment = string.IsNullOrWhiteSpace(ArchiveComment) ? null : ArchiveComment.Trim();
+        if (archiveComment is not null)
+        {
+            db.InventoryActions.Add(new InventoryAction
+            {
+                Title = "Motivo de archivado",
+                Description = archiveComment,
+                Kind = InventoryActionKind.ArchiveReason,
+                Status = InventoryActionStatus.Archived,
+                LinkedEntityType = InventoryActionLinkedEntityType.Item,
+                LinkedEntityId = item.Id
+            });
+        }
+
         var boxCode = item.Box?.Code;
         item.ArchivedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         TempData["UndoItemId"] = item.Id;
-        return RedirectToPage("/Boxes/Details", new { code = boxCode });
+        if (!string.IsNullOrWhiteSpace(boxCode))
+        {
+            return RedirectToPage("/Boxes/Details", new { code = boxCode });
+        }
+
+        return RedirectToPage("/Archive");
+    }
+
+    public async Task<IActionResult> OnPostAddCommentAsync(int id, string? mode, CancellationToken cancellationToken)
+    {
+        var item = await db.Items.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        var comment = CommentText?.Trim();
+        if (string.IsNullOrWhiteSpace(comment))
+        {
+            TempData["InventoryCommentMessage"] = "Escribe un comentario antes de guardar.";
+            return RedirectToPage(new { id, mode });
+        }
+
+        db.InventoryActions.Add(new InventoryAction
+        {
+            Title = "Comentario",
+            Description = comment,
+            Kind = InventoryActionKind.Comment,
+            Status = InventoryActionStatus.Archived,
+            LinkedEntityType = InventoryActionLinkedEntityType.Item,
+            LinkedEntityId = item.Id
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        TempData["InventoryCommentMessage"] = "Comentario guardado.";
+        return RedirectToPage(new { id, mode });
     }
 
     public async Task<IActionResult> OnPostArchivePhotoAsync(int id, int photoId, CancellationToken cancellationToken)
@@ -157,6 +213,7 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
         var action = await db.InventoryActions.FirstOrDefaultAsync(a =>
             a.Id == actionId &&
             a.LinkedEntityType == InventoryActionLinkedEntityType.Item &&
+            a.Kind == InventoryActionKind.Task &&
             a.LinkedEntityId == item.Id, cancellationToken);
         if (action is null)
         {
@@ -458,9 +515,13 @@ public class EditModel(InventoryDbContext db, PhotoStorage photos) : PageModel
             .ToListAsync(cancellationToken);
         PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, new[] { CoverPhotoFilename }, cancellationToken);
         LinkedActions = await db.InventoryActions.AsNoTracking()
-            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Item && action.LinkedEntityId == itemId && action.Status == InventoryActionStatus.Open)
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Item && action.LinkedEntityId == itemId && action.Kind == InventoryActionKind.Task && action.Status == InventoryActionStatus.Open)
             .OrderByDescending(action => action.Priority)
             .ThenByDescending(action => action.CreatedAt)
+            .ToListAsync(cancellationToken);
+        Comments = await db.InventoryActions.AsNoTracking()
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Item && action.LinkedEntityId == itemId && action.Kind != InventoryActionKind.Task)
+            .OrderByDescending(action => action.CreatedAt)
             .ToListAsync(cancellationToken);
     }
 

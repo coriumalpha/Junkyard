@@ -21,6 +21,7 @@ public static class SchemaUpgrader
         AddColumn(db, "Items", "ArchivedAt", "TEXT NULL");
         EnsureNullableItemBoxId(db);
         EnsureInventoryActions(db);
+        AddColumn(db, "InventoryActions", "Kind", "TEXT NOT NULL DEFAULT 'Task'");
         EnsurePhotoInbox(db);
         AddColumn(db, "PhotoInboxes", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");
         AddColumn(db, "PhotoInboxes", "UpdatedAt", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'");
@@ -68,6 +69,7 @@ public static class SchemaUpgrader
                 "Id" INTEGER NOT NULL CONSTRAINT "PK_InventoryActions" PRIMARY KEY AUTOINCREMENT,
                 "Title" TEXT NOT NULL,
                 "Description" TEXT NULL,
+                "Kind" TEXT NOT NULL DEFAULT 'Task',
                 "Status" TEXT NOT NULL,
                 "Priority" INTEGER NOT NULL DEFAULT 3,
                 "LinkedEntityType" TEXT NOT NULL DEFAULT 'None',
@@ -79,6 +81,7 @@ public static class SchemaUpgrader
             );
             """);
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_Status" ON "InventoryActions" ("Status");""");
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_Kind" ON "InventoryActions" ("Kind");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_LinkedEntityType_LinkedEntityId" ON "InventoryActions" ("LinkedEntityType", "LinkedEntityId");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_Priority_CreatedAt" ON "InventoryActions" ("Priority", "CreatedAt");""");
     }

@@ -51,9 +51,11 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.ToTable(tb => tb.HasCheckConstraint("CK_InventoryActions_Priority", "\"Priority\" BETWEEN 1 AND 5"));
             entity.Property(x => x.Title).HasMaxLength(180).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(24);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
             entity.Property(x => x.LinkedEntityType).HasConversion<string>().HasMaxLength(16);
             entity.Property(x => x.Priority).IsRequired();
+            entity.HasIndex(x => x.Kind);
             entity.HasIndex(x => x.Status);
             entity.HasIndex(x => new { x.LinkedEntityType, x.LinkedEntityId });
             entity.HasIndex(x => new { x.Priority, x.CreatedAt });

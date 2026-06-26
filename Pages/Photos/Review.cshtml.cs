@@ -111,15 +111,27 @@ public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageMode
     public async Task<IActionResult> OnPostCreateItemAsync(CancellationToken cancellationToken)
     {
         var ids = SelectedIds();
-        if (!ModelState.IsValid || Input.BoxId is null)
+        if (!ModelState.IsValid)
         {
             await LoadAsync(Input.CurrentId, cancellationToken);
             return Page();
         }
 
+        var boxId = Input.BoxId is > 0 ? Input.BoxId : null;
+        if (boxId is not null)
+        {
+            var boxExists = await db.Boxes.AnyAsync(b => b.Id == boxId.Value, cancellationToken);
+            if (!boxExists)
+            {
+                ModelState.AddModelError(nameof(Input.BoxId), "Selecciona una caja válida o deja el campo vacío.");
+                await LoadAsync(Input.CurrentId, cancellationToken);
+                return Page();
+            }
+        }
+
         var item = new Item
         {
-            BoxId = Input.BoxId,
+            BoxId = boxId,
             Name = Input.Name.Trim(),
             Category = Input.Category,
             Quantity = Input.Quantity <= 0 ? 1 : Input.Quantity,
@@ -284,10 +296,14 @@ public class ReviewModel(InventoryDbContext db, PhotoStorage storage) : PageMode
             InputId = "Input_BoxId",
             Label = "Caja para B / objeto nuevo",
             Placeholder = "Buscar por CT, nombre, tipo, ubicación o padre...",
-            SelectedValue = Input.BoxId?.ToString(),
+            SelectedValue = Input.BoxId is > 0 ? Input.BoxId.ToString() : null,
             EmptyLabel = "Sin caja seleccionada",
-            EmptyHint = "Elige un contenedor antes de asociar o crear.",
+            EmptyHint = "Opcional: deja esto vacío para crear el objeto como huérfano.",
             ClearValue = "",
+            NoneOptionLabel = "Sin caja / huérfano",
+            NoneOptionHint = "Crea el objeto sin contenedor asignado por ahora.",
+            NoneOptionValue = "",
+            NoneOptionIcon = "—",
             SubmitOnEnter = true,
             SubmitButtonSelector = "[formaction*=\"AssignBox\"]",
             Options = await SearchPickerFactory.BuildBoxOptionsAsync(db, cancellationToken)

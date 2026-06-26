@@ -263,10 +263,63 @@
                     }
                 </section>
 
+                <section class="panel comments-panel">
+                    <div class="section-header compact">
+                        <div>
+                            <p class="eyebrow">Comentarios</p>
+                            <h2>Notas sobre el ítem</h2>
+                            <p class="section-kicker">Contexto operativo, observaciones o detalles que no son tareas.</p>
+                        </div>
+                    </div>
+                    @if (TempData["InventoryCommentMessage"] is string inventoryCommentMessage)
+                    {
+                        <div class="notice toast stack-top">@inventoryCommentMessage</div>
+                    }
+                    <form class="form-grid stack-top" method="post" asp-page-handler="AddComment" asp-route-id="@Model.Input.Id">
+                        <div class="field full">
+                            <label asp-for="CommentText">Nuevo comentario</label>
+                            <textarea asp-for="CommentText" rows="4" placeholder="Contexto, hallazgos, recordatorios..."></textarea>
+                        </div>
+                        <div class="actions full">
+                            <button class="btn primary" type="submit">Guardar comentario</button>
+                        </div>
+                    </form>
+                    @if (Model.Comments.Count == 0)
+                    {
+                        <div class="empty stack-top">
+                            <strong>No hay comentarios aún.</strong>
+                            <span>Sirven para dejar contexto sin abrir una tarea nueva.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="inventory-comments-list stack-top">
+                            @foreach (var comment in Model.Comments)
+                            {
+                                <article class="panel inventory-comment-card">
+                                    <div class="section-header compact">
+                                        <div>
+                                            <div class="chips">
+                                                <span class="chip">@comment.KindLabel</span>
+                                                <span class="chip">@comment.CreatedAt.ToString("dd MMM yyyy HH:mm")</span>
+                                            </div>
+                                            <p class="caption">@comment.Title</p>
+                                            @if (!string.IsNullOrWhiteSpace(comment.Description))
+                                            {
+                                                <p class="item-description-text">@comment.Description</p>
+                                            }
+                                        </div>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    }
+                </section>
+
                 <section class="panel danger-zone">
                     <h2>Zona peligrosa</h2>
                     <p class="muted">Archiva el ítem. No se elimina físicamente y podrás restaurarlo desde Archivo.</p>
-                    <button class="btn danger" type="submit" formaction="?handler=Delete&id=@Model.Input.Id">Archivar ítem</button>
+                    <button class="btn danger" type="button" data-open-archive-item-dialog>Archivar ítem</button>
                 </section>
             </section>
         </main>
@@ -349,7 +402,7 @@
             <section class="panel danger-zone">
                 <h2>Zona peligrosa</h2>
                 <p class="muted">Archiva el ítem. No se elimina físicamente y podrás restaurarlo desde Archivo.</p>
-                <button class="btn danger" type="submit" formaction="?handler=Delete&id=@Model.Input.Id">Archivar ítem</button>
+                <button class="btn danger" type="button" data-open-archive-item-dialog>Archivar ítem</button>
             </section>
         </form>
 
@@ -421,6 +474,59 @@
                                         <form method="post" asp-page-handler="CompleteAction" asp-route-id="@Model.Input.Id" asp-route-actionId="@action.Id">
                                             <button class="btn primary" type="submit">Completar</button>
                                         </form>
+                                    </div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+                </section>
+
+            <section class="panel comments-panel">
+                <div class="section-header compact">
+                    <div>
+                        <p class="eyebrow">Comentarios</p>
+                        <h2>Notas sobre el ítem</h2>
+                        <p class="section-kicker">Contexto operativo, observaciones o detalles que no son tareas.</p>
+                    </div>
+                </div>
+                @if (TempData["InventoryCommentMessage"] is string inventoryCommentMessage)
+                {
+                    <div class="notice toast stack-top">@inventoryCommentMessage</div>
+                }
+                <form class="form-grid stack-top" method="post" asp-page-handler="AddComment" asp-route-id="@Model.Input.Id" asp-route-mode="edit">
+                    <div class="field full">
+                        <label asp-for="CommentText">Nuevo comentario</label>
+                        <textarea asp-for="CommentText" rows="4" placeholder="Contexto, hallazgos, recordatorios..."></textarea>
+                    </div>
+                    <div class="actions full">
+                        <button class="btn primary" type="submit">Guardar comentario</button>
+                    </div>
+                </form>
+                @if (Model.Comments.Count == 0)
+                {
+                    <div class="empty stack-top">
+                        <strong>No hay comentarios aún.</strong>
+                        <span>Sirven para dejar contexto sin abrir una tarea nueva.</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="inventory-comments-list stack-top">
+                        @foreach (var comment in Model.Comments)
+                        {
+                            <article class="panel inventory-comment-card">
+                                <div class="section-header compact">
+                                    <div>
+                                        <div class="chips">
+                                            <span class="chip">@comment.KindLabel</span>
+                                            <span class="chip">@comment.CreatedAt.ToString("dd MMM yyyy HH:mm")</span>
+                                        </div>
+                                        <p class="caption">@comment.Title</p>
+                                        @if (!string.IsNullOrWhiteSpace(comment.Description))
+                                        {
+                                            <p class="item-description-text">@comment.Description</p>
+                                        }
                                     </div>
                                 </div>
                             </article>
@@ -504,6 +610,21 @@
     }
 </div>
 
+<dialog id="archiveItemDialog" class="modal-card">
+    <form class="form-grid" method="post" asp-page-handler="Delete" asp-route-id="@Model.Input.Id">
+        <h2>Archivar ítem</h2>
+        <p class="muted">El comentario es opcional, pero deja trazabilidad del motivo de archivado.</p>
+        <div class="field full">
+            <label asp-for="ArchiveComment">Motivo de archivado</label>
+            <textarea asp-for="ArchiveComment" rows="4" placeholder="Opcional: contexto, motivo o siguiente paso..."></textarea>
+        </div>
+        <div class="actions full">
+            <button class="btn danger" type="submit">Archivar</button>
+            <button class="btn" type="button" data-archive-cancel>Cancelar</button>
+        </div>
+    </form>
+</dialog>
+
 <dialog id="photoLightbox" class="lightbox-dialog">
     <button class="btn lightbox-close" type="button" data-lightbox-close>Esc · Cerrar</button>
     <figure>
@@ -514,6 +635,14 @@
 
 <script>
 (() => {
+  const archiveDialog = document.getElementById('archiveItemDialog');
+  document.querySelectorAll('[data-open-archive-item-dialog]').forEach(button => {
+    button.addEventListener('click', () => archiveDialog?.showModal());
+  });
+  document.querySelector('[data-archive-cancel]')?.addEventListener('click', () => archiveDialog?.close());
+  archiveDialog?.addEventListener('click', event => {
+    if (event.target === archiveDialog) archiveDialog.close();
+  });
   const dialog = document.getElementById('photoLightbox');
   const image = document.getElementById('photoLightboxImage');
   const caption = document.getElementById('photoLightboxCaption');

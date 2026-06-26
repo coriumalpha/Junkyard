@@ -391,10 +391,52 @@
 }
 
 .advanced-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 14px 18px;
   padding-top: 8px;
+  align-items: start;
+}
+
+.advanced-grid mat-slide-toggle {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+}
+
+.wide-control {
+  grid-column: 1 / -1;
+}
+
+.selected-boxes {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--app-border);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.selected-boxes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--app-muted);
+  font-size: 0.86rem;
+}
+
+::ng-deep .mat-mdc-option .mdc-list-item__primary-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+::ng-deep .mat-mdc-option small {
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scope-card {
@@ -1080,6 +1122,10 @@ mat-form-field {
   }
 
   .filters-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .advanced-grid {
     grid-template-columns: 1fr;
   }
 

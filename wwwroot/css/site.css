@@ -1354,6 +1354,14 @@ a.box-breadcrumb-node:hover {
 .inventory-action-card.completed {
   opacity: .78;
 }
+.inventory-comments-list {
+  display: grid;
+  gap: 10px;
+}
+.inventory-comment-card {
+  display: grid;
+  gap: 6px;
+}
 .inventory-actions-summary {
   list-style: none;
   display: flex;

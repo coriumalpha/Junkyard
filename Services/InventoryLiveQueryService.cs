@@ -6,6 +6,36 @@ namespace Inventario.Services;
 
 public sealed class InventoryLiveQueryService(InventoryDbContext db)
 {
+    public async Task<InventoryOptionsDto> GetOptionsAsync(CancellationToken cancellationToken)
+    {
+        var categories = await db.Items.AsNoTracking()
+            .Select(item => item.Category)
+            .Where(category => category != "")
+            .Distinct()
+            .OrderBy(category => category)
+            .ToListAsync(cancellationToken);
+
+        var locations = await db.Locations.AsNoTracking()
+            .OrderBy(location => location.Name)
+            .Select(location => new InventoryOptionDto(location.Id, location.Name))
+            .ToListAsync(cancellationToken);
+
+        var boxes = await db.Boxes.AsNoTracking()
+            .Include(box => box.Location)
+            .Include(box => box.ParentBox)
+            .OrderBy(box => box.Code)
+            .Select(box => new InventoryBoxOptionDto(
+                box.Id,
+                box.Code,
+                box.Name,
+                BuildBoxPath(box),
+                box.LocationDisplay,
+                box.ContainerTypeLabel))
+            .ToListAsync(cancellationToken);
+
+        return new InventoryOptionsDto(categories, locations, boxes);
+    }
+
     public async Task<InventoryLiveResponseDto> GetLiveAsync(
         string? q,
         string? category,
@@ -350,6 +380,23 @@ public record InventoryLiveResponseDto(
     int GroupsCount,
     List<InventoryGroupDto> Groups,
     List<InventoryItemDto> Items);
+
+public record InventoryOptionsDto(
+    List<string> Categories,
+    List<InventoryOptionDto> Locations,
+    List<InventoryBoxOptionDto> Boxes);
+
+public record InventoryOptionDto(
+    int Id,
+    string Name);
+
+public record InventoryBoxOptionDto(
+    int Id,
+    string Code,
+    string Name,
+    string Path,
+    string? LocationName,
+    string ContainerTypeLabel);
 
 public record InventorySelectedBoxDto(
     int Id,

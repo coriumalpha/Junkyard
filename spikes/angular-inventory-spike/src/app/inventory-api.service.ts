@@ -7,7 +7,10 @@ export type InventoryLayoutMode = 'grouped' | 'flat' | 'gallery' | 'table';
 
 export interface InventoryQueryState {
   q: string;
+  category: string;
   box: string;
+  boxIds: number[];
+  locationId: number | null;
   includeChildren: boolean;
   onlyConsumable: boolean;
   onlyOrphans: boolean;
@@ -33,6 +36,26 @@ export interface InventoryLiveResponse {
   groupsCount: number;
   groups: InventoryGroup[];
   items: InventoryItem[];
+}
+
+export interface InventoryOptionsResponse {
+  categories: string[];
+  locations: InventoryOption[];
+  boxes: InventoryBoxOption[];
+}
+
+export interface InventoryOption {
+  id: number;
+  name: string;
+}
+
+export interface InventoryBoxOption {
+  id: number;
+  code: string;
+  name: string;
+  path: string;
+  locationName: string | null;
+  containerTypeLabel: string;
 }
 
 export interface InventorySelectedBox {
@@ -103,8 +126,20 @@ export class InventoryApiService {
       params = params.set('q', state.q.trim());
     }
 
+    if (state.category.trim()) {
+      params = params.set('category', state.category.trim());
+    }
+
     if (state.box.trim()) {
       params = params.set('box', state.box.trim());
+    }
+
+    for (const boxId of state.boxIds) {
+      params = params.append('boxIds', String(boxId));
+    }
+
+    if (state.locationId !== null) {
+      params = params.set('locationId', String(state.locationId));
     }
 
     if (state.includeChildren) {
@@ -122,5 +157,9 @@ export class InventoryApiService {
     params = params.set('view', state.view);
 
     return this.http.get<InventoryLiveResponse>('/api/inventory/live', { params });
+  }
+
+  fetchOptions(): Observable<InventoryOptionsResponse> {
+    return this.http.get<InventoryOptionsResponse>('/api/inventory/options');
   }
 }
