@@ -11,6 +11,7 @@
 }
 
 .actions-header,
+.create-panel,
 .panel,
 .stat-card,
 .state-panel {
@@ -31,6 +32,7 @@
 }
 
 .actions-header h1,
+.create-panel h2,
 .panel h2 {
   margin: 0;
 }
@@ -56,6 +58,44 @@
   grid-template-columns: repeat(2, minmax(160px, 1fr));
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.create-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  margin-bottom: 14px;
+}
+
+.create-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.create-grid .wide {
+  grid-column: 1 / -2;
+}
+
+.priority-field {
+  width: 120px;
+}
+
+.link-mode {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.link-mode button {
+  border-radius: 999px;
+}
+
+.link-mode button.active {
+  color: #06120d;
+  background: var(--app-accent);
 }
 
 .stat-card {
@@ -176,8 +216,13 @@
 
 @media (max-width: 980px) {
   .actions-grid,
-  .stats-row {
+  .stats-row,
+  .create-grid {
     grid-template-columns: 1fr;
+  }
+
+  .create-grid .wide {
+    grid-column: auto;
   }
 
   .action-row {

@@ -194,6 +194,7 @@ export interface InventoryAction {
   id: number;
   title: string;
   description: string | null;
+  kind: string;
   priority: number;
   status: string;
   linkedLabel: string;
@@ -226,6 +227,8 @@ export interface InventoryItemDetail {
   box: InventoryItemBox | null;
   legacyUrl: string;
   photos: InventoryPhoto[];
+  actions: InventoryAction[];
+  comments: InventoryAction[];
 }
 
 export interface InventoryItemUpdate {
@@ -281,6 +284,18 @@ export interface InventoryBoxDetail {
   photos: InventoryPhoto[];
   createdAt: string;
   updatedAt: string;
+  actions: InventoryAction[];
+  comments: InventoryAction[];
+}
+
+export interface InventoryActionCreate {
+  title: string;
+  description: string;
+  priority: number;
+}
+
+export interface InventoryCommentCreate {
+  text: string;
 }
 
 export interface InventoryBoxUpdate {
@@ -460,12 +475,32 @@ export class InventoryApiService {
     return this.http.get<InventoryActionsResponse>('/api/actions');
   }
 
+  createAction(input: InventoryActionCreate): Observable<InventoryAction> {
+    return this.http.post<InventoryAction>('/api/actions', input);
+  }
+
   completeAction(id: number): Observable<InventoryAction> {
     return this.http.post<InventoryAction>(`/api/actions/${id}/complete`, {});
   }
 
   reopenAction(id: number): Observable<InventoryAction> {
     return this.http.post<InventoryAction>(`/api/actions/${id}/reopen`, {});
+  }
+
+  createItemAction(id: number, input: InventoryActionCreate): Observable<InventoryAction> {
+    return this.http.post<InventoryAction>(`/api/items/${id}/actions`, input);
+  }
+
+  createItemComment(id: number, input: InventoryCommentCreate): Observable<InventoryAction> {
+    return this.http.post<InventoryAction>(`/api/items/${id}/comments`, input);
+  }
+
+  createBoxAction(id: number, input: InventoryActionCreate): Observable<InventoryAction> {
+    return this.http.post<InventoryAction>(`/api/boxes/${id}/actions`, input);
+  }
+
+  createBoxComment(id: number, input: InventoryCommentCreate): Observable<InventoryAction> {
+    return this.http.post<InventoryAction>(`/api/boxes/${id}/comments`, input);
   }
 
   fetchItem(id: number): Observable<InventoryItemDetail> {

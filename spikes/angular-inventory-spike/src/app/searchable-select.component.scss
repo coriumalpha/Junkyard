@@ -1,0 +1,51 @@
+:host {
+  display: block;
+}
+
+.select-search-row {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--app-surface-raised) 92%, black);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.select-search-row mat-icon {
+  color: var(--app-muted);
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.select-search-row input {
+  width: 100%;
+  min-width: 180px;
+  border: 0;
+  outline: 0;
+  color: var(--app-text);
+  background: transparent;
+  font: inherit;
+}
+
+.select-search-row input::placeholder,
+small {
+  color: var(--app-muted);
+}
+
+.option-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+small {
+  display: block;
+  margin-top: -2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.72rem;
+}

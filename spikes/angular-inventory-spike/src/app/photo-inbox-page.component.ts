@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -9,11 +9,11 @@ import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { InventoryApiService, InventoryOptionsResponse, PhotoInboxItem, PhotoInboxResponse, PhotoInboxStatus } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
+import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
 interface StatusOption {
   value: PhotoInboxStatus;
@@ -40,7 +40,7 @@ const STATUS_OPTIONS: StatusOption[] = [
     MatChipsModule,
     MatFormFieldModule,
     MatIconModule,
-    MatSelectModule,
+    SearchableSelectComponent,
     MatProgressSpinnerModule
   ],
   templateUrl: './photo-inbox-page.component.html',
@@ -55,6 +55,12 @@ export class PhotoInboxPageComponent {
   protected readonly uploading = signal(false);
   protected readonly uploadSourceBoxId = signal<number | null>(null);
   protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], locations: [], boxes: [] });
+  protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().boxes.map((box) => ({
+      value: box.id,
+      label: `${box.code} · ${box.name}`,
+      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · ')
+    })));
   protected readonly statusOptions = STATUS_OPTIONS;
   private readonly currentStatus = signal<PhotoInboxStatus>('Pending');
 

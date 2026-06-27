@@ -1,0 +1,33 @@
+<mat-select
+  [value]="value"
+  [multiple]="multiple"
+  [disabled]="disabled"
+  (selectionChange)="updateValue($event.value)"
+  (openedChange)="clearSearch()"
+>
+  <div class="select-search-row" (click)="stopPanelEvent($event)" (keydown)="stopPanelEvent($event)">
+    <mat-icon>search</mat-icon>
+    <input
+      type="search"
+      [ngModel]="query()"
+      (ngModelChange)="query.set($event)"
+      [placeholder]="placeholder"
+      autocomplete="off"
+    />
+  </div>
+
+  @if (!multiple && noneLabel !== null) {
+    <mat-option [value]="null">{{ noneLabel }}</mat-option>
+  }
+
+  @for (option of filteredOptions(); track option.value) {
+    <mat-option [value]="option.value">
+      <span class="option-label">{{ option.label }}</span>
+      @if (option.hint) {
+        <small>{{ option.hint }}</small>
+      }
+    </mat-option>
+  } @empty {
+    <mat-option disabled>Sin resultados</mat-option>
+  }
+</mat-select>

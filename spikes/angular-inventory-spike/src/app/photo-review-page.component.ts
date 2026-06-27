@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -10,16 +10,16 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 
 import { InventoryApiService, InventoryItem, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse } from './inventory-api.service';
+import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
 type ReviewPanel = 'none' | 'create' | 'assignItem' | 'assignBox';
 
 @Component({
   selector: 'app-photo-review-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSelectModule],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, SearchableSelectComponent],
   templateUrl: './photo-review-page.component.html',
   styleUrl: './photo-review-page.component.scss'
 })
@@ -42,6 +42,20 @@ export class PhotoReviewPageComponent {
   protected readonly draftUnit = signal('uds');
   protected readonly draftTagIds = signal<number[]>([]);
   protected readonly draftBoxId = signal<number | null>(null);
+  protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().boxes.map((box) => ({
+      value: box.id,
+      label: `${box.code} · ${box.name}`,
+      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · ')
+    })));
+  protected readonly tagOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().tags.map((tag) => ({ value: tag.id, label: tag.name, hint: tag.color })));
+  protected readonly itemOptions = computed<SearchableSelectOption[]>(() =>
+    this.items().map((item) => ({
+      value: item.id,
+      label: `${item.code} · ${item.name}`,
+      hint: [item.category, item.boxCode].filter(Boolean).join(' · ')
+    })));
 
   private readonly api = inject(InventoryApiService);
   private readonly route = inject(ActivatedRoute);

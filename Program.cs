@@ -218,6 +218,34 @@ app.MapPut("/api/items/{id:int}", async (
 
     return item is null ? Results.NotFound() : Results.Json(item);
 });
+app.MapPost("/api/items/{id:int}/actions", async (
+    int id,
+    InventoryActionCreateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (action, error) = await queryService.CreateLinkedActionAsync(InventoryActionLinkedEntityType.Item, id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return action is null ? Results.NotFound() : Results.Json(action);
+});
+app.MapPost("/api/items/{id:int}/comments", async (
+    int id,
+    InventoryCommentCreateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (comment, error) = await queryService.CreateLinkedCommentAsync(InventoryActionLinkedEntityType.Item, id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return comment is null ? Results.NotFound() : Results.Json(comment);
+});
 app.MapPost("/api/items/{id:int}/photos/{photoId:int}/cover", async (
     int id,
     int photoId,
@@ -325,6 +353,34 @@ app.MapPut("/api/boxes/{id:int}", async (
     }
 
     return box is null ? Results.NotFound() : Results.Json(box);
+});
+app.MapPost("/api/boxes/{id:int}/actions", async (
+    int id,
+    InventoryActionCreateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (action, error) = await queryService.CreateLinkedActionAsync(InventoryActionLinkedEntityType.Box, id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return action is null ? Results.NotFound() : Results.Json(action);
+});
+app.MapPost("/api/boxes/{id:int}/comments", async (
+    int id,
+    InventoryCommentCreateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (comment, error) = await queryService.CreateLinkedCommentAsync(InventoryActionLinkedEntityType.Box, id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return comment is null ? Results.NotFound() : Results.Json(comment);
 });
 app.MapPost("/api/boxes/{id:int}/photos/{photoId:int}/cover", async (
     int id,
@@ -552,6 +608,19 @@ app.MapGet("/api/actions", async (
 {
     var response = await queryService.GetActionsAsync(cancellationToken);
     return Results.Json(response);
+});
+app.MapPost("/api/actions", async (
+    InventoryActionCreateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (action, error) = await queryService.CreateLinkedActionAsync(InventoryActionLinkedEntityType.None, 0, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return Results.Json(action);
 });
 app.MapPost("/api/actions/{id:int}/complete", async (
     int id,

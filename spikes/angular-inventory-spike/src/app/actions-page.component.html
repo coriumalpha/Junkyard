@@ -12,6 +12,56 @@
     </a>
   </header>
 
+  <mat-card class="create-panel">
+    <div>
+      <p class="eyebrow">Nueva tarea</p>
+      <h2>Subir a pendientes</h2>
+    </div>
+    <div class="create-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Título</mat-label>
+        <input matInput [ngModel]="newTitle()" (ngModelChange)="newTitle.set($event)" placeholder="Revisar, mover, reponer..." />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="priority-field">
+        <mat-label>Prioridad</mat-label>
+        <input matInput type="number" min="1" max="5" [ngModel]="newPriority()" (ngModelChange)="newPriority.set(+$event)" />
+      </mat-form-field>
+      <div class="link-mode">
+        <button mat-stroked-button type="button" [class.active]="linkMode() === 'none'" (click)="setLinkMode('none')">Sin vínculo</button>
+        <button mat-stroked-button type="button" [class.active]="linkMode() === 'box'" (click)="setLinkMode('box')">Contenedor</button>
+        <button mat-stroked-button type="button" [class.active]="linkMode() === 'item'" (click)="setLinkMode('item')">Ítem</button>
+      </div>
+      @if (linkMode() === 'box') {
+        <mat-form-field appearance="outline" class="wide">
+          <mat-label>Contenedor</mat-label>
+          <app-searchable-select
+            [value]="linkedBoxId()"
+            [options]="boxOptions()"
+            placeholder="Buscar contenedor..."
+            (valueChange)="linkedBoxId.set($any($event))" />
+        </mat-form-field>
+      }
+      @if (linkMode() === 'item') {
+        <mat-form-field appearance="outline" class="wide">
+          <mat-label>Ítem</mat-label>
+          <app-searchable-select
+            [value]="linkedItemId()"
+            [options]="itemOptions()"
+            placeholder="Buscar ítem..."
+            (valueChange)="linkedItemId.set($any($event))" />
+        </mat-form-field>
+      }
+      <mat-form-field appearance="outline" class="wide">
+        <mat-label>Detalle opcional</mat-label>
+        <textarea matInput rows="2" [ngModel]="newDescription()" (ngModelChange)="newDescription.set($event)"></textarea>
+      </mat-form-field>
+      <button mat-flat-button type="button" (click)="createAction()" [disabled]="busyId() === -1">
+        <mat-icon>add_task</mat-icon>
+        Crear tarea
+      </button>
+    </div>
+  </mat-card>
+
   @if (loading()) {
     <section class="state-panel">
       <mat-progress-spinner mode="indeterminate" diameter="48" />

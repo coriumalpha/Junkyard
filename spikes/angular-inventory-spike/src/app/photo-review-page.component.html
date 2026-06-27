@@ -99,11 +99,11 @@
           <mat-card class="action-card">
             <mat-form-field appearance="outline">
               <mat-label>Contenedor</mat-label>
-              <mat-select [ngModel]="assignBoxId()" (ngModelChange)="assignBoxId.set($event)">
-                @for (box of options().boxes; track box.id) {
-                  <mat-option [value]="box.id">{{ box.code }} · {{ box.name }}</mat-option>
-                }
-              </mat-select>
+              <app-searchable-select
+                [value]="assignBoxId()"
+                [options]="boxOptions()"
+                placeholder="Buscar contenedor..."
+                (valueChange)="assignBoxId.set($any($event))" />
             </mat-form-field>
             <button mat-flat-button type="button" (click)="assignBox()" [disabled]="busy()">Asignar</button>
           </mat-card>
@@ -113,11 +113,11 @@
           <mat-card class="action-card">
             <mat-form-field appearance="outline">
               <mat-label>Ítem</mat-label>
-              <mat-select [ngModel]="assignItemId()" (ngModelChange)="assignItemId.set($event)">
-                @for (item of items(); track item.id) {
-                  <mat-option [value]="item.id">{{ item.code }} · {{ item.name }}</mat-option>
-                }
-              </mat-select>
+              <app-searchable-select
+                [value]="assignItemId()"
+                [options]="itemOptions()"
+                placeholder="Buscar ítem..."
+                (valueChange)="assignItemId.set($any($event))" />
             </mat-form-field>
             <button mat-flat-button type="button" (click)="assignItem()" [disabled]="busy()">Asignar</button>
           </mat-card>
@@ -131,20 +131,21 @@
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Tags</mat-label>
-              <mat-select [ngModel]="draftTagIds()" (ngModelChange)="draftTagIds.set($event)" multiple>
-                @for (tag of options().tags; track tag.id) {
-                  <mat-option [value]="tag.id">{{ tag.name }}</mat-option>
-                }
-              </mat-select>
+              <app-searchable-select
+                [value]="draftTagIds()"
+                [options]="tagOptions()"
+                [multiple]="true"
+                placeholder="Buscar tag..."
+                (valueChange)="draftTagIds.set($any($event))" />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Contenedor</mat-label>
-              <mat-select [ngModel]="draftBoxId()" (ngModelChange)="draftBoxId.set($event)">
-                <mat-option [value]="null">Sin caja</mat-option>
-                @for (box of options().boxes; track box.id) {
-                  <mat-option [value]="box.id">{{ box.code }} · {{ box.name }}</mat-option>
-                }
-              </mat-select>
+              <app-searchable-select
+                [value]="draftBoxId()"
+                [options]="boxOptions()"
+                noneLabel="Sin caja"
+                placeholder="Buscar contenedor..."
+                (valueChange)="draftBoxId.set($any($event))" />
             </mat-form-field>
             <div class="two-cols">
               <mat-form-field appearance="outline">

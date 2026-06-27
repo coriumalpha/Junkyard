@@ -22,6 +22,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         var locationLookup = await BoxHierarchyService.BuildLocationLookupAsync(db, cancellationToken);
         var photos = await EntityPhotosAsync(PhotoEntityType.Item, item.Id, item.CoverPhoto, cancellationToken);
         var photoStates = await PhotoStorage.LoadViewStatesAsync(db, photos.Select(photo => photo.Filename).ToList(), cancellationToken);
+        var linkedRows = await GetLinkedRowsAsync(InventoryActionLinkedEntityType.Item, item.Id, cancellationToken);
         var locationName = item.Box is not null && locationLookup.TryGetValue(item.Box.Id, out var location)
             ? location.LocationName
             : item.Box?.Location?.Name;
@@ -59,7 +60,9 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 item.Box.ContainerTypeLabel,
                 await BuildHierarchyNodesAsync(item.Box, item.Name, "category", "item", locationLookup, cancellationToken)),
             $"/Items/Edit?id={item.Id}",
-            ToPhotoDtos(photos, photoStates));
+            ToPhotoDtos(photos, photoStates),
+            linkedRows.Actions,
+            linkedRows.Comments);
     }
 
     public async Task<(InventoryItemDetailDto? Item, string? Error)> UpdateItemAsync(
@@ -457,6 +460,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 .ToDictionaryAsync(entry => entry.ItemId, entry => entry.Count, cancellationToken);
 
         var photos = await EntityPhotosAsync(PhotoEntityType.Box, box.Id, box.CoverPhoto, cancellationToken);
+        var linkedRows = await GetLinkedRowsAsync(InventoryActionLinkedEntityType.Box, box.Id, cancellationToken);
         var filenames = photos.Select(photo => photo.Filename)
             .Concat(box.Items.Select(item => item.CoverPhoto).Where(filename => !string.IsNullOrWhiteSpace(filename)).Select(filename => filename!))
             .Distinct()
@@ -485,6 +489,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 .ToList(),
             $"/Boxes/Details?code={Uri.EscapeDataString(box.Code)}",
             ToPhotoDtos(photos, photoStates),
+            linkedRows.Actions,
+            linkedRows.Comments,
             box.CreatedAt,
             box.UpdatedAt);
     }
@@ -975,6 +981,85 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         await db.SaveChangesAsync(cancellationToken);
 
         return (await GetActionsAsync(cancellationToken)).Actions.FirstOrDefault(row => row.Id == id);
+    }
+
+    public async Task<(InventoryActionDto? Action, string? Error)> CreateLinkedActionAsync(
+        InventoryActionLinkedEntityType linkedEntityType,
+        int linkedEntityId,
+        InventoryActionCreateDto input,
+        CancellationToken cancellationToken)
+    {
+        var exists = linkedEntityType switch
+        {
+            InventoryActionLinkedEntityType.None => true,
+            InventoryActionLinkedEntityType.Box => await db.Boxes.AnyAsync(box => box.Id == linkedEntityId, cancellationToken),
+            InventoryActionLinkedEntityType.Item => await db.Items.AnyAsync(item => item.Id == linkedEntityId, cancellationToken),
+            _ => false
+        };
+        if (!exists)
+        {
+            return (null, "El vínculo no existe.");
+        }
+
+        var title = (input.Title ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return (null, "El título es obligatorio.");
+        }
+
+        var action = new InventoryAction
+        {
+            Title = title,
+            Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim(),
+            Kind = InventoryActionKind.Task,
+            Status = InventoryActionStatus.Open,
+            Priority = Math.Clamp(input.Priority, 1, 5),
+            LinkedEntityType = linkedEntityType,
+            LinkedEntityId = linkedEntityType == InventoryActionLinkedEntityType.None ? null : linkedEntityId
+        };
+
+        db.InventoryActions.Add(action);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await ToActionDtoAsync(action, cancellationToken), null);
+    }
+
+    public async Task<(InventoryActionDto? Comment, string? Error)> CreateLinkedCommentAsync(
+        InventoryActionLinkedEntityType linkedEntityType,
+        int linkedEntityId,
+        InventoryCommentCreateDto input,
+        CancellationToken cancellationToken)
+    {
+        var exists = linkedEntityType switch
+        {
+            InventoryActionLinkedEntityType.Box => await db.Boxes.AnyAsync(box => box.Id == linkedEntityId, cancellationToken),
+            InventoryActionLinkedEntityType.Item => await db.Items.AnyAsync(item => item.Id == linkedEntityId, cancellationToken),
+            _ => false
+        };
+        if (!exists)
+        {
+            return (null, "El vínculo no existe.");
+        }
+
+        var text = (input.Text ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return (null, "El comentario es obligatorio.");
+        }
+
+        var comment = new InventoryAction
+        {
+            Title = "Comentario",
+            Description = text,
+            Kind = InventoryActionKind.Comment,
+            Status = InventoryActionStatus.Archived,
+            Priority = 3,
+            LinkedEntityType = linkedEntityType,
+            LinkedEntityId = linkedEntityId
+        };
+
+        db.InventoryActions.Add(comment);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await ToActionDtoAsync(comment, cancellationToken), null);
     }
 
     public async Task<InventoryOptionsDto> GetOptionsAsync(CancellationToken cancellationToken)
@@ -1670,6 +1755,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             action.Id,
             action.Title,
             action.Description,
+            action.Kind.ToString(),
             action.Priority,
             action.Status.ToString(),
             linkedLabel,
@@ -1677,6 +1763,76 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             legacyUrl,
             action.CreatedAt,
             action.CompletedAt);
+    }
+
+    private async Task<InventoryActionDto> ToActionDtoAsync(InventoryAction action, CancellationToken cancellationToken)
+    {
+        var boxes = new Dictionary<int, Box>();
+        var items = new Dictionary<int, Item>();
+
+        if (action.LinkedEntityType == InventoryActionLinkedEntityType.Box && action.LinkedEntityId is int boxId)
+        {
+            var box = await db.Boxes.AsNoTracking().FirstOrDefaultAsync(box => box.Id == boxId, cancellationToken);
+            if (box is not null)
+            {
+                boxes[box.Id] = box;
+            }
+        }
+
+        if (action.LinkedEntityType == InventoryActionLinkedEntityType.Item && action.LinkedEntityId is int itemId)
+        {
+            var item = await db.Items.AsNoTracking()
+                .Include(item => item.Box)
+                .FirstOrDefaultAsync(item => item.Id == itemId, cancellationToken);
+            if (item is not null)
+            {
+                items[item.Id] = item;
+            }
+        }
+
+        return ToActionDto(action, boxes, items);
+    }
+
+    private async Task<(List<InventoryActionDto> Actions, List<InventoryActionDto> Comments)> GetLinkedRowsAsync(
+        InventoryActionLinkedEntityType linkedEntityType,
+        int linkedEntityId,
+        CancellationToken cancellationToken)
+    {
+        var rows = await db.InventoryActions.AsNoTracking()
+            .Where(action => action.LinkedEntityType == linkedEntityType && action.LinkedEntityId == linkedEntityId)
+            .OrderBy(action => action.Kind == InventoryActionKind.Task ? 0 : 1)
+            .ThenBy(action => action.Status == InventoryActionStatus.Completed)
+            .ThenByDescending(action => action.Priority)
+            .ThenByDescending(action => action.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var boxIds = rows
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Box && action.LinkedEntityId.HasValue)
+            .Select(action => action.LinkedEntityId!.Value)
+            .Distinct()
+            .ToList();
+        var itemIds = rows
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Item && action.LinkedEntityId.HasValue)
+            .Select(action => action.LinkedEntityId!.Value)
+            .Distinct()
+            .ToList();
+
+        var boxes = boxIds.Count == 0
+            ? new Dictionary<int, Box>()
+            : await db.Boxes.AsNoTracking()
+                .Where(box => boxIds.Contains(box.Id))
+                .ToDictionaryAsync(box => box.Id, cancellationToken);
+        var items = itemIds.Count == 0
+            ? new Dictionary<int, Item>()
+            : await db.Items.AsNoTracking()
+                .Include(item => item.Box)
+                .Where(item => itemIds.Contains(item.Id))
+                .ToDictionaryAsync(item => item.Id, cancellationToken);
+
+        var dtos = rows.Select(action => ToActionDto(action, boxes, items)).ToList();
+        return (
+            dtos.Where(action => action.Kind == InventoryActionKind.Task.ToString() && action.Status == InventoryActionStatus.Open.ToString()).ToList(),
+            dtos.Where(action => action.Kind != InventoryActionKind.Task.ToString()).ToList());
     }
 
 }
@@ -1734,7 +1890,9 @@ public record InventoryItemDetailDto(
     DateTime UpdatedAt,
     InventoryItemBoxDto? Box,
     string LegacyUrl,
-    List<InventoryPhotoDto> Photos);
+    List<InventoryPhotoDto> Photos,
+    List<InventoryActionDto> Actions,
+    List<InventoryActionDto> Comments);
 
 public record InventoryItemUpdateDto(
     string? Code,
@@ -1780,6 +1938,8 @@ public record InventoryBoxDetailDto(
     List<InventoryItemDto> Items,
     string LegacyUrl,
     List<InventoryPhotoDto> Photos,
+    List<InventoryActionDto> Actions,
+    List<InventoryActionDto> Comments,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
@@ -1902,6 +2062,7 @@ public record InventoryActionDto(
     int Id,
     string Title,
     string? Description,
+    string Kind,
     int Priority,
     string Status,
     string LinkedLabel,
@@ -1909,6 +2070,13 @@ public record InventoryActionDto(
     string? LegacyUrl,
     DateTime CreatedAt,
     DateTime? CompletedAt);
+
+public record InventoryActionCreateDto(
+    string? Title,
+    string? Description,
+    int Priority);
+
+public record InventoryCommentCreateDto(string? Text);
 
 public record InventoryOptionsDto(
     List<string> Categories,

@@ -180,11 +180,12 @@
 
             <mat-form-field appearance="outline">
               <mat-label>Tags</mat-label>
-              <mat-select [ngModel]="itemForm().tagIds" (ngModelChange)="patchItemForm({ tagIds: $event })" multiple>
-                @for (tag of options().tags; track tag.id) {
-                  <mat-option [value]="tag.id">{{ tag.name }}</mat-option>
-                }
-              </mat-select>
+              <app-searchable-select
+                [value]="itemForm().tagIds"
+                [options]="tagOptions()"
+                [multiple]="true"
+                placeholder="Buscar tag..."
+                (valueChange)="patchItemForm({ tagIds: $any($event) })" />
             </mat-form-field>
 
             <div class="quick-tag wide">
@@ -204,12 +205,12 @@
 
             <mat-form-field appearance="outline">
               <mat-label>Contenedor</mat-label>
-              <mat-select [ngModel]="itemForm().boxId" (ngModelChange)="patchItemForm({ boxId: $event })">
-                <mat-option [value]="null">Sin caja</mat-option>
-                @for (boxOption of options().boxes; track boxOption.id) {
-                  <mat-option [value]="boxOption.id">{{ boxOption.code }} · {{ boxOption.name }}</mat-option>
-                }
-              </mat-select>
+              <app-searchable-select
+                [value]="itemForm().boxId"
+                [options]="boxOptions()"
+                noneLabel="Sin caja"
+                placeholder="Buscar contenedor..."
+                (valueChange)="patchItemForm({ boxId: $any($event) })" />
             </mat-form-field>
 
             <mat-form-field appearance="outline">
@@ -262,6 +263,74 @@
       <mat-card class="info-card">
         <p class="eyebrow">Ubicación</p>
         <app-hierarchy-trail [nodes]="itemHierarchyNodes()" />
+      </mat-card>
+
+      <mat-card class="info-card action-log-card">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow">Pendientes</p>
+            <h2>Tareas y comentarios</h2>
+          </div>
+        </div>
+        <div class="quick-action-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Nueva tarea</mat-label>
+            <input matInput [ngModel]="newActionTitle()" (ngModelChange)="newActionTitle.set($event)" placeholder="Revisar, medir, reponer..." />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="priority-field">
+            <mat-label>Prioridad</mat-label>
+            <input matInput type="number" min="1" max="5" [ngModel]="newActionPriority()" (ngModelChange)="newActionPriority.set(+$event)" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="wide">
+            <mat-label>Detalle opcional</mat-label>
+            <textarea matInput rows="2" [ngModel]="newActionDescription()" (ngModelChange)="newActionDescription.set($event)"></textarea>
+          </mat-form-field>
+          <button mat-flat-button type="button" (click)="createLinkedAction()" [disabled]="saving()">
+            <mat-icon>add_task</mat-icon>
+            Añadir tarea
+          </button>
+        </div>
+        <div class="linked-list">
+          @for (action of linkedActions(); track action.id) {
+            <article class="linked-row">
+              <span class="priority">P{{ action.priority }}</span>
+              <div>
+                <strong>{{ action.title }}</strong>
+                @if (action.description) {
+                  <p>{{ action.description }}</p>
+                }
+              </div>
+              <button mat-button type="button" (click)="completeLinkedAction(action)" [disabled]="saving()">
+                <mat-icon>check</mat-icon>
+                Completar
+              </button>
+            </article>
+          } @empty {
+            <p class="empty-note">Sin tareas abiertas vinculadas.</p>
+          }
+        </div>
+        <mat-divider />
+        <div class="comment-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Nuevo comentario</mat-label>
+            <textarea matInput rows="3" [ngModel]="newCommentText()" (ngModelChange)="newCommentText.set($event)" placeholder="Contexto, hallazgos, recordatorios..."></textarea>
+          </mat-form-field>
+          <button mat-stroked-button type="button" (click)="addLinkedComment()" [disabled]="saving()">
+            <mat-icon>comment</mat-icon>
+            Guardar comentario
+          </button>
+        </div>
+        <div class="comment-list">
+          @for (comment of linkedComments(); track comment.id) {
+            <article class="comment-row">
+              <strong>{{ comment.title }}</strong>
+              <p>{{ comment.description }}</p>
+              <small>{{ comment.createdAt | date:'short' }}</small>
+            </article>
+          } @empty {
+            <p class="empty-note">Sin comentarios todavía.</p>
+          }
+        </div>
       </mat-card>
     </section>
 
@@ -369,41 +438,40 @@
 
             <mat-form-field appearance="outline">
               <mat-label>Tipo</mat-label>
-              <mat-select [ngModel]="boxForm().containerType" (ngModelChange)="patchBoxForm({ containerType: $event })">
-                @for (type of containerTypes; track type.value) {
-                  <mat-option [value]="type.value">{{ type.label }}</mat-option>
-                }
-              </mat-select>
+              <app-searchable-select
+                [value]="boxForm().containerType"
+                [options]="containerTypeOptions"
+                placeholder="Buscar tipo..."
+                (valueChange)="patchBoxForm({ containerType: $any($event) })" />
             </mat-form-field>
 
             <mat-form-field appearance="outline">
               <mat-label>Ubicación raíz</mat-label>
-              <mat-select [ngModel]="boxForm().locationId" (ngModelChange)="patchBoxForm({ locationId: $event })" [disabled]="boxForm().parentBoxId !== null">
-                @for (location of options().locations; track location.id) {
-                  <mat-option [value]="location.id">{{ location.name }}</mat-option>
-                }
-              </mat-select>
+              <app-searchable-select
+                [value]="boxForm().locationId"
+                [options]="locationOptions()"
+                [disabled]="boxForm().parentBoxId !== null"
+                placeholder="Buscar ubicación..."
+                (valueChange)="patchBoxForm({ locationId: $any($event) })" />
             </mat-form-field>
 
             <mat-form-field appearance="outline">
               <mat-label>Dentro de</mat-label>
-              <mat-select [ngModel]="boxForm().parentBoxId" (ngModelChange)="patchBoxForm({ parentBoxId: $event })">
-                <mat-option [value]="null">Primer nivel</mat-option>
-                @for (boxOption of options().boxes; track boxOption.id) {
-                  @if (boxOption.id !== box()!.id) {
-                    <mat-option [value]="boxOption.id">{{ boxOption.code }} · {{ boxOption.name }}</mat-option>
-                  }
-                }
-              </mat-select>
+              <app-searchable-select
+                [value]="boxForm().parentBoxId"
+                [options]="parentBoxOptions()"
+                noneLabel="Primer nivel"
+                placeholder="Buscar contenedor..."
+                (valueChange)="patchBoxForm({ parentBoxId: $any($event) })" />
             </mat-form-field>
 
             <mat-form-field appearance="outline">
               <mat-label>Estado</mat-label>
-              <mat-select [ngModel]="boxForm().status" (ngModelChange)="patchBoxForm({ status: $event })">
-                @for (status of boxStatuses; track status) {
-                  <mat-option [value]="status">{{ status }}</mat-option>
-                }
-              </mat-select>
+              <app-searchable-select
+                [value]="boxForm().status"
+                [options]="boxStatusOptions"
+                placeholder="Buscar estado..."
+                (valueChange)="patchBoxForm({ status: $any($event) })" />
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="wide">
@@ -472,6 +540,74 @@
           }
           </div>
         }
+      </mat-card>
+
+      <mat-card class="info-card action-log-card">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow">Pendientes</p>
+            <h2>Tareas y comentarios</h2>
+          </div>
+        </div>
+        <div class="quick-action-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Nueva tarea</mat-label>
+            <input matInput [ngModel]="newActionTitle()" (ngModelChange)="newActionTitle.set($event)" placeholder="Mover, revisar, inventariar..." />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="priority-field">
+            <mat-label>Prioridad</mat-label>
+            <input matInput type="number" min="1" max="5" [ngModel]="newActionPriority()" (ngModelChange)="newActionPriority.set(+$event)" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="wide">
+            <mat-label>Detalle opcional</mat-label>
+            <textarea matInput rows="2" [ngModel]="newActionDescription()" (ngModelChange)="newActionDescription.set($event)"></textarea>
+          </mat-form-field>
+          <button mat-flat-button type="button" (click)="createLinkedAction()" [disabled]="saving()">
+            <mat-icon>add_task</mat-icon>
+            Añadir tarea
+          </button>
+        </div>
+        <div class="linked-list">
+          @for (action of linkedActions(); track action.id) {
+            <article class="linked-row">
+              <span class="priority">P{{ action.priority }}</span>
+              <div>
+                <strong>{{ action.title }}</strong>
+                @if (action.description) {
+                  <p>{{ action.description }}</p>
+                }
+              </div>
+              <button mat-button type="button" (click)="completeLinkedAction(action)" [disabled]="saving()">
+                <mat-icon>check</mat-icon>
+                Completar
+              </button>
+            </article>
+          } @empty {
+            <p class="empty-note">Sin tareas abiertas vinculadas.</p>
+          }
+        </div>
+        <mat-divider />
+        <div class="comment-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Nuevo comentario</mat-label>
+            <textarea matInput rows="3" [ngModel]="newCommentText()" (ngModelChange)="newCommentText.set($event)" placeholder="Contexto, hallazgos, recordatorios..."></textarea>
+          </mat-form-field>
+          <button mat-stroked-button type="button" (click)="addLinkedComment()" [disabled]="saving()">
+            <mat-icon>comment</mat-icon>
+            Guardar comentario
+          </button>
+        </div>
+        <div class="comment-list">
+          @for (comment of linkedComments(); track comment.id) {
+            <article class="comment-row">
+              <strong>{{ comment.title }}</strong>
+              <p>{{ comment.description }}</p>
+              <small>{{ comment.createdAt | date:'short' }}</small>
+            </article>
+          } @empty {
+            <p class="empty-note">Sin comentarios todavía.</p>
+          }
+        </div>
       </mat-card>
     </section>
 

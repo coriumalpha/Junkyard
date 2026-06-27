@@ -12,13 +12,13 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { EntityMiniCardComponent } from './entity-mini-card.component';
 import { HierarchyTrailComponent, HierarchyTrailNode } from './hierarchy-trail.component';
-import { InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryOptionsResponse, InventoryPhoto } from './inventory-api.service';
+import { InventoryAction, InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryOptionsResponse, InventoryPhoto } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
+import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
 type DetailKind = 'item' | 'box';
 type BoxItemsView = 'list' | 'gallery' | 'table';
@@ -39,8 +39,8 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
     MatIconModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    MatSelectModule,
     MatSlideToggleModule,
+    SearchableSelectComponent,
     EntityMiniCardComponent,
     HierarchyTrailComponent
   ],
@@ -69,6 +69,10 @@ export class DetailPageComponent {
   protected readonly boxItemSortKey = signal<BoxItemSortKey>('name');
   protected readonly boxItemSortDirection = signal<'asc' | 'desc'>('asc');
   protected readonly uploadCaption = signal('');
+  protected readonly newActionTitle = signal('');
+  protected readonly newActionDescription = signal('');
+  protected readonly newActionPriority = signal(3);
+  protected readonly newCommentText = signal('');
   protected readonly zooming = signal(false);
   protected readonly zoomOriginX = signal('50%');
   protected readonly zoomOriginY = signal('50%');
@@ -86,9 +90,27 @@ export class DetailPageComponent {
     { value: 'other', label: 'Otro soporte' }
   ];
   protected readonly boxStatuses = ['Active', 'Quarantine', 'Archived'];
+  protected readonly containerTypeOptions: SearchableSelectOption[] = this.containerTypes.map((type) => ({ value: type.value, label: type.label }));
+  protected readonly boxStatusOptions: SearchableSelectOption[] = this.boxStatuses.map((status) => ({ value: status, label: status }));
   protected readonly title = computed(() => this.item()?.name ?? this.box()?.name ?? 'Detalle');
   protected readonly currentPhotos = computed(() => this.item()?.photos ?? this.box()?.photos ?? []);
   protected readonly activePhoto = computed(() => this.currentPhotos()[this.activePhotoIndex()] ?? null);
+  protected readonly linkedActions = computed(() => this.item()?.actions ?? this.box()?.actions ?? []);
+  protected readonly linkedComments = computed(() => this.item()?.comments ?? this.box()?.comments ?? []);
+  protected readonly tagOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().tags.map((tag) => ({ value: tag.id, label: tag.name, hint: tag.color })));
+  protected readonly locationOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().locations.map((location) => ({ value: location.id, label: location.name })));
+  protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().boxes.map((box) => ({
+      value: box.id,
+      label: `${box.code} · ${box.name}`,
+      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · ')
+    })));
+  protected readonly parentBoxOptions = computed<SearchableSelectOption[]>(() => {
+    const currentBoxId = this.box()?.id;
+    return this.boxOptions().filter((option) => option.value !== currentBoxId);
+  });
   protected readonly sortedBoxItems = computed(() => {
     const items = [...(this.box()?.items ?? [])];
     const key = this.boxItemSortKey();
@@ -381,6 +403,104 @@ export class DetailPageComponent {
       }),
       catchError((error: unknown) => {
         this.formError.set(error instanceof Error ? error.message : 'No se pudo guardar el contenedor.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected createLinkedAction(): void {
+    const title = this.newActionTitle().trim();
+    if (!title || this.saving()) {
+      this.formError.set('El título de la tarea es obligatorio.');
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    const input = {
+      title,
+      description: this.newActionDescription().trim(),
+      priority: this.newActionPriority()
+    };
+    const item = this.item();
+    const request = item
+      ? this.api.createItemAction(item.id, input)
+      : this.box()
+        ? this.api.createBoxAction(this.box()!.id, input)
+        : null;
+    if (!request) {
+      this.saving.set(false);
+      return;
+    }
+
+    request.pipe(
+      tap((action) => {
+        this.appendLinkedAction(action);
+        this.newActionTitle.set('');
+        this.newActionDescription.set('');
+        this.newActionPriority.set(3);
+        this.saveMessage.set('Tarea añadida.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo crear la tarea.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected addLinkedComment(): void {
+    const text = this.newCommentText().trim();
+    if (!text || this.saving()) {
+      this.formError.set('Escribe un comentario antes de guardar.');
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    const item = this.item();
+    const request = item
+      ? this.api.createItemComment(item.id, { text })
+      : this.box()
+        ? this.api.createBoxComment(this.box()!.id, { text })
+        : null;
+    if (!request) {
+      this.saving.set(false);
+      return;
+    }
+
+    request.pipe(
+      tap((comment) => {
+        this.appendLinkedComment(comment);
+        this.newCommentText.set('');
+        this.saveMessage.set('Comentario guardado.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo guardar el comentario.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected completeLinkedAction(action: InventoryAction): void {
+    if (this.saving()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    this.api.completeAction(action.id).pipe(
+      tap((updated) => {
+        this.replaceOrRemoveLinkedAction(updated);
+        this.saveMessage.set('Tarea completada.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo completar la tarea.');
         return EMPTY;
       }),
       finalize(() => this.saving.set(false)),
@@ -699,6 +819,25 @@ export class DetailPageComponent {
       input.value = '';
     }
     this.saveMessage.set('Fotos subidas.');
+  }
+
+  private appendLinkedAction(action: InventoryAction): void {
+    this.item.update((item) => item ? { ...item, actions: [action, ...item.actions] } : item);
+    this.box.update((box) => box ? { ...box, actions: [action, ...box.actions] } : box);
+  }
+
+  private appendLinkedComment(comment: InventoryAction): void {
+    this.item.update((item) => item ? { ...item, comments: [comment, ...item.comments] } : item);
+    this.box.update((box) => box ? { ...box, comments: [comment, ...box.comments] } : box);
+  }
+
+  private replaceOrRemoveLinkedAction(action: InventoryAction): void {
+    const replace = (actions: InventoryAction[]) =>
+      action.status === 'Open'
+        ? actions.map((candidate) => candidate.id === action.id ? action : candidate)
+        : actions.filter((candidate) => candidate.id !== action.id);
+    this.item.update((item) => item ? { ...item, actions: replace(item.actions) } : item);
+    this.box.update((box) => box ? { ...box, actions: replace(box.actions) } : box);
   }
 
   protected activePhotoTransform(photo: InventoryPhoto): string {

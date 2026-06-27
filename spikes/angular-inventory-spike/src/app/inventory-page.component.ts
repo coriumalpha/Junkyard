@@ -12,12 +12,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatToolbarModule } from '@angular/material/toolbar';
 
 import { InventoryApiService, InventoryBoxOption, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
+import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
 interface FocusVisual {
   kind: 'group' | 'item' | 'summary';
@@ -101,7 +101,7 @@ const LAYOUT_TO_VIEW: Record<InventoryLayoutMode, InventoryViewMode> = {
     MatIconModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    MatSelectModule,
+    SearchableSelectComponent,
     MatSlideToggleModule,
     MatToolbarModule,
     RouterLink
@@ -125,6 +125,12 @@ export class InventoryPageComponent {
     const selected = new Set(this.state().boxIds);
     return this.options().boxes.filter((box) => selected.has(box.id));
   });
+  protected readonly tagOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().tags.map((tag) => ({ value: tag.id, label: tag.name, hint: tag.color })));
+  protected readonly locationOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().locations.map((location) => ({ value: location.id, label: location.name })));
+  protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().boxes.map((box) => ({ value: box.id, label: this.boxOptionLabel(box), hint: this.boxOptionHint(box) })));
   protected readonly layoutOptions = LAYOUT_OPTIONS;
   protected readonly groupPageSize = 12;
 

@@ -1,27 +1,37 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { catchError, EMPTY, finalize, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { InventoryAction, InventoryActionsResponse, InventoryApiService } from './inventory-api.service';
+import { InventoryAction, InventoryActionsResponse, InventoryApiService, InventoryItem, InventoryOptionsResponse } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
+import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
+
+type LinkMode = 'none' | 'box' | 'item';
 
 @Component({
   selector: 'app-actions-page',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
+    MatFormFieldModule,
     MatIconModule,
+    MatInputModule,
     MatProgressSpinnerModule,
+    SearchableSelectComponent,
     RouterLink
   ],
   templateUrl: './actions-page.component.html',
@@ -32,8 +42,28 @@ export class ActionsPageComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly busyId = signal<number | null>(null);
   protected readonly data = signal<InventoryActionsResponse | null>(null);
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], locations: [], boxes: [] });
+  protected readonly items = signal<InventoryItem[]>([]);
+  protected readonly newTitle = signal('');
+  protected readonly newDescription = signal('');
+  protected readonly newPriority = signal(3);
+  protected readonly linkMode = signal<LinkMode>('none');
+  protected readonly linkedBoxId = signal<number | null>(null);
+  protected readonly linkedItemId = signal<number | null>(null);
   protected readonly openActions = computed(() => this.data()?.actions.filter((action) => action.status === 'Open') ?? []);
   protected readonly completedActions = computed(() => this.data()?.actions.filter((action) => action.status === 'Completed') ?? []);
+  protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().boxes.map((box) => ({
+      value: box.id,
+      label: `${box.code} · ${box.name}`,
+      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · ')
+    })));
+  protected readonly itemOptions = computed<SearchableSelectOption[]>(() =>
+    this.items().map((item) => ({
+      value: item.id,
+      label: `${item.code} · ${item.name}`,
+      hint: [item.category, item.boxCode].filter(Boolean).join(' · ')
+    })));
   protected readonly legacyActionsUrl = legacyUrl('/Pendientes');
 
   private readonly api = inject(InventoryApiService);
@@ -41,6 +71,80 @@ export class ActionsPageComponent {
 
   constructor() {
     this.load();
+    this.api.fetchOptions().pipe(
+      tap((options) => this.options.set(options)),
+      catchError(() => EMPTY),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+    this.api.fetchInventory({
+      q: '',
+      category: '',
+      tagIds: [],
+      box: '',
+      boxIds: [],
+      locationId: null,
+      includeChildren: false,
+      onlyConsumable: false,
+      onlyOrphans: false,
+      layout: 'flat',
+      view: 'flat'
+    }).pipe(
+      tap((response) => this.items.set(response.items)),
+      catchError(() => EMPTY),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected setLinkMode(mode: LinkMode): void {
+    this.linkMode.set(mode);
+    if (mode !== 'box') {
+      this.linkedBoxId.set(null);
+    }
+    if (mode !== 'item') {
+      this.linkedItemId.set(null);
+    }
+  }
+
+  protected createAction(): void {
+    const title = this.newTitle().trim();
+    if (!title || this.busyId()) {
+      this.error.set('El título de la tarea es obligatorio.');
+      return;
+    }
+
+    const input = {
+      title,
+      description: this.newDescription().trim(),
+      priority: this.newPriority()
+    };
+    const mode = this.linkMode();
+    const request = mode === 'box' && this.linkedBoxId()
+      ? this.api.createBoxAction(this.linkedBoxId()!, input)
+      : mode === 'item' && this.linkedItemId()
+        ? this.api.createItemAction(this.linkedItemId()!, input)
+        : this.api.createAction(input);
+
+    this.busyId.set(-1);
+    request.pipe(
+      tap((action) => {
+        this.data.update((current) => current ? {
+          openCount: current.openCount + 1,
+          completedCount: current.completedCount,
+          actions: [action, ...current.actions]
+        } : current);
+        this.newTitle.set('');
+        this.newDescription.set('');
+        this.newPriority.set(3);
+        this.setLinkMode('none');
+        this.error.set(null);
+      }),
+      catchError((error: unknown) => {
+        this.error.set(error instanceof Error ? error.message : 'No se pudo crear la tarea.');
+        return EMPTY;
+      }),
+      finalize(() => this.busyId.set(null)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
   }
 
   protected complete(action: InventoryAction): void {

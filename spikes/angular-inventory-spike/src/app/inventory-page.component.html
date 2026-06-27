@@ -117,11 +117,12 @@
         <div class="advanced-grid">
           <mat-form-field appearance="outline">
             <mat-label>Tags</mat-label>
-            <mat-select [value]="state().tagIds" (selectionChange)="setTagIds($event.value)" multiple>
-              @for (tag of options().tags; track tag.id) {
-                <mat-option [value]="tag.id">{{ tag.name }}</mat-option>
-              }
-            </mat-select>
+            <app-searchable-select
+              [value]="state().tagIds"
+              [options]="tagOptions()"
+              [multiple]="true"
+              placeholder="Buscar tag..."
+              (valueChange)="setTagIds($any($event))" />
           </mat-form-field>
 
           @if (state().tagIds.length) {
@@ -144,24 +145,22 @@
 
           <mat-form-field appearance="outline">
             <mat-label>Ubicación efectiva</mat-label>
-            <mat-select [value]="state().locationId" (selectionChange)="setLocationId($event.value)">
-              <mat-option [value]="null">Todas</mat-option>
-              @for (location of options().locations; track location.id) {
-                <mat-option [value]="location.id">{{ location.name }}</mat-option>
-              }
-            </mat-select>
+            <app-searchable-select
+              [value]="state().locationId"
+              [options]="locationOptions()"
+              noneLabel="Todas"
+              placeholder="Buscar ubicación..."
+              (valueChange)="setLocationId($any($event))" />
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="wide-control">
             <mat-label>Contenedores múltiples</mat-label>
-            <mat-select [value]="state().boxIds" (selectionChange)="setBoxIds($event.value)" multiple>
-              @for (box of options().boxes; track box.id) {
-                <mat-option [value]="box.id">
-                  <span>{{ boxOptionLabel(box) }}</span>
-                  <small>{{ boxOptionHint(box) }}</small>
-                </mat-option>
-              }
-            </mat-select>
+            <app-searchable-select
+              [value]="state().boxIds"
+              [options]="boxOptions()"
+              [multiple]="true"
+              placeholder="Buscar contenedor..."
+              (valueChange)="setBoxIds($any($event))" />
           </mat-form-field>
 
           @if (selectedBoxOptions().length) {

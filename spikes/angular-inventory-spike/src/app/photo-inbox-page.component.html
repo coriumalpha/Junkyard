@@ -21,12 +21,12 @@
     </div>
     <mat-form-field appearance="outline">
       <mat-label>Caja origen</mat-label>
-      <mat-select [ngModel]="uploadSourceBoxId()" (ngModelChange)="uploadSourceBoxId.set($event)">
-        <mat-option [value]="null">Sin caja origen</mat-option>
-        @for (box of options().boxes; track box.id) {
-          <mat-option [value]="box.id">{{ box.code }} · {{ box.name }}</mat-option>
-        }
-      </mat-select>
+      <app-searchable-select
+        [value]="uploadSourceBoxId()"
+        [options]="boxOptions()"
+        noneLabel="Sin caja origen"
+        placeholder="Buscar caja..."
+        (valueChange)="uploadSourceBoxId.set($any($event))" />
     </mat-form-field>
     <label class="upload-button">
       <input type="file" accept="image/*" multiple (change)="uploadFiles($event)" [disabled]="uploading()" />
