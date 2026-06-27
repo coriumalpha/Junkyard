@@ -1,104 +1,4 @@
-<mat-sidenav-container class="inventory-shell">
-  <mat-sidenav
-    class="inventory-drawer"
-    [class.collapsed]="drawerCollapsed() && !handset()"
-    [mode]="handset() ? 'over' : 'side'"
-    [opened]="handset() ? drawerOpen() : true"
-    [fixedInViewport]="handset()"
-  >
-    <div class="drawer-top">
-      <div class="drawer-brand">
-        <span class="drawer-mark">
-          <mat-icon>inventory_2</mat-icon>
-        </span>
-        @if (!drawerCollapsed() || handset()) {
-          <div class="drawer-brand-copy">
-            <strong>Inventario SPA</strong>
-            <span>Angular base</span>
-          </div>
-        }
-      </div>
-
-      <button mat-icon-button type="button" (click)="toggleDrawer()" [attr.aria-label]="handset() ? 'Cerrar menú' : (drawerCollapsed() ? 'Expandir menú' : 'Colapsar menú')">
-        <mat-icon>{{ handset() ? 'close' : (drawerCollapsed() ? 'chevron_right' : 'chevron_left') }}</mat-icon>
-      </button>
-    </div>
-
-    <mat-nav-list class="drawer-nav">
-      <a mat-list-item href="#overview" (click)="closeDrawer()">
-        <mat-icon matListItemIcon>insights</mat-icon>
-        <span matListItemTitle>Resumen</span>
-        @if (!drawerCollapsed() || handset()) {
-          <span matListItemLine>Estado general y foco visual</span>
-        }
-      </a>
-      <a mat-list-item routerLink="/dashboard" (click)="closeDrawer()">
-        <mat-icon matListItemIcon>dashboard</mat-icon>
-        <span matListItemTitle>Dashboard</span>
-        @if (!drawerCollapsed() || handset()) {
-          <span matListItemLine>Inicio SPA</span>
-        }
-      </a>
-      <a mat-list-item href="#filters" (click)="closeDrawer()">
-        <mat-icon matListItemIcon>tune</mat-icon>
-        <span matListItemTitle>Filtros</span>
-        @if (!drawerCollapsed() || handset()) {
-          <span matListItemLine>Búsqueda, alcance y modos</span>
-        }
-      </a>
-      <a mat-list-item href="#results" (click)="closeDrawer()">
-        <mat-icon matListItemIcon>view_comfy</mat-icon>
-        <span matListItemTitle>Resultados</span>
-        @if (!drawerCollapsed() || handset()) {
-          <span matListItemLine>Contenedores, ítems y galería</span>
-        }
-      </a>
-      <a mat-list-item routerLink="/photos/inbox" (click)="closeDrawer()">
-        <mat-icon matListItemIcon>photo_library</mat-icon>
-        <span matListItemTitle>Fotos</span>
-        @if (!drawerCollapsed() || handset()) {
-          <span matListItemLine>Bandeja SPA</span>
-        }
-      </a>
-      <a mat-list-item [href]="currentScopeBackendUrl()" target="_blank" rel="noreferrer">
-        <mat-icon matListItemIcon>open_in_new</mat-icon>
-        <span matListItemTitle>Razor</span>
-        @if (!drawerCollapsed() || handset()) {
-          <span matListItemLine>Legacy solo como apoyo</span>
-        }
-      </a>
-    </mat-nav-list>
-
-    <mat-divider />
-
-    @if (!drawerCollapsed() || handset()) {
-      <section class="drawer-stack">
-        <div class="drawer-stat">
-          <span>Ítems</span>
-          <strong>{{ data()?.itemsCount ?? 0 }}</strong>
-        </div>
-        <div class="drawer-stat">
-          <span>Grupos</span>
-          <strong>{{ data()?.groupsCount ?? 0 }}</strong>
-        </div>
-        <div class="drawer-stat">
-          <span>Ámbito</span>
-          <strong>{{ data()?.selectedBoxes?.length ?? 0 }}</strong>
-        </div>
-      </section>
-
-      <section class="drawer-stack compact">
-        <div class="drawer-label">Filtros activos</div>
-        <mat-chip-set>
-          @for (item of filterSummary(); track item) {
-            <mat-chip>{{ item }}</mat-chip>
-          }
-        </mat-chip-set>
-      </section>
-    }
-  </mat-sidenav>
-
-  <mat-sidenav-content class="inventory-main">
+<main class="inventory-main">
     <header class="workspace-header" id="overview">
       <div class="workspace-title">
         <div class="eyebrow-row">
@@ -114,14 +14,6 @@
       </div>
 
       <div class="workspace-actions">
-        <button mat-stroked-button type="button" class="drawer-toggle" (click)="toggleDrawer()">
-          <mat-icon>{{ handset() ? 'menu' : (drawerCollapsed() ? 'chevron_right' : 'chevron_left') }}</mat-icon>
-          @if (!handset()) {
-            {{ drawerCollapsed() ? 'Abrir menú' : 'Cerrar menú' }}
-          } @else {
-            Menú
-          }
-        </button>
         <a mat-stroked-button class="ghost-link" [href]="currentScopeBackendUrl()" target="_blank" rel="noreferrer">
           <mat-icon>open_in_new</mat-icon>
           Abrir Razor
@@ -224,14 +116,31 @@
 
         <div class="advanced-grid">
           <mat-form-field appearance="outline">
-            <mat-label>Categoría</mat-label>
-            <mat-select [value]="state().category" (selectionChange)="setCategory($event.value)">
-              <mat-option value="">Todas</mat-option>
-              @for (category of options().categories; track category) {
-                <mat-option [value]="category">{{ category }}</mat-option>
+            <mat-label>Tags</mat-label>
+            <mat-select [value]="state().tagIds" (selectionChange)="setTagIds($event.value)" multiple>
+              @for (tag of options().tags; track tag.id) {
+                <mat-option [value]="tag.id">{{ tag.name }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
+
+          @if (state().tagIds.length) {
+            <div class="selected-boxes wide-control">
+              <div class="selected-boxes-head">
+                <span>Coincidir con todos los tags</span>
+              </div>
+              <mat-chip-set>
+                @for (tagId of state().tagIds; track tagId) {
+                  <mat-chip (removed)="removeTagId(tagId)">
+                    {{ selectedTagLabel(tagId) }}
+                    <button matChipRemove type="button" [attr.aria-label]="'Quitar tag ' + selectedTagLabel(tagId)">
+                      <mat-icon>cancel</mat-icon>
+                    </button>
+                  </mat-chip>
+                }
+              </mat-chip-set>
+            </div>
+          }
 
           <mat-form-field appearance="outline">
             <mat-label>Ubicación efectiva</mat-label>
@@ -460,7 +369,7 @@
 
                           <div class="group-item-main">
                             <strong>{{ item.name }}</strong>
-                            <span>{{ item.category }}</span>
+                            <span>{{ tagSummary(item) }}</span>
                           </div>
 
                           <div class="group-item-meta">
@@ -546,7 +455,7 @@
                     }
 
                     <div class="item-copy">
-                      <p class="eyebrow">{{ item.category }}</p>
+                      <p class="eyebrow">{{ tagSummary(item) }}</p>
                       <h3>{{ item.name }}</h3>
                       <p>{{ item.quantityLabel }}</p>
                       <p class="item-path">{{ item.boxPath || 'Sin caja' }}</p>
@@ -604,7 +513,11 @@
                     </div>
                     <p class="gallery-meta">{{ item.quantityLabel }}</p>
                     <div class="gallery-tags">
-                      <span class="badge cool">{{ item.category }}</span>
+                      @for (tag of item.tags; track tag.id) {
+                        <span class="badge cool" [style.border-color]="tag.color" [style.color]="tag.color">{{ tag.name }}</span>
+                      } @empty {
+                        <span class="badge cool">{{ item.category }}</span>
+                      }
                       @if (item.consumable) {
                         <span class="badge cool">Consumible</span>
                       }
@@ -645,7 +558,7 @@
 
                   <div class="table-main">
                     <strong>{{ item.name }}</strong>
-                    <span>{{ item.category }}</span>
+                    <span>{{ tagSummary(item) }}</span>
                     @if (item.locationName) {
                       <span>{{ item.locationName }}</span>
                     }
@@ -686,5 +599,4 @@
         </mat-card>
       }
     }
-  </mat-sidenav-content>
-</mat-sidenav-container>
+  </main>

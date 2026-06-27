@@ -11,6 +11,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         var item = await db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
             .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
+            .Include(i => i.ItemTags).ThenInclude(itemTag => itemTag.Tag)
             .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
 
         if (item is null)
@@ -32,6 +33,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             item.Id,
             item.Name,
             item.Category,
+            ToTagDtos(item),
             $"{item.Quantity} {item.Unit}",
             item.Quantity,
             item.Unit ?? "",
@@ -63,22 +65,30 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         InventoryItemUpdateDto input,
         CancellationToken cancellationToken)
     {
-        var item = await db.Items.FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        var item = await db.Items
+            .Include(i => i.ItemTags)
+            .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
         if (item is null)
         {
             return (null, null);
         }
 
         var name = (input.Name ?? "").Trim();
-        var category = (input.Category ?? "").Trim();
+        var tagIds = input.TagIds?.Where(tagId => tagId > 0).Distinct().ToList() ?? [];
         if (string.IsNullOrWhiteSpace(name))
         {
             return (null, "El nombre es obligatorio.");
         }
 
-        if (string.IsNullOrWhiteSpace(category))
+        if (tagIds.Count == 0)
         {
-            return (null, "La categoría es obligatoria.");
+            return (null, "Selecciona al menos un tag.");
+        }
+
+        var tags = await db.Tags.Where(tag => tagIds.Contains(tag.Id)).ToListAsync(cancellationToken);
+        if (tags.Count != tagIds.Count)
+        {
+            return (null, "Algún tag seleccionado no existe.");
         }
 
         if (input.BoxId is int boxId && boxId > 0 && !await db.Boxes.AnyAsync(box => box.Id == boxId, cancellationToken))
@@ -88,7 +98,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
 
         item.BoxId = input.BoxId is > 0 ? input.BoxId : null;
         item.Name = name;
-        item.Category = category;
+        item.Category = tags.OrderBy(tag => tag.Name).First().Name;
         item.Quantity = input.Quantity;
         item.Unit = string.IsNullOrWhiteSpace(input.Unit) ? null : input.Unit.Trim();
         item.MinQuantity = input.MinQuantity;
@@ -99,9 +109,66 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         item.Obsolete = input.Obsolete;
         item.Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim();
         item.UpdatedAt = DateTime.UtcNow;
+        item.ItemTags.Clear();
+        foreach (var tag in tags.OrderBy(tag => tag.Name))
+        {
+            item.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = tag.Id });
+        }
 
         await db.SaveChangesAsync(cancellationToken);
         return (await GetItemDetailAsync(id, cancellationToken), null);
+    }
+
+    public async Task<TagsResponseDto> GetTagsAsync(CancellationToken cancellationToken)
+    {
+        var tags = await db.Tags.AsNoTracking()
+            .OrderBy(tag => tag.Name)
+            .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color))
+            .ToListAsync(cancellationToken);
+
+        return new TagsResponseDto(tags);
+    }
+
+    public async Task<(TagDto? Tag, string? Error)> CreateTagAsync(TagUpdateDto input, CancellationToken cancellationToken)
+    {
+        var name = (input.Name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return (null, "El nombre del tag es obligatorio.");
+        }
+
+        var color = NormalizeTagColor(input.Color);
+        var existing = await db.Tags.FirstOrDefaultAsync(tag => tag.Name == name, cancellationToken);
+        if (existing is not null)
+        {
+            return (new TagDto(existing.Id, existing.Name, existing.Color), null);
+        }
+
+        var tag = new Tag { Name = name, Color = color };
+        db.Tags.Add(tag);
+        await db.SaveChangesAsync(cancellationToken);
+        return (new TagDto(tag.Id, tag.Name, tag.Color), null);
+    }
+
+    public async Task<(TagDto? Tag, string? Error)> UpdateTagAsync(int id, TagUpdateDto input, CancellationToken cancellationToken)
+    {
+        var tag = await db.Tags.FirstOrDefaultAsync(tag => tag.Id == id, cancellationToken);
+        if (tag is null)
+        {
+            return (null, null);
+        }
+
+        var name = (input.Name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return (null, "El nombre del tag es obligatorio.");
+        }
+
+        tag.Name = name;
+        tag.Color = NormalizeTagColor(input.Color);
+        tag.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return (new TagDto(tag.Id, tag.Name, tag.Color), null);
     }
 
     public async Task<InventoryBoxDetailDto?> GetBoxDetailAsync(string code, CancellationToken cancellationToken)
@@ -116,7 +183,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             .Include(b => b.Location)
             .Include(b => b.ParentBox)
             .Include(b => b.ChildBoxes)
-            .Include(b => b.Items)
+            .Include(b => b.Items).ThenInclude(item => item.ItemTags).ThenInclude(itemTag => itemTag.Tag)
             .FirstOrDefaultAsync(b => b.Code == normalizedCode, cancellationToken);
 
         if (box is null)
@@ -397,6 +464,65 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
                 photo.EntityId)).ToList());
     }
 
+    public async Task<InventoryActionsResponseDto> GetActionsAsync(CancellationToken cancellationToken)
+    {
+        var actions = await db.InventoryActions.AsNoTracking()
+            .Where(action => action.Kind == InventoryActionKind.Task)
+            .OrderBy(action => action.Status == InventoryActionStatus.Completed)
+            .ThenByDescending(action => action.Priority)
+            .ThenByDescending(action => action.CreatedAt)
+            .Take(300)
+            .ToListAsync(cancellationToken);
+
+        var boxIds = actions
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Box && action.LinkedEntityId.HasValue)
+            .Select(action => action.LinkedEntityId!.Value)
+            .Distinct()
+            .ToList();
+        var itemIds = actions
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Item && action.LinkedEntityId.HasValue)
+            .Select(action => action.LinkedEntityId!.Value)
+            .Distinct()
+            .ToList();
+
+        var boxes = boxIds.Count == 0
+            ? new Dictionary<int, Box>()
+            : await db.Boxes.AsNoTracking()
+                .Where(box => boxIds.Contains(box.Id))
+                .ToDictionaryAsync(box => box.Id, cancellationToken);
+        var items = itemIds.Count == 0
+            ? new Dictionary<int, Item>()
+            : await db.Items.AsNoTracking()
+                .Include(item => item.Box)
+                .Where(item => itemIds.Contains(item.Id))
+                .ToDictionaryAsync(item => item.Id, cancellationToken);
+
+        var rows = actions.Select(action => ToActionDto(action, boxes, items)).ToList();
+        return new InventoryActionsResponseDto(
+            rows.Count(action => action.Status == InventoryActionStatus.Open.ToString()),
+            rows.Count(action => action.Status == InventoryActionStatus.Completed.ToString()),
+            rows);
+    }
+
+    public async Task<InventoryActionDto?> UpdateActionStatusAsync(
+        int id,
+        InventoryActionStatus status,
+        CancellationToken cancellationToken)
+    {
+        var action = await db.InventoryActions.FirstOrDefaultAsync(action => action.Id == id && action.Kind == InventoryActionKind.Task, cancellationToken);
+        if (action is null)
+        {
+            return null;
+        }
+
+        action.Status = status;
+        action.CompletedAt = status == InventoryActionStatus.Completed ? DateTime.UtcNow : null;
+        action.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return (await GetActionsAsync(cancellationToken)).Actions.FirstOrDefault(row => row.Id == id);
+    }
+
     public async Task<InventoryOptionsDto> GetOptionsAsync(CancellationToken cancellationToken)
     {
         var categories = await db.Items.AsNoTracking()
@@ -405,31 +531,47 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             .Distinct()
             .OrderBy(category => category)
             .ToListAsync(cancellationToken);
+        var tags = await db.Tags.AsNoTracking()
+            .OrderBy(tag => tag.Name)
+            .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color))
+            .ToListAsync(cancellationToken);
 
         var locations = await db.Locations.AsNoTracking()
             .OrderBy(location => location.Name)
             .Select(location => new InventoryOptionDto(location.Id, location.Name))
             .ToListAsync(cancellationToken);
 
-        var boxes = await db.Boxes.AsNoTracking()
+        var boxesRaw = await db.Boxes.AsNoTracking()
             .Include(box => box.Location)
             .Include(box => box.ParentBox)
             .OrderBy(box => box.Code)
+            .ToListAsync(cancellationToken);
+        var boxCoverFilenames = boxesRaw
+            .Select(box => box.CoverPhoto)
+            .Where(filename => !string.IsNullOrWhiteSpace(filename))
+            .Select(filename => filename!)
+            .Distinct()
+            .ToList();
+        var boxCoverStates = await PhotoStorage.LoadViewStatesAsync(db, boxCoverFilenames, cancellationToken);
+        var boxes = boxesRaw
             .Select(box => new InventoryBoxOptionDto(
                 box.Id,
                 box.Code,
                 box.Name,
                 BuildBoxPath(box),
                 box.LocationDisplay,
-                box.ContainerTypeLabel))
-            .ToListAsync(cancellationToken);
+                box.ContainerTypeLabel,
+                ThumbUrl(boxCoverStates, box.CoverPhoto),
+                RotationFor(boxCoverStates, box.CoverPhoto)))
+            .ToList();
 
-        return new InventoryOptionsDto(categories, locations, boxes);
+        return new InventoryOptionsDto(categories, tags, locations, boxes);
     }
 
     public async Task<InventoryLiveResponseDto> GetLiveAsync(
         string? q,
         string? category,
+        int[]? tagIds,
         string? box,
         int[]? boxIds,
         int? boxId,
@@ -442,6 +584,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
     {
         var queryValue = (q ?? "").Trim();
         var categoryValue = (category ?? "").Trim();
+        var selectedTagIds = tagIds?.Where(id => id > 0).Distinct().OrderBy(id => id).ToList() ?? [];
         var boxCode = Box.NormalizePublicCode(box);
         var viewMode = string.Equals(view, "flat", StringComparison.OrdinalIgnoreCase) ? "flat" : "grouped";
         var locationLookup = await BoxHierarchyService.BuildLocationLookupAsync(db, cancellationToken);
@@ -451,6 +594,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         var query = db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
             .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
+            .Include(i => i.ItemTags).ThenInclude(itemTag => itemTag.Tag)
             .AsQueryable();
 
         if (boxIds is { Length: > 0 })
@@ -563,6 +707,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             var term = queryValue.ToLowerInvariant();
             query = query.Where(i => i.Name.ToLower().Contains(term)
                 || i.Category.ToLower().Contains(term)
+                || i.ItemTags.Any(itemTag => itemTag.Tag.Name.ToLower().Contains(term))
                 || (i.Notes != null && i.Notes.ToLower().Contains(term))
                 || (i.Box != null && (i.Box.Code.ToLower().Contains(term) || i.Box.Name.ToLower().Contains(term))));
         }
@@ -570,6 +715,11 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         if (!string.IsNullOrWhiteSpace(categoryValue))
         {
             query = query.Where(i => i.Category == categoryValue);
+        }
+
+        foreach (var tagIdFilter in selectedTagIds)
+        {
+            query = query.Where(i => i.ItemTags.Any(itemTag => itemTag.TagId == tagIdFilter));
         }
 
         var items = await query
@@ -647,6 +797,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         return new InventoryLiveResponseDto(
             queryValue,
             categoryValue,
+            selectedTagIds,
             boxCode,
             boxId,
             selectedBoxIds,
@@ -702,6 +853,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             path,
             locationName,
             item.Category,
+            ToTagDtos(item),
             $"{item.Quantity} {item.Unit}",
             string.IsNullOrWhiteSpace(item.CoverPhoto) ? item.Name[..Math.Min(1, item.Name.Length)] : null,
             item.Consumable,
@@ -726,10 +878,33 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         return photos.Select(photo => new InventoryPhotoDto(
                 photo.Id,
                 PhotoStorage.ThumbUrl(photo.Filename, photoStates.GetValueOrDefault(photo.Filename)?.UpdatedAt ?? photo.UpdatedAt),
+                PhotoStorage.PreviewUrl(photo.Filename, photoStates.GetValueOrDefault(photo.Filename)?.UpdatedAt ?? photo.UpdatedAt),
                 photoStates.TryGetValue(photo.Filename, out var state) ? state.RotationDegrees : photo.RotationDegrees,
                 photo.Caption,
                 photo.CreatedAt))
             .ToList();
+    }
+
+    private static List<TagDto> ToTagDtos(Item item)
+    {
+        return item.ItemTags
+            .Where(itemTag => itemTag.Tag is not null)
+            .Select(itemTag => itemTag.Tag)
+            .OrderBy(tag => tag.Name)
+            .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color))
+            .ToList();
+    }
+
+    private static string NormalizeTagColor(string? color)
+    {
+        var value = (color ?? "").Trim();
+        if (value.Length == 7 && value[0] == '#'
+            && value.Skip(1).All(Uri.IsHexDigit))
+        {
+            return value.ToLowerInvariant();
+        }
+
+        return "#48ffb0";
     }
 
     private static string? ThumbUrl(IReadOnlyDictionary<string, PhotoViewState> photoStates, string? filename)
@@ -773,11 +948,49 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         return string.Join(" / ", parts);
     }
 
+    private static InventoryActionDto ToActionDto(
+        InventoryAction action,
+        IReadOnlyDictionary<int, Box> boxes,
+        IReadOnlyDictionary<int, Item> items)
+    {
+        var linkedLabel = action.LinkedEntityType switch
+        {
+            InventoryActionLinkedEntityType.Box when action.LinkedEntityId is int boxId && boxes.TryGetValue(boxId, out var box) => $"{box.Code} · {box.Name}",
+            InventoryActionLinkedEntityType.Item when action.LinkedEntityId is int itemId && items.TryGetValue(itemId, out var item) => item.Box is null ? item.Name : $"{item.Name} · {item.Box.Code}",
+            _ => "Sin vínculo"
+        };
+        var spaUrl = action.LinkedEntityType switch
+        {
+            InventoryActionLinkedEntityType.Box when action.LinkedEntityId is int boxId && boxes.TryGetValue(boxId, out var box) => $"/boxes/{Uri.EscapeDataString(box.Code)}",
+            InventoryActionLinkedEntityType.Item when action.LinkedEntityId is int itemId && items.ContainsKey(itemId) => $"/item/{itemId}",
+            _ => null
+        };
+        var legacyUrl = action.LinkedEntityType switch
+        {
+            InventoryActionLinkedEntityType.Box when action.LinkedEntityId is int boxId && boxes.TryGetValue(boxId, out var box) => $"/Boxes/Details?code={Uri.EscapeDataString(box.Code)}",
+            InventoryActionLinkedEntityType.Item when action.LinkedEntityId is int itemId && items.ContainsKey(itemId) => $"/Items/Edit?id={itemId}",
+            _ => null
+        };
+
+        return new InventoryActionDto(
+            action.Id,
+            action.Title,
+            action.Description,
+            action.Priority,
+            action.Status.ToString(),
+            linkedLabel,
+            spaUrl,
+            legacyUrl,
+            action.CreatedAt,
+            action.CompletedAt);
+    }
+
 }
 
 public record InventoryLiveResponseDto(
     string Query,
     string Category,
+    List<int> TagIds,
     string BoxCode,
     int? BoxId,
     List<int> BoxIds,
@@ -809,6 +1022,7 @@ public record InventoryItemDetailDto(
     int Id,
     string Name,
     string Category,
+    List<TagDto> Tags,
     string QuantityLabel,
     decimal Quantity,
     string Unit,
@@ -830,6 +1044,7 @@ public record InventoryItemDetailDto(
 public record InventoryItemUpdateDto(
     string? Name,
     string? Category,
+    List<int>? TagIds,
     decimal Quantity,
     string? Unit,
     decimal? MinQuantity,
@@ -887,6 +1102,7 @@ public record InventoryBoxLinkDto(
 public record InventoryPhotoDto(
     int Id,
     string Url,
+    string PreviewUrl,
     int RotationDegrees,
     string? Caption,
     DateTime CreatedAt);
@@ -942,8 +1158,26 @@ public record DashboardPhotoDto(
     string EntityType,
     int EntityId);
 
+public record InventoryActionsResponseDto(
+    int OpenCount,
+    int CompletedCount,
+    List<InventoryActionDto> Actions);
+
+public record InventoryActionDto(
+    int Id,
+    string Title,
+    string? Description,
+    int Priority,
+    string Status,
+    string LinkedLabel,
+    string? SpaUrl,
+    string? LegacyUrl,
+    DateTime CreatedAt,
+    DateTime? CompletedAt);
+
 public record InventoryOptionsDto(
     List<string> Categories,
+    List<TagDto> Tags,
     List<InventoryOptionDto> Locations,
     List<InventoryBoxOptionDto> Boxes);
 
@@ -957,7 +1191,9 @@ public record InventoryBoxOptionDto(
     string Name,
     string Path,
     string? LocationName,
-    string ContainerTypeLabel);
+    string ContainerTypeLabel,
+    string? CoverUrl,
+    int RotationDegrees);
 
 public record InventorySelectedBoxDto(
     int Id,
@@ -1005,9 +1241,16 @@ public record InventoryItemDto(
     string? BoxPath,
     string? LocationName,
     string Category,
+    List<TagDto> Tags,
     string QuantityLabel,
     string? GeneratedLabel,
     bool Consumable,
     bool LowStock,
     bool Sentimental,
     bool Obsolete);
+
+public record TagsResponseDto(List<TagDto> Tags);
+
+public record TagDto(int Id, string Name, string Color);
+
+public record TagUpdateDto(string? Name, string? Color);

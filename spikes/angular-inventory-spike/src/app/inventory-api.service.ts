@@ -8,6 +8,7 @@ export type InventoryLayoutMode = 'grouped' | 'flat' | 'gallery' | 'table';
 export interface InventoryQueryState {
   q: string;
   category: string;
+  tagIds: number[];
   box: string;
   boxIds: number[];
   locationId: number | null;
@@ -21,6 +22,7 @@ export interface InventoryQueryState {
 export interface InventoryLiveResponse {
   query: string;
   category: string;
+  tagIds: number[];
   boxCode: string;
   boxId: number | null;
   boxIds: number[];
@@ -40,8 +42,24 @@ export interface InventoryLiveResponse {
 
 export interface InventoryOptionsResponse {
   categories: string[];
+  tags: InventoryTag[];
   locations: InventoryOption[];
   boxes: InventoryBoxOption[];
+}
+
+export interface TagsResponse {
+  tags: InventoryTag[];
+}
+
+export interface InventoryTag {
+  id: number;
+  name: string;
+  color: string;
+}
+
+export interface TagUpdate {
+  name: string;
+  color: string;
 }
 
 export interface InventoryOption {
@@ -56,6 +74,8 @@ export interface InventoryBoxOption {
   path: string;
   locationName: string | null;
   containerTypeLabel: string;
+  coverUrl: string | null;
+  rotationDegrees: number;
 }
 
 export interface InventorySelectedBox {
@@ -107,6 +127,7 @@ export interface InventoryItem {
   boxPath: string | null;
   locationName: string | null;
   category: string;
+  tags: InventoryTag[];
   quantityLabel: string;
   generatedLabel: string | null;
   consumable: boolean;
@@ -162,10 +183,30 @@ export interface DashboardPhoto {
   entityId: number;
 }
 
+export interface InventoryActionsResponse {
+  openCount: number;
+  completedCount: number;
+  actions: InventoryAction[];
+}
+
+export interface InventoryAction {
+  id: number;
+  title: string;
+  description: string | null;
+  priority: number;
+  status: string;
+  linkedLabel: string;
+  spaUrl: string | null;
+  legacyUrl: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
 export interface InventoryItemDetail {
   id: number;
   name: string;
   category: string;
+  tags: InventoryTag[];
   quantityLabel: string;
   quantity: number;
   unit: string;
@@ -188,6 +229,7 @@ export interface InventoryItemDetail {
 export interface InventoryItemUpdate {
   name: string;
   category: string;
+  tagIds: number[];
   quantity: number;
   unit: string;
   minQuantity: number | null;
@@ -250,6 +292,7 @@ export interface InventoryBoxLink {
 export interface InventoryPhoto {
   id: number;
   url: string;
+  previewUrl: string;
   rotationDegrees: number;
   caption: string | null;
   createdAt: string;
@@ -293,6 +336,10 @@ export class InventoryApiService {
       params = params.set('category', state.category.trim());
     }
 
+    for (const tagId of state.tagIds) {
+      params = params.append('tagIds', String(tagId));
+    }
+
     if (state.box.trim()) {
       params = params.set('box', state.box.trim());
     }
@@ -326,8 +373,32 @@ export class InventoryApiService {
     return this.http.get<InventoryOptionsResponse>('/api/inventory/options');
   }
 
+  fetchTags(): Observable<TagsResponse> {
+    return this.http.get<TagsResponse>('/api/tags');
+  }
+
+  createTag(input: TagUpdate): Observable<InventoryTag> {
+    return this.http.post<InventoryTag>('/api/tags', input);
+  }
+
+  updateTag(id: number, input: TagUpdate): Observable<InventoryTag> {
+    return this.http.put<InventoryTag>(`/api/tags/${id}`, input);
+  }
+
   fetchDashboard(): Observable<DashboardResponse> {
     return this.http.get<DashboardResponse>('/api/dashboard');
+  }
+
+  fetchActions(): Observable<InventoryActionsResponse> {
+    return this.http.get<InventoryActionsResponse>('/api/actions');
+  }
+
+  completeAction(id: number): Observable<InventoryAction> {
+    return this.http.post<InventoryAction>(`/api/actions/${id}/complete`, {});
+  }
+
+  reopenAction(id: number): Observable<InventoryAction> {
+    return this.http.post<InventoryAction>(`/api/actions/${id}/reopen`, {});
   }
 
   fetchItem(id: number): Observable<InventoryItemDetail> {

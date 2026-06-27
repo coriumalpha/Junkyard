@@ -7,14 +7,6 @@
     </div>
 
     <nav class="detail-actions" aria-label="Acciones de detalle">
-      <a mat-stroked-button routerLink="/dashboard">
-        <mat-icon>dashboard</mat-icon>
-        Dashboard
-      </a>
-      <a mat-stroked-button routerLink="/inventory">
-        <mat-icon>inventory_2</mat-icon>
-        Inventario
-      </a>
       @if (kind() === 'item' && item()) {
         <button mat-flat-button type="button" (click)="startItemEdit()">
           <mat-icon>edit</mat-icon>
@@ -57,9 +49,23 @@
     }
 
     <section class="detail-grid">
-      <mat-card class="hero-card">
-        @if (item()!.photos.length) {
-          <img [src]="assetUrl(item()!.photos[0].url)!" [style.transform]="'rotate(' + item()!.photos[0].rotationDegrees + 'deg)'" [alt]="item()!.name" />
+      <mat-card class="product-gallery">
+        @if (activePhoto()) {
+          <div class="thumb-rail" aria-label="Fotos del ítem">
+            @for (photo of item()!.photos; track photoTrack($index, photo)) {
+              <button type="button" class="thumb-button" [class.active]="$index === activePhotoIndex()" (click)="selectPhoto($index)">
+                <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || item()!.name" />
+              </button>
+            }
+          </div>
+          <div class="main-photo"
+               (mousemove)="updateZoomOrigin($event)"
+               (mouseleave)="stopZoom()">
+            <img [src]="assetUrl(activePhoto()!.previewUrl || activePhoto()!.url)!"
+                 [style.transform]="activePhotoTransform(activePhoto()!)"
+                 [style.transform-origin]="zoomOriginX() + ' ' + zoomOriginY()"
+                 [alt]="activePhoto()!.caption || item()!.name" />
+          </div>
         } @else {
           <div class="hero-placeholder">{{ firstLetter(item()!.name) }}</div>
         }
@@ -69,7 +75,7 @@
         <p class="eyebrow">Ítem</p>
         <h2>{{ item()!.name }}</h2>
         <div class="meta-grid">
-          <span>Categoría</span><strong>{{ item()!.category }}</strong>
+          <span>Tags</span><strong>{{ tagSummary(item()!) }}</strong>
           <span>Cantidad</span><strong>{{ item()!.quantityLabel }}</strong>
           <span>Mínimo</span><strong>{{ item()!.minQuantity ?? 'Sin mínimo' }}</strong>
           <span>Estado</span><strong>{{ item()!.condition || 'Sin estado' }}</strong>
@@ -110,13 +116,28 @@
             </mat-form-field>
 
             <mat-form-field appearance="outline">
-              <mat-label>Categoría</mat-label>
-              <mat-select [ngModel]="itemForm().category" (ngModelChange)="patchItemForm({ category: $event })">
-                @for (category of options().categories; track category) {
-                  <mat-option [value]="category">{{ category }}</mat-option>
+              <mat-label>Tags</mat-label>
+              <mat-select [ngModel]="itemForm().tagIds" (ngModelChange)="patchItemForm({ tagIds: $event })" multiple>
+                @for (tag of options().tags; track tag.id) {
+                  <mat-option [value]="tag.id">{{ tag.name }}</mat-option>
                 }
               </mat-select>
             </mat-form-field>
+
+            <div class="quick-tag wide">
+              <mat-form-field appearance="outline">
+                <mat-label>Nuevo tag</mat-label>
+                <input matInput [ngModel]="newTagName()" (ngModelChange)="setNewTagName($event)" />
+              </mat-form-field>
+              <label class="color-pick">
+                <span>Color</span>
+                <input type="color" [ngModel]="newTagColor()" (ngModelChange)="setNewTagColor($event)" />
+              </label>
+              <button mat-stroked-button type="button" (click)="quickCreateTag()" [disabled]="!newTagName().trim() || saving()">
+                <mat-icon>add</mat-icon>
+                Crear y asignar
+              </button>
+            </div>
 
             <mat-form-field appearance="outline">
               <mat-label>Contenedor</mat-label>
@@ -177,26 +198,10 @@
 
       <mat-card class="info-card">
         <p class="eyebrow">Ubicación</p>
-        @if (item()!.box) {
-          <h2>{{ item()!.box!.code }} · {{ item()!.box!.name }}</h2>
-          <p>{{ item()!.box!.path }}</p>
-          <p>{{ item()!.box!.locationName || 'Sin ubicación' }} @if (item()!.box!.locationSourceLabel) { · {{ item()!.box!.locationSourceLabel }} }</p>
-          <a mat-stroked-button [routerLink]="['/boxes', item()!.box!.code]">
-            <mat-icon>inventory_2</mat-icon>
-            Ver contenedor
-          </a>
-        } @else {
-          <h2>Sin caja</h2>
-          <p>Ítem pendiente de clasificar.</p>
-        }
+        <app-hierarchy-trail [nodes]="itemHierarchyNodes()" />
       </mat-card>
     </section>
 
-    <section class="photo-section">
-      @for (photo of item()!.photos; track photoTrack($index, photo)) {
-        <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || item()!.name" />
-      }
-    </section>
   } @else if (box()) {
     @if (saveMessage()) {
       <section class="state-panel success">
@@ -206,9 +211,23 @@
     }
 
     <section class="detail-grid">
-      <mat-card class="hero-card">
-        @if (box()!.photos.length) {
-          <img [src]="assetUrl(box()!.photos[0].url)!" [style.transform]="'rotate(' + box()!.photos[0].rotationDegrees + 'deg)'" [alt]="box()!.name" />
+      <mat-card class="product-gallery">
+        @if (activePhoto()) {
+          <div class="thumb-rail" aria-label="Fotos del contenedor">
+            @for (photo of box()!.photos; track photoTrack($index, photo)) {
+              <button type="button" class="thumb-button" [class.active]="$index === activePhotoIndex()" (click)="selectPhoto($index)">
+                <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || box()!.name" />
+              </button>
+            }
+          </div>
+          <div class="main-photo"
+               (mousemove)="updateZoomOrigin($event)"
+               (mouseleave)="stopZoom()">
+            <img [src]="assetUrl(activePhoto()!.previewUrl || activePhoto()!.url)!"
+                 [style.transform]="activePhotoTransform(activePhoto()!)"
+                 [style.transform-origin]="zoomOriginX() + ' ' + zoomOriginY()"
+                 [alt]="activePhoto()!.caption || box()!.name" />
+          </div>
         } @else {
           <div class="hero-placeholder">{{ box()!.code }}</div>
         }
@@ -296,16 +315,34 @@
         </mat-card>
       }
 
-      <mat-card class="info-card">
+      <mat-card class="info-card container-summary-card">
         <p class="eyebrow">Contenedor</p>
         <h2>{{ box()!.code }} · {{ box()!.name }}</h2>
-        <div class="meta-grid">
-          <span>Tipo</span><strong>{{ box()!.containerTypeLabel }}</strong>
-          <span>Estado</span><strong>{{ box()!.status }}</strong>
-          <span>Ítems</span><strong>{{ box()!.items.length }}</strong>
-          <span>Hijos</span><strong>{{ box()!.children.length }}</strong>
-          <span>Ubicación</span><strong>{{ box()!.locationName || 'Sin ubicación' }}</strong>
-          <span>Actualizado</span><strong>{{ box()!.updatedAt | date:'short' }}</strong>
+        <div class="container-stat-grid">
+          <span>
+            <small>Tipo</small>
+            <strong>{{ box()!.containerTypeLabel }}</strong>
+          </span>
+          <span>
+            <small>Estado</small>
+            <strong>{{ box()!.status }}</strong>
+          </span>
+          <span>
+            <small>Ítems</small>
+            <strong>{{ box()!.items.length }}</strong>
+          </span>
+          <span>
+            <small>Hijos</small>
+            <strong>{{ box()!.children.length }}</strong>
+          </span>
+          <span class="wide">
+            <small>Ubicación</small>
+            <strong>{{ box()!.locationName || 'Sin ubicación' }}</strong>
+          </span>
+          <span class="wide">
+            <small>Actualizado</small>
+            <strong>{{ box()!.updatedAt | date:'short' }}</strong>
+          </span>
         </div>
         @if (box()!.description) {
           <mat-divider />
@@ -314,21 +351,20 @@
       </mat-card>
 
       <mat-card class="info-card">
-        <p class="eyebrow">Jerarquía</p>
-        <h2>{{ box()!.path }}</h2>
-        @if (box()!.parent) {
-          <a mat-stroked-button [routerLink]="['/boxes', box()!.parent!.code]">
-            <mat-icon>arrow_upward</mat-icon>
-            {{ box()!.parent!.code }}
-          </a>
-        }
-        <mat-chip-set>
+        <p class="eyebrow">Ubicación y jerarquía</p>
+        <app-hierarchy-trail [nodes]="boxHierarchyNodes()" />
+        @if (box()!.children.length) {
+          <div class="child-container-list">
+            <p class="subsection-label">Dentro de este contenedor</p>
           @for (child of box()!.children; track child.id) {
-            <mat-chip>
-              <a [routerLink]="['/boxes', child.code]">{{ child.code }} · {{ child.name }}</a>
-            </mat-chip>
+              <app-entity-mini-card
+                [title]="child.name"
+                [subtitle]="child.code"
+                [placeholder]="child.code.slice(-2)"
+                [routerLink]="['/boxes', child.code]" />
           }
-        </mat-chip-set>
+          </div>
+        }
       </mat-card>
     </section>
 
@@ -339,25 +375,18 @@
       </div>
       <div class="item-list">
         @for (item of box()!.items; track item.id) {
-          <a class="item-row" [routerLink]="['/item', item.id]">
-            @if (item.coverUrl) {
-              <img [src]="assetUrl(item.coverUrl)!" [style.transform]="'rotate(' + item.rotationDegrees + 'deg)'" [alt]="item.name" />
-            } @else {
-              <span>{{ firstLetter(item.name) }}</span>
-            }
-            <strong>{{ item.name }}</strong>
-            <small>{{ item.category }} · {{ item.quantityLabel }}</small>
-          </a>
+          <app-entity-mini-card
+            [title]="item.name"
+            [subtitle]="tagSummary(item) + ' · ' + item.quantityLabel"
+            [imageUrl]="assetUrl(item.coverUrl)"
+            [rotationDegrees]="item.rotationDegrees"
+            [placeholder]="firstLetter(item.name)"
+            [routerLink]="['/item', item.id]" />
         } @empty {
           <div class="empty">Sin ítems directos.</div>
         }
       </div>
     </section>
 
-    <section class="photo-section">
-      @for (photo of box()!.photos; track photoTrack($index, photo)) {
-        <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || box()!.name" />
-      }
-    </section>
   }
 </main>

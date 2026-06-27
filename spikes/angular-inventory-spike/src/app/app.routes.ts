@@ -27,6 +27,18 @@ export const routes: Routes = [
     loadComponent: () => import('./photo-inbox-page.component').then((m) => m.PhotoInboxPageComponent)
   },
   {
+    path: 'locations',
+    loadComponent: () => import('./locations-page.component').then((m) => m.LocationsPageComponent)
+  },
+  {
+    path: 'actions',
+    loadComponent: () => import('./actions-page.component').then((m) => m.ActionsPageComponent)
+  },
+  {
+    path: 'settings/tags',
+    loadComponent: () => import('./settings-tags-page.component').then((m) => m.SettingsTagsPageComponent)
+  },
+  {
     path: '**',
     redirectTo: 'inventory'
   }

@@ -15,6 +15,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
+import { EntityMiniCardComponent } from './entity-mini-card.component';
+import { HierarchyTrailComponent, HierarchyTrailNode } from './hierarchy-trail.component';
 import { InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryOptionsResponse, InventoryPhoto } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
 
@@ -34,10 +36,11 @@ type DetailKind = 'item' | 'box';
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
-    MatProgressSpinnerModule
-    ,
+    MatProgressSpinnerModule,
     MatSelectModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    EntityMiniCardComponent,
+    HierarchyTrailComponent
   ],
   templateUrl: './detail-page.component.html',
   styleUrl: './detail-page.component.scss'
@@ -53,9 +56,15 @@ export class DetailPageComponent {
   protected readonly saving = signal(false);
   protected readonly saveMessage = signal<string | null>(null);
   protected readonly formError = signal<string | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], locations: [], boxes: [] });
   protected readonly itemForm = signal<InventoryItemUpdate>(this.emptyItemForm());
   protected readonly boxForm = signal<InventoryBoxUpdate>(this.emptyBoxForm());
+  protected readonly newTagName = signal('');
+  protected readonly newTagColor = signal('#48ffb0');
+  protected readonly activePhotoIndex = signal(0);
+  protected readonly zooming = signal(false);
+  protected readonly zoomOriginX = signal('50%');
+  protected readonly zoomOriginY = signal('50%');
   protected readonly containerTypes = [
     { value: 'box', label: 'Caja' },
     { value: 'subbox', label: 'Subcaja' },
@@ -71,6 +80,78 @@ export class DetailPageComponent {
   ];
   protected readonly boxStatuses = ['Active', 'Quarantine', 'Archived'];
   protected readonly title = computed(() => this.item()?.name ?? this.box()?.name ?? 'Detalle');
+  protected readonly currentPhotos = computed(() => this.item()?.photos ?? this.box()?.photos ?? []);
+  protected readonly activePhoto = computed(() => this.currentPhotos()[this.activePhotoIndex()] ?? null);
+  protected readonly itemHierarchyNodes = computed<HierarchyTrailNode[]>(() => {
+    const item = this.item();
+    if (!item) {
+      return [];
+    }
+
+    const nodes: HierarchyTrailNode[] = [];
+    if (item.box) {
+      nodes.push({
+        label: item.box.locationName || 'Sin ubicación',
+        sublabel: item.box.locationSourceLabel,
+        icon: 'place',
+        routerLink: item.box.locationName ? ['/locations'] : null,
+        tone: 'location'
+      });
+      nodes.push({
+        label: `${item.box.code} · ${item.box.name}`,
+        sublabel: item.box.path,
+        icon: 'inventory_2',
+        routerLink: ['/boxes', item.box.code],
+        tone: 'box'
+      });
+    } else {
+      nodes.push({
+        label: 'Sin contenedor',
+        sublabel: 'Pendiente de clasificar',
+        icon: 'location_off',
+        tone: 'muted'
+      });
+    }
+
+    nodes.push({
+      label: item.name,
+      sublabel: this.tagSummary(item),
+      icon: 'category',
+      tone: 'item'
+    });
+    return nodes;
+  });
+  protected readonly boxHierarchyNodes = computed<HierarchyTrailNode[]>(() => {
+    const box = this.box();
+    if (!box) {
+      return [];
+    }
+
+    const nodes: HierarchyTrailNode[] = [{
+      label: box.locationName || 'Sin ubicación',
+      sublabel: box.locationSourceLabel,
+      icon: 'place',
+      routerLink: box.locationName ? ['/locations'] : null,
+      tone: 'location'
+    }];
+
+    if (box.parent) {
+      nodes.push({
+        label: `${box.parent.code} · ${box.parent.name}`,
+        icon: 'inventory_2',
+        routerLink: ['/boxes', box.parent.code],
+        tone: 'box'
+      });
+    }
+
+    nodes.push({
+      label: `${box.code} · ${box.name}`,
+      sublabel: box.path,
+      icon: 'inventory_2',
+      tone: 'current'
+    });
+    return nodes;
+  });
   protected readonly subtitle = computed(() => {
     const item = this.item();
     if (item) {
@@ -98,6 +179,8 @@ export class DetailPageComponent {
         this.error.set(null);
         this.item.set(null);
         this.box.set(null);
+        this.activePhotoIndex.set(0);
+        this.zooming.set(false);
         this.editingItem.set(false);
         this.editingBox.set(false);
         this.saveMessage.set(null);
@@ -108,24 +191,35 @@ export class DetailPageComponent {
           const id = Number.parseInt(value, 10);
           if (!Number.isInteger(id) || id < 1) {
             this.error.set('Ítem no válido.');
+            this.loading.set(false);
             return EMPTY;
           }
 
-          return this.api.fetchItem(id).pipe(tap((item) => this.item.set(item)));
+          return this.api.fetchItem(id).pipe(
+            tap((item) => this.item.set(item)),
+            catchError((error: unknown) => {
+              this.error.set(error instanceof Error ? error.message : 'No se pudo cargar el detalle.');
+              return EMPTY;
+            }),
+            finalize(() => this.loading.set(false))
+          );
         }
 
         if (!value.trim()) {
           this.error.set('Contenedor no válido.');
+          this.loading.set(false);
           return EMPTY;
         }
 
-        return this.api.fetchBox(value).pipe(tap((box) => this.box.set(box)));
+        return this.api.fetchBox(value).pipe(
+          tap((box) => this.box.set(box)),
+          catchError((error: unknown) => {
+            this.error.set(error instanceof Error ? error.message : 'No se pudo cargar el detalle.');
+            return EMPTY;
+          }),
+          finalize(() => this.loading.set(false))
+        );
       }),
-      catchError((error: unknown) => {
-        this.error.set(error instanceof Error ? error.message : 'No se pudo cargar el detalle.');
-        return EMPTY;
-      }),
-      finalize(() => this.loading.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
 
@@ -145,6 +239,7 @@ export class DetailPageComponent {
     this.itemForm.set({
       name: item.name,
       category: item.category,
+      tagIds: item.tags.map((tag) => tag.id),
       quantity: item.quantity,
       unit: item.unit,
       minQuantity: item.minQuantity,
@@ -211,8 +306,8 @@ export class DetailPageComponent {
       return;
     }
 
-    if (!form.category.trim()) {
-      this.formError.set('La categoría es obligatoria.');
+    if (!form.tagIds.length) {
+      this.formError.set('Selecciona o crea al menos un tag.');
       return;
     }
 
@@ -222,7 +317,7 @@ export class DetailPageComponent {
     this.api.updateItem(item.id, {
       ...form,
       name: form.name.trim(),
-      category: form.category.trim(),
+      category: this.primaryTagName(form.tagIds),
       unit: form.unit.trim(),
       condition: form.condition.trim(),
       retention: form.retention.trim(),
@@ -234,6 +329,7 @@ export class DetailPageComponent {
         this.itemForm.set({
           name: updated.name,
           category: updated.category,
+          tagIds: updated.tags.map((tag) => tag.id),
           quantity: updated.quantity,
           unit: updated.unit,
           minQuantity: updated.minQuantity,
@@ -352,10 +448,88 @@ export class DetailPageComponent {
     return photo.id;
   }
 
+  protected selectPhoto(index: number): void {
+    this.activePhotoIndex.set(index);
+    this.zooming.set(false);
+  }
+
+  protected activePhotoTransform(photo: InventoryPhoto): string {
+    const scale = this.zooming() ? 1.85 : 1;
+    return `rotate(${photo.rotationDegrees}deg) scale(${scale})`;
+  }
+
+  protected updateZoomOrigin(event: MouseEvent): void {
+    const target = event.currentTarget as HTMLElement | null;
+    if (!target) {
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+    this.zoomOriginX.set(`${Math.max(0, Math.min(100, x))}%`);
+    this.zoomOriginY.set(`${Math.max(0, Math.min(100, y))}%`);
+    this.zooming.set(true);
+  }
+
+  protected stopZoom(): void {
+    this.zooming.set(false);
+    this.zoomOriginX.set('50%');
+    this.zoomOriginY.set('50%');
+  }
+
+  protected quickCreateTag(): void {
+    const name = this.newTagName().trim();
+    if (!name || this.saving()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    this.api.createTag({ name, color: this.newTagColor() }).pipe(
+      tap((tag) => {
+        this.options.update((current) => ({
+          ...current,
+          tags: [...current.tags.filter((existing) => existing.id !== tag.id), tag].sort((left, right) => left.name.localeCompare(right.name))
+        }));
+        this.itemForm.update((current) => ({
+          ...current,
+          tagIds: Array.from(new Set([...current.tagIds, tag.id]))
+        }));
+        this.newTagName.set('');
+        this.newTagColor.set('#48ffb0');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo crear el tag.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected setNewTagName(value: string): void {
+    this.newTagName.set(value);
+  }
+
+  protected setNewTagColor(value: string): void {
+    this.newTagColor.set(value);
+  }
+
+  protected tagSummary(item: InventoryItemDetail | InventoryItem): string {
+    return item.tags.length ? item.tags.map((tag) => tag.name).join(', ') : item.category;
+  }
+
+  protected primaryTagName(tagIds: number[]): string {
+    const first = this.options().tags.find((tag) => tagIds.includes(tag.id));
+    return first?.name ?? 'Otros';
+  }
+
   private emptyItemForm(): InventoryItemUpdate {
     return {
       name: '',
       category: 'Otros',
+      tagIds: [],
       quantity: 1,
       unit: '',
       minQuantity: null,

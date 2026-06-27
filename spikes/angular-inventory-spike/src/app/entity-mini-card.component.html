@@ -1,0 +1,26 @@
+@if (routerLink) {
+  <a class="entity-mini-card" [routerLink]="routerLink">
+    <ng-container [ngTemplateOutlet]="content" />
+  </a>
+} @else {
+  <div class="entity-mini-card">
+    <ng-container [ngTemplateOutlet]="content" />
+  </div>
+}
+
+<ng-template #content>
+  @if (imageUrl) {
+    <img [src]="imageUrl" [style.transform]="'rotate(' + rotationDegrees + 'deg)'" [alt]="title" />
+  } @else {
+    <span class="entity-placeholder">{{ placeholder }}</span>
+  }
+  <span class="entity-copy">
+    <strong>{{ title }}</strong>
+    @if (subtitle) {
+      <small>{{ subtitle }}</small>
+    }
+    @if (meta) {
+      <em>{{ meta }}</em>
+    }
+  </span>
+</ng-template>

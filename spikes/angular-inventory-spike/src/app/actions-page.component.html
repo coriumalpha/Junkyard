@@ -1,0 +1,107 @@
+<main class="actions-shell">
+  <header class="actions-header">
+    <div>
+      <p class="eyebrow">Junkyard / Angular SPA</p>
+      <h1>Pendientes</h1>
+      <p>Tareas operativas vinculadas a contenedores o ítems.</p>
+    </div>
+
+    <a mat-stroked-button [href]="legacyActionsUrl" target="_blank" rel="noreferrer">
+      <mat-icon>add_task</mat-icon>
+      Crear en legacy
+    </a>
+  </header>
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="48" />
+      <span>Cargando pendientes...</span>
+    </section>
+  } @else if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  } @else if (data()) {
+    <section class="stats-row">
+      <mat-card class="stat-card"><span>Abiertas</span><strong>{{ data()!.openCount }}</strong></mat-card>
+      <mat-card class="stat-card"><span>Completadas</span><strong>{{ data()!.completedCount }}</strong></mat-card>
+    </section>
+
+    <section class="actions-grid">
+      <mat-card class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Ahora</p>
+            <h2>Abiertas</h2>
+          </div>
+          <mat-chip>{{ openActions().length }}</mat-chip>
+        </div>
+
+        <div class="action-list">
+          @for (action of openActions(); track action.id) {
+            <article class="action-row">
+              <div class="priority">P{{ action.priority }}</div>
+              <div class="action-copy">
+                <strong>{{ action.title }}</strong>
+                <span>{{ action.linkedLabel }}</span>
+                @if (action.description) {
+                  <p>{{ action.description }}</p>
+                }
+              </div>
+              <div class="action-buttons">
+                @if (action.spaUrl) {
+                  <a mat-button [routerLink]="action.spaUrl">
+                    <mat-icon>open_in_new</mat-icon>
+                    Abrir
+                  </a>
+                } @else if (action.legacyUrl) {
+                  <a mat-button [href]="legacyUrl(action.legacyUrl)" target="_blank" rel="noreferrer">
+                    <mat-icon>open_in_new</mat-icon>
+                    Abrir
+                  </a>
+                }
+                <button mat-flat-button type="button" (click)="complete(action)" [disabled]="busyId() === action.id">
+                  <mat-icon>check</mat-icon>
+                  Completar
+                </button>
+              </div>
+            </article>
+          } @empty {
+            <div class="empty">No hay acciones abiertas.</div>
+          }
+        </div>
+      </mat-card>
+
+      <mat-card class="panel completed-panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Histórico</p>
+            <h2>Completadas</h2>
+          </div>
+          <mat-chip>{{ completedActions().length }}</mat-chip>
+        </div>
+
+        <div class="action-list">
+          @for (action of completedActions().slice(0, 20); track action.id) {
+            <article class="action-row completed">
+              <div class="priority">P{{ action.priority }}</div>
+              <div class="action-copy">
+                <strong>{{ action.title }}</strong>
+                <span>{{ action.linkedLabel }}</span>
+              </div>
+              <div class="action-buttons">
+                <button mat-button type="button" (click)="reopen(action)" [disabled]="busyId() === action.id">
+                  <mat-icon>undo</mat-icon>
+                  Reabrir
+                </button>
+              </div>
+            </article>
+          } @empty {
+            <div class="empty">No hay acciones completadas.</div>
+          }
+        </div>
+      </mat-card>
+    </section>
+  }
+</main>

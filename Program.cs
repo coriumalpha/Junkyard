@@ -122,10 +122,19 @@ app.MapGet("/api/inventory/live", async (
             .Select(value => value!.Value)
             .ToArray()
         : [];
+    var tagIds = query.TryGetValue("tagIds", out var rawTagIds)
+        ? rawTagIds
+            .SelectMany(value => value?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [])
+            .Select(value => int.TryParse(value, out var parsed) ? parsed : (int?)null)
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToArray()
+        : [];
 
     var response = await queryService.GetLiveAsync(
         query["q"].ToString(),
         query["category"].ToString(),
+        tagIds,
         query["box"].ToString(),
         boxIds,
         int.TryParse(query["boxId"], out var boxId) ? boxId : (int?)null,
@@ -137,6 +146,40 @@ app.MapGet("/api/inventory/live", async (
         cancellationToken);
 
     return Results.Json(response);
+});
+app.MapGet("/api/tags", async (
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetTagsAsync(cancellationToken);
+    return Results.Json(response);
+});
+app.MapPost("/api/tags", async (
+    TagUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (tag, error) = await queryService.CreateTagAsync(input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return Results.Json(tag);
+});
+app.MapPut("/api/tags/{id:int}", async (
+    int id,
+    TagUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (tag, error) = await queryService.UpdateTagAsync(id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return tag is null ? Results.NotFound() : Results.Json(tag);
 });
 app.MapGet("/api/inventory/options", async (
     InventoryLiveQueryService queryService,
@@ -229,6 +272,29 @@ app.MapGet("/api/dashboard", async (
 {
     var response = await queryService.GetDashboardAsync(cancellationToken);
     return Results.Json(response);
+});
+app.MapGet("/api/actions", async (
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetActionsAsync(cancellationToken);
+    return Results.Json(response);
+});
+app.MapPost("/api/actions/{id:int}/complete", async (
+    int id,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.UpdateActionStatusAsync(id, InventoryActionStatus.Completed, cancellationToken);
+    return response is null ? Results.NotFound() : Results.Json(response);
+});
+app.MapPost("/api/actions/{id:int}/reopen", async (
+    int id,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.UpdateActionStatusAsync(id, InventoryActionStatus.Open, cancellationToken);
+    return response is null ? Results.NotFound() : Results.Json(response);
 });
 app.MapRazorPages();
 

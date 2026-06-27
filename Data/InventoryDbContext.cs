@@ -8,6 +8,8 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Box> Boxes => Set<Box>();
     public DbSet<Item> Items => Set<Item>();
+    public DbSet<Tag> Tags => Set<Tag>();
+    public DbSet<ItemTag> ItemTags => Set<ItemTag>();
     public DbSet<InventoryAction> InventoryActions => Set<InventoryAction>();
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<PhotoInbox> PhotoInboxes => Set<PhotoInbox>();
@@ -44,6 +46,22 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.HasOne(x => x.Box).WithMany(x => x.Items).HasForeignKey(x => x.BoxId).OnDelete(DeleteBehavior.SetNull);
             entity.HasIndex(x => x.Name);
             entity.HasIndex(x => x.Category);
+        });
+
+        modelBuilder.Entity<Tag>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Color).HasMaxLength(16).IsRequired();
+            entity.HasIndex(x => x.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<ItemTag>(entity =>
+        {
+            entity.HasKey(x => new { x.ItemId, x.TagId });
+            entity.HasQueryFilter(x => x.Item.ArchivedAt == null);
+            entity.HasOne(x => x.Item).WithMany(x => x.ItemTags).HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Tag).WithMany(x => x.ItemTags).HasForeignKey(x => x.TagId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.TagId);
         });
 
         modelBuilder.Entity<InventoryAction>(entity =>

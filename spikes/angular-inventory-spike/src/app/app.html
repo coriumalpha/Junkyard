@@ -1,1 +1,111 @@
-<router-outlet />
+<mat-sidenav-container class="app-shell">
+  <mat-sidenav
+    class="app-drawer"
+    [class.collapsed]="drawerCollapsed() && !handset()"
+    [mode]="handset() ? 'over' : 'side'"
+    [opened]="handset() ? drawerOpen() : true"
+    [fixedInViewport]="handset()"
+  >
+    <div class="drawer-top">
+      <a class="drawer-brand" routerLink="/dashboard" (click)="closeDrawer()">
+        <span class="drawer-mark">
+          <mat-icon>inventory_2</mat-icon>
+        </span>
+        @if (!drawerCollapsed() || handset()) {
+          <span class="drawer-brand-copy">
+            <strong>Junkyard</strong>
+            <small>Aplicación</small>
+          </span>
+        }
+      </a>
+
+      <button mat-icon-button type="button" (click)="toggleDrawer()" [attr.aria-label]="handset() ? 'Cerrar menú' : (drawerCollapsed() ? 'Expandir menú' : 'Colapsar menú')">
+        <mat-icon>{{ handset() ? 'close' : (drawerCollapsed() ? 'chevron_right' : 'chevron_left') }}</mat-icon>
+      </button>
+    </div>
+
+    <mat-nav-list class="drawer-nav">
+      <a mat-list-item routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>dashboard</mat-icon>
+        <span matListItemTitle>Dashboard</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Resumen operativo</span>
+        }
+      </a>
+      <a mat-list-item routerLink="/inventory" [class.active]="isInventorySection()" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>inventory_2</mat-icon>
+        <span matListItemTitle>Inventario</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Filtros y resultados</span>
+        }
+      </a>
+      <a mat-list-item routerLink="/inventory" [queryParams]="{ onlyConsumable: 'true', layout: 'flat', view: 'flat' }" [class.active]="isConsumablesSection()" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>shopping_basket</mat-icon>
+        <span matListItemTitle>Consumibles</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Stock y mínimos</span>
+        }
+      </a>
+      <a mat-list-item routerLink="/inventory" [queryParams]="{ onlyOrphans: 'true', layout: 'grouped', view: 'grouped' }" [class.active]="isOrphansSection()" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>inbox</mat-icon>
+        <span matListItemTitle>Sin clasificar</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Ítems pendientes de caja</span>
+        }
+      </a>
+      <a mat-list-item routerLink="/photos/inbox" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>photo_library</mat-icon>
+        <span matListItemTitle>Fotos</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Bandeja visual</span>
+        }
+      </a>
+      <a mat-list-item routerLink="/actions" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>task_alt</mat-icon>
+        <span matListItemTitle>Pendientes</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Tareas operativas</span>
+        }
+      </a>
+      <a mat-list-item routerLink="/locations" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>place</mat-icon>
+        <span matListItemTitle>Ubicaciones</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Entrada por ubicación</span>
+        }
+      </a>
+      <div class="drawer-section" [class.active]="isSettingsSection()">
+        <div class="drawer-section-title">
+          <mat-icon>tune</mat-icon>
+          @if (!drawerCollapsed() || handset()) {
+            <span>Configuración</span>
+          }
+        </div>
+        @if (!drawerCollapsed() || handset()) {
+          <a mat-list-item routerLink="/settings/tags" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+            <mat-icon matListItemIcon>sell</mat-icon>
+            <span matListItemTitle>Tags</span>
+          </a>
+        }
+      </div>
+      <a mat-list-item [href]="legacyHomeUrl" target="_blank" rel="noreferrer">
+        <mat-icon matListItemIcon>open_in_new</mat-icon>
+        <span matListItemTitle>Razor</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Backend clásico</span>
+        }
+      </a>
+    </mat-nav-list>
+
+  </mat-sidenav>
+
+  <mat-sidenav-content class="app-content">
+    @if (handset()) {
+      <button mat-fab extended type="button" class="mobile-menu" (click)="toggleDrawer()">
+        <mat-icon>menu</mat-icon>
+        Menú
+      </button>
+    }
+    <router-outlet />
+  </mat-sidenav-content>
+</mat-sidenav-container>

@@ -20,4 +20,5 @@ public class Item
     public DateTime? ArchivedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public List<ItemTag> ItemTags { get; set; } = [];
 }
