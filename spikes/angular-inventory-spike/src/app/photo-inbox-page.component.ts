@@ -1,15 +1,18 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, distinctUntilChanged, EMPTY, finalize, map, switchMap, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { InventoryApiService, PhotoInboxItem, PhotoInboxResponse, PhotoInboxStatus } from './inventory-api.service';
+import { InventoryApiService, InventoryOptionsResponse, PhotoInboxItem, PhotoInboxResponse, PhotoInboxStatus } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
 
 interface StatusOption {
@@ -30,11 +33,14 @@ const STATUS_OPTIONS: StatusOption[] = [
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     RouterLink,
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
+    MatFormFieldModule,
     MatIconModule,
+    MatSelectModule,
     MatProgressSpinnerModule
   ],
   templateUrl: './photo-inbox-page.component.html',
@@ -46,6 +52,9 @@ export class PhotoInboxPageComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly actionMessage = signal<string | null>(null);
   protected readonly busyPhotoId = signal<number | null>(null);
+  protected readonly uploading = signal(false);
+  protected readonly uploadSourceBoxId = signal<number | null>(null);
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], locations: [], boxes: [] });
   protected readonly statusOptions = STATUS_OPTIONS;
   private readonly currentStatus = signal<PhotoInboxStatus>('Pending');
 
@@ -72,6 +81,12 @@ export class PhotoInboxPageComponent {
         }),
         finalize(() => this.loading.set(false))
       )),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+
+    this.api.fetchOptions().pipe(
+      tap((options) => this.options.set(options)),
+      catchError(() => EMPTY),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
   }
@@ -162,6 +177,33 @@ export class PhotoInboxPageComponent {
         return EMPTY;
       }),
       finalize(() => this.busyPhotoId.set(null)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected uploadFiles(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const files = Array.from(input?.files ?? []);
+    if (files.length === 0 || this.uploading()) {
+      return;
+    }
+
+    this.uploading.set(true);
+    this.error.set(null);
+    this.actionMessage.set(null);
+    this.api.uploadInboxPhotos(files, this.uploadSourceBoxId()).pipe(
+      tap((response) => {
+        this.data.set(response.inbox);
+        this.actionMessage.set(`Importadas ${response.imported} fotos.${response.rejected.length ? ` Rechazadas: ${response.rejected.length}.` : ''}`);
+        if (input) {
+          input.value = '';
+        }
+      }),
+      catchError((error: unknown) => {
+        this.error.set(error instanceof Error ? error.message : 'No se pudieron subir las fotos.');
+        return EMPTY;
+      }),
+      finalize(() => this.uploading.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
   }

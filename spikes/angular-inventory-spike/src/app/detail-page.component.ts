@@ -68,6 +68,7 @@ export class DetailPageComponent {
   protected readonly boxItemsView = signal<BoxItemsView>('list');
   protected readonly boxItemSortKey = signal<BoxItemSortKey>('name');
   protected readonly boxItemSortDirection = signal<'asc' | 'desc'>('asc');
+  protected readonly uploadCaption = signal('');
   protected readonly zooming = signal(false);
   protected readonly zoomOriginX = signal('50%');
   protected readonly zoomOriginY = signal('50%');
@@ -442,6 +443,161 @@ export class DetailPageComponent {
     return Boolean(item?.photos[0]?.id === photo.id);
   }
 
+  protected isCoverPhoto(photo: InventoryPhoto): boolean {
+    return this.currentPhotos()[0]?.id === photo.id;
+  }
+
+  protected setCoverPhoto(photo: InventoryPhoto): void {
+    const item = this.item();
+    if (item) {
+      this.setItemCover(photo);
+      return;
+    }
+
+    const box = this.box();
+    if (!box || this.saving()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    this.api.setBoxCoverPhoto(box.id, photo.id).pipe(
+      tap((updated) => {
+        this.box.set(updated);
+        this.activePhotoIndex.set(0);
+        this.saveMessage.set('Foto principal actualizada.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo fijar la foto principal.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected rotatePhoto(photo: InventoryPhoto, delta: number): void {
+    const item = this.item();
+    if (item) {
+      this.rotateItemPhoto(photo, delta);
+      return;
+    }
+
+    const box = this.box();
+    if (!box || this.saving()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    this.api.rotateBoxPhoto(box.id, photo.id, delta).pipe(
+      tap((updated) => {
+        this.box.set(updated);
+        const nextIndex = Math.max(0, updated.photos.findIndex((candidate) => candidate.id === photo.id));
+        this.activePhotoIndex.set(nextIndex);
+        this.saveMessage.set('Foto girada.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo girar la foto.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected archivePhoto(photo: InventoryPhoto): void {
+    if (this.saving() || !window.confirm('¿Archivar esta foto de la ficha?')) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    const item = this.item();
+    if (item) {
+      this.api.archiveItemPhoto(item.id, photo.id).pipe(
+        tap((updated) => {
+          this.item.set(updated);
+          this.activePhotoIndex.set(0);
+          this.saveMessage.set('Foto archivada.');
+        }),
+        catchError((error: unknown) => {
+          this.formError.set(error instanceof Error ? error.message : 'No se pudo archivar la foto.');
+          return EMPTY;
+        }),
+        finalize(() => this.saving.set(false)),
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe();
+      return;
+    }
+
+    const box = this.box();
+    if (box) {
+      this.api.archiveBoxPhoto(box.id, photo.id).pipe(
+        tap((updated) => {
+          this.box.set(updated);
+          this.activePhotoIndex.set(0);
+          this.saveMessage.set('Foto archivada.');
+        }),
+        catchError((error: unknown) => {
+          this.formError.set(error instanceof Error ? error.message : 'No se pudo archivar la foto.');
+          return EMPTY;
+        }),
+        finalize(() => this.saving.set(false)),
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe();
+      return;
+    }
+
+    this.saving.set(false);
+  }
+
+  protected returnPhotoToInbox(photo: InventoryPhoto): void {
+    if (this.saving() || !window.confirm('¿Devolver esta foto a la bandeja de revisión?')) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    const item = this.item();
+    if (item) {
+      this.api.returnItemPhotoToInbox(item.id, photo.id).pipe(
+        tap((response) => {
+          this.item.set(response.detail);
+          this.activePhotoIndex.set(0);
+          this.saveMessage.set(response.inboxId ? `Foto devuelta a revisión (#${response.inboxId}).` : 'Foto devuelta a revisión.');
+        }),
+        catchError((error: unknown) => {
+          this.formError.set(error instanceof Error ? error.message : 'No se pudo devolver la foto.');
+          return EMPTY;
+        }),
+        finalize(() => this.saving.set(false)),
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe();
+      return;
+    }
+
+    const box = this.box();
+    if (box) {
+      this.api.returnBoxPhotoToInbox(box.id, photo.id).pipe(
+        tap((response) => {
+          this.box.set(response.detail);
+          this.activePhotoIndex.set(0);
+          this.saveMessage.set(response.inboxId ? `Foto devuelta a revisión (#${response.inboxId}).` : 'Foto devuelta a revisión.');
+        }),
+        catchError((error: unknown) => {
+          this.formError.set(error instanceof Error ? error.message : 'No se pudo devolver la foto.');
+          return EMPTY;
+        }),
+        finalize(() => this.saving.set(false)),
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe();
+      return;
+    }
+
+    this.saving.set(false);
+  }
+
   protected setItemCover(photo: InventoryPhoto): void {
     const item = this.item();
     if (!item || this.saving()) {
@@ -487,6 +643,62 @@ export class DetailPageComponent {
       finalize(() => this.saving.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
+  }
+
+  protected uploadDetailPhotos(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const files = Array.from(input?.files ?? []);
+    if (files.length === 0 || this.saving()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    const caption = this.uploadCaption();
+    const item = this.item();
+    if (item) {
+      this.api.uploadItemPhotos(item.id, files, caption).pipe(
+        tap((updated) => {
+          this.item.set(updated);
+          this.finishPhotoUpload(input);
+        }),
+        catchError((error: unknown) => {
+          this.formError.set(error instanceof Error ? error.message : 'No se pudieron subir las fotos.');
+          return EMPTY;
+        }),
+        finalize(() => this.saving.set(false)),
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe();
+      return;
+    }
+
+    const box = this.box();
+    if (box) {
+      this.api.uploadBoxPhotos(box.id, files, caption).pipe(
+        tap((updated) => {
+          this.box.set(updated);
+          this.finishPhotoUpload(input);
+        }),
+        catchError((error: unknown) => {
+          this.formError.set(error instanceof Error ? error.message : 'No se pudieron subir las fotos.');
+          return EMPTY;
+        }),
+        finalize(() => this.saving.set(false)),
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe();
+      return;
+    }
+
+    this.saving.set(false);
+  }
+
+  private finishPhotoUpload(input: HTMLInputElement | null): void {
+    this.activePhotoIndex.set(0);
+    this.uploadCaption.set('');
+    if (input) {
+      input.value = '';
+    }
+    this.saveMessage.set('Fotos subidas.');
   }
 
   protected activePhotoTransform(photo: InventoryPhoto): string {

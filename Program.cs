@@ -248,6 +248,62 @@ app.MapPost("/api/items/{id:int}/photos/{photoId:int}/rotate", async (
 
     return item is null ? Results.NotFound() : Results.Json(item);
 });
+app.MapPost("/api/items/{id:int}/photos/{photoId:int}/archive", async (
+    int id,
+    int photoId,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (item, error) = await queryService.ArchiveItemPhotoAsync(id, photoId, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return item is null ? Results.NotFound() : Results.Json(item);
+});
+app.MapPost("/api/items/{id:int}/photos/{photoId:int}/return-to-inbox", async (
+    int id,
+    int photoId,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (item, inboxId, error) = await queryService.ReturnItemPhotoToInboxAsync(id, photoId, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return item is null ? Results.NotFound() : Results.Json(new PhotoReturnToInboxDto<InventoryItemDetailDto>(item, inboxId));
+});
+app.MapPost("/api/items/{id:int}/photos/upload", async (
+    int id,
+    HttpRequest request,
+    InventoryDbContext db,
+    PhotoStorage storage,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var item = await db.Items.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+    if (item is null)
+    {
+        return Results.NotFound();
+    }
+
+    var form = await request.ReadFormAsync(cancellationToken);
+    foreach (var file in form.Files)
+    {
+        var photo = await storage.SaveAsync(file, PhotoEntityType.Item, item.Id, form["caption"].ToString(), cancellationToken);
+        if (photo is not null)
+        {
+            db.Photos.Add(photo);
+            item.CoverPhoto ??= photo.Filename;
+        }
+    }
+
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(await queryService.GetItemDetailAsync(id, cancellationToken));
+});
 app.MapGet("/api/boxes/{code}", async (
     string code,
     InventoryLiveQueryService queryService,
@@ -269,6 +325,92 @@ app.MapPut("/api/boxes/{id:int}", async (
     }
 
     return box is null ? Results.NotFound() : Results.Json(box);
+});
+app.MapPost("/api/boxes/{id:int}/photos/{photoId:int}/cover", async (
+    int id,
+    int photoId,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (box, error) = await queryService.SetBoxCoverPhotoAsync(id, photoId, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return box is null ? Results.NotFound() : Results.Json(box);
+});
+app.MapPost("/api/boxes/{id:int}/photos/{photoId:int}/rotate", async (
+    int id,
+    int photoId,
+    PhotoRotateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var delta = input.Delta < 0 ? -90 : 90;
+    var (box, error) = await queryService.RotateBoxPhotoAsync(id, photoId, delta, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return box is null ? Results.NotFound() : Results.Json(box);
+});
+app.MapPost("/api/boxes/{id:int}/photos/{photoId:int}/archive", async (
+    int id,
+    int photoId,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (box, error) = await queryService.ArchiveBoxPhotoAsync(id, photoId, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return box is null ? Results.NotFound() : Results.Json(box);
+});
+app.MapPost("/api/boxes/{id:int}/photos/{photoId:int}/return-to-inbox", async (
+    int id,
+    int photoId,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (box, inboxId, error) = await queryService.ReturnBoxPhotoToInboxAsync(id, photoId, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return box is null ? Results.NotFound() : Results.Json(new PhotoReturnToInboxDto<InventoryBoxDetailDto>(box, inboxId));
+});
+app.MapPost("/api/boxes/{id:int}/photos/upload", async (
+    int id,
+    HttpRequest request,
+    InventoryDbContext db,
+    PhotoStorage storage,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var box = await db.Boxes.FirstOrDefaultAsync(box => box.Id == id, cancellationToken);
+    if (box is null)
+    {
+        return Results.NotFound();
+    }
+
+    var form = await request.ReadFormAsync(cancellationToken);
+    foreach (var file in form.Files)
+    {
+        var photo = await storage.SaveAsync(file, PhotoEntityType.Box, box.Id, form["caption"].ToString(), cancellationToken);
+        if (photo is not null)
+        {
+            db.Photos.Add(photo);
+            box.CoverPhoto ??= photo.Filename;
+        }
+    }
+
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(await queryService.GetBoxDetailAsync(box.Code, cancellationToken));
 });
 app.MapGet("/api/photos/inbox", async (
     HttpContext httpContext,
@@ -303,6 +445,38 @@ app.MapPost("/api/photos/inbox/{id:int}/pending", async (
     }
 
     return photo is null ? Results.NotFound() : Results.Json(photo);
+});
+app.MapPost("/api/photos/inbox/upload", async (
+    HttpRequest request,
+    InventoryDbContext db,
+    PhotoStorage storage,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var form = await request.ReadFormAsync(cancellationToken);
+    var sourceBoxId = int.TryParse(form["sourceBoxId"], out var parsedBoxId) ? parsedBoxId : (int?)null;
+    var imported = 0;
+    var rejected = new List<string>();
+    foreach (var file in form.Files)
+    {
+        try
+        {
+            var inbox = await storage.SaveInboxAsync(file, sourceBoxId, cancellationToken);
+            if (inbox is not null)
+            {
+                db.PhotoInboxes.Add(inbox);
+                imported++;
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            rejected.Add($"{file.FileName}: {ex.Message}");
+        }
+    }
+
+    await db.SaveChangesAsync(cancellationToken);
+    var inboxResponse = await queryService.GetPhotoInboxAsync("Pending", cancellationToken);
+    return Results.Json(new { imported, rejected, inbox = inboxResponse });
 });
 app.MapGet("/api/photos/review", async (
     HttpContext httpContext,
@@ -461,3 +635,4 @@ static async Task GeneratePhotoDerivativesAsync(IServiceProvider services)
 }
 
 public record PhotoRotateDto(int Delta);
+public record PhotoReturnToInboxDto<TDetail>(TDetail Detail, int? InboxId);

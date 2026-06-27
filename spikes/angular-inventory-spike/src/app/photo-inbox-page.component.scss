@@ -12,12 +12,50 @@
 }
 
 .photo-inbox-header,
+.upload-card,
 .state-panel,
 .stat-card,
 .photo-card {
   border: 1px solid var(--app-border);
   background: var(--app-surface-raised);
   box-shadow: var(--app-shadow-md);
+}
+
+.upload-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.upload-card strong {
+  display: block;
+  line-height: 1.2;
+}
+
+.upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: #06120d;
+  background: var(--app-accent);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .photo-inbox-header {
@@ -191,5 +229,9 @@
 
   .photo-grid {
     grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+
+  .upload-card {
+    grid-template-columns: 1fr;
   }
 }

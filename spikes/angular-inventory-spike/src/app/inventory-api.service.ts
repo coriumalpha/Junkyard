@@ -256,6 +256,11 @@ export interface InventoryItemBox {
   hierarchy: InventoryHierarchyNode[];
 }
 
+export interface PhotoReturnToInboxResponse<TDetail> {
+  detail: TDetail;
+  inboxId: number | null;
+}
+
 export interface InventoryBoxDetail {
   id: number;
   code: string;
@@ -322,6 +327,12 @@ export interface PhotoInboxResponse {
   assignedCount: number;
   discardedCount: number;
   photos: PhotoInboxItem[];
+}
+
+export interface PhotoInboxUploadResponse {
+  imported: number;
+  rejected: string[];
+  inbox: PhotoInboxResponse;
 }
 
 export interface PhotoInboxItem {
@@ -473,12 +484,36 @@ export class InventoryApiService {
     return this.http.post<InventoryItemDetail>(`/api/items/${id}/photos/${photoId}/rotate`, { delta });
   }
 
+  archiveItemPhoto(id: number, photoId: number): Observable<InventoryItemDetail> {
+    return this.http.post<InventoryItemDetail>(`/api/items/${id}/photos/${photoId}/archive`, {});
+  }
+
+  returnItemPhotoToInbox(id: number, photoId: number): Observable<PhotoReturnToInboxResponse<InventoryItemDetail>> {
+    return this.http.post<PhotoReturnToInboxResponse<InventoryItemDetail>>(`/api/items/${id}/photos/${photoId}/return-to-inbox`, {});
+  }
+
   fetchBox(code: string): Observable<InventoryBoxDetail> {
     return this.http.get<InventoryBoxDetail>(`/api/boxes/${encodeURIComponent(code)}`);
   }
 
   updateBox(id: number, input: InventoryBoxUpdate): Observable<InventoryBoxDetail> {
     return this.http.put<InventoryBoxDetail>(`/api/boxes/${id}`, input);
+  }
+
+  setBoxCoverPhoto(id: number, photoId: number): Observable<InventoryBoxDetail> {
+    return this.http.post<InventoryBoxDetail>(`/api/boxes/${id}/photos/${photoId}/cover`, {});
+  }
+
+  rotateBoxPhoto(id: number, photoId: number, delta: number): Observable<InventoryBoxDetail> {
+    return this.http.post<InventoryBoxDetail>(`/api/boxes/${id}/photos/${photoId}/rotate`, { delta });
+  }
+
+  archiveBoxPhoto(id: number, photoId: number): Observable<InventoryBoxDetail> {
+    return this.http.post<InventoryBoxDetail>(`/api/boxes/${id}/photos/${photoId}/archive`, {});
+  }
+
+  returnBoxPhotoToInbox(id: number, photoId: number): Observable<PhotoReturnToInboxResponse<InventoryBoxDetail>> {
+    return this.http.post<PhotoReturnToInboxResponse<InventoryBoxDetail>>(`/api/boxes/${id}/photos/${photoId}/return-to-inbox`, {});
   }
 
   fetchPhotoInbox(status: PhotoInboxStatus): Observable<PhotoInboxResponse> {
@@ -492,6 +527,42 @@ export class InventoryApiService {
 
   restoreInboxPhoto(id: number): Observable<PhotoInboxItem> {
     return this.http.post<PhotoInboxItem>(`/api/photos/inbox/${id}/pending`, {});
+  }
+
+  uploadInboxPhotos(files: File[], sourceBoxId: number | null): Observable<PhotoInboxUploadResponse> {
+    const body = new FormData();
+    for (const file of files) {
+      body.append('files', file, file.name);
+    }
+    if (sourceBoxId !== null) {
+      body.append('sourceBoxId', String(sourceBoxId));
+    }
+
+    return this.http.post<PhotoInboxUploadResponse>('/api/photos/inbox/upload', body);
+  }
+
+  uploadItemPhotos(id: number, files: File[], caption: string): Observable<InventoryItemDetail> {
+    const body = new FormData();
+    for (const file of files) {
+      body.append('files', file, file.name);
+    }
+    if (caption.trim()) {
+      body.append('caption', caption.trim());
+    }
+
+    return this.http.post<InventoryItemDetail>(`/api/items/${id}/photos/upload`, body);
+  }
+
+  uploadBoxPhotos(id: number, files: File[], caption: string): Observable<InventoryBoxDetail> {
+    const body = new FormData();
+    for (const file of files) {
+      body.append('files', file, file.name);
+    }
+    if (caption.trim()) {
+      body.append('caption', caption.trim());
+    }
+
+    return this.http.post<InventoryBoxDetail>(`/api/boxes/${id}/photos/upload`, body);
   }
 
   fetchPhotoReview(id: number | null): Observable<PhotoReviewResponse> {

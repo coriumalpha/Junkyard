@@ -63,14 +63,20 @@
           </div>
           <div class="main-photo-stack">
             <div class="photo-toolbar">
-              <button mat-icon-button type="button" (click)="setItemCover(activePhoto()!)" [disabled]="saving() || isItemCover(activePhoto()!)" aria-label="Usar como foto principal">
+              <button mat-icon-button type="button" (click)="setCoverPhoto(activePhoto()!)" [disabled]="saving() || isCoverPhoto(activePhoto()!)" aria-label="Usar como foto principal">
                 <mat-icon>star</mat-icon>
               </button>
-              <button mat-icon-button type="button" (click)="rotateItemPhoto(activePhoto()!, -90)" [disabled]="saving()" aria-label="Girar a la izquierda">
+              <button mat-icon-button type="button" (click)="rotatePhoto(activePhoto()!, -90)" [disabled]="saving()" aria-label="Girar a la izquierda">
                 <mat-icon>rotate_left</mat-icon>
               </button>
-              <button mat-icon-button type="button" (click)="rotateItemPhoto(activePhoto()!, 90)" [disabled]="saving()" aria-label="Girar a la derecha">
+              <button mat-icon-button type="button" (click)="rotatePhoto(activePhoto()!, 90)" [disabled]="saving()" aria-label="Girar a la derecha">
                 <mat-icon>rotate_right</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="returnPhotoToInbox(activePhoto()!)" [disabled]="saving()" aria-label="Devolver a revisión">
+                <mat-icon>move_to_inbox</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="archivePhoto(activePhoto()!)" [disabled]="saving()" aria-label="Archivar foto">
+                <mat-icon>archive</mat-icon>
               </button>
             </div>
             <div class="main-photo"
@@ -85,8 +91,30 @@
                    [alt]="activePhoto()!.caption || item()!.name" />
             </div>
           </div>
+          <div class="gallery-upload">
+            <mat-form-field appearance="outline">
+              <mat-label>Caption</mat-label>
+              <input matInput [ngModel]="uploadCaption()" (ngModelChange)="uploadCaption.set($event)" />
+            </mat-form-field>
+            <label class="gallery-upload-button">
+              <input type="file" accept="image/*" multiple (change)="uploadDetailPhotos($event)" [disabled]="saving()" />
+              <mat-icon>upload</mat-icon>
+              <span>Subir</span>
+            </label>
+          </div>
         } @else {
           <div class="hero-placeholder">{{ firstLetter(item()!.name) }}</div>
+          <div class="gallery-upload">
+            <mat-form-field appearance="outline">
+              <mat-label>Caption</mat-label>
+              <input matInput [ngModel]="uploadCaption()" (ngModelChange)="uploadCaption.set($event)" />
+            </mat-form-field>
+            <label class="gallery-upload-button">
+              <input type="file" accept="image/*" multiple (change)="uploadDetailPhotos($event)" [disabled]="saving()" />
+              <mat-icon>upload</mat-icon>
+              <span>Subir fotos</span>
+            </label>
+          </div>
         }
       </mat-card>
 
@@ -255,19 +283,60 @@
               </button>
             }
           </div>
-          <div class="main-photo"
-               (mousemove)="updateZoomOrigin($event)"
-               (mouseleave)="stopZoom()"
-               (click)="openPhotoModal(activePhoto())"
-               role="button"
-               tabindex="0">
-            <img [src]="assetUrl(activePhoto()!.previewUrl || activePhoto()!.url)!"
-                 [style.transform]="activePhotoTransform(activePhoto()!)"
-                 [style.transform-origin]="zoomOriginX() + ' ' + zoomOriginY()"
-                 [alt]="activePhoto()!.caption || box()!.name" />
+          <div class="main-photo-stack">
+            <div class="photo-toolbar">
+              <button mat-icon-button type="button" (click)="setCoverPhoto(activePhoto()!)" [disabled]="saving() || isCoverPhoto(activePhoto()!)" aria-label="Usar como foto principal">
+                <mat-icon>star</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="rotatePhoto(activePhoto()!, -90)" [disabled]="saving()" aria-label="Girar a la izquierda">
+                <mat-icon>rotate_left</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="rotatePhoto(activePhoto()!, 90)" [disabled]="saving()" aria-label="Girar a la derecha">
+                <mat-icon>rotate_right</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="returnPhotoToInbox(activePhoto()!)" [disabled]="saving()" aria-label="Devolver a revisión">
+                <mat-icon>move_to_inbox</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="archivePhoto(activePhoto()!)" [disabled]="saving()" aria-label="Archivar foto">
+                <mat-icon>archive</mat-icon>
+              </button>
+            </div>
+            <div class="main-photo"
+                 (mousemove)="updateZoomOrigin($event)"
+                 (mouseleave)="stopZoom()"
+                 (click)="openPhotoModal(activePhoto())"
+                 role="button"
+                 tabindex="0">
+              <img [src]="assetUrl(activePhoto()!.previewUrl || activePhoto()!.url)!"
+                   [style.transform]="activePhotoTransform(activePhoto()!)"
+                   [style.transform-origin]="zoomOriginX() + ' ' + zoomOriginY()"
+                   [alt]="activePhoto()!.caption || box()!.name" />
+            </div>
+          </div>
+          <div class="gallery-upload">
+            <mat-form-field appearance="outline">
+              <mat-label>Caption</mat-label>
+              <input matInput [ngModel]="uploadCaption()" (ngModelChange)="uploadCaption.set($event)" />
+            </mat-form-field>
+            <label class="gallery-upload-button">
+              <input type="file" accept="image/*" multiple (change)="uploadDetailPhotos($event)" [disabled]="saving()" />
+              <mat-icon>upload</mat-icon>
+              <span>Subir</span>
+            </label>
           </div>
         } @else {
           <div class="hero-placeholder">{{ box()!.code }}</div>
+          <div class="gallery-upload">
+            <mat-form-field appearance="outline">
+              <mat-label>Caption</mat-label>
+              <input matInput [ngModel]="uploadCaption()" (ngModelChange)="uploadCaption.set($event)" />
+            </mat-form-field>
+            <label class="gallery-upload-button">
+              <input type="file" accept="image/*" multiple (change)="uploadDetailPhotos($event)" [disabled]="saving()" />
+              <mat-icon>upload</mat-icon>
+              <span>Subir fotos</span>
+            </label>
+          </div>
         }
       </mat-card>
 

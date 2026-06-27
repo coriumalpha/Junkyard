@@ -188,6 +188,167 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         return (await GetItemDetailAsync(id, cancellationToken), null);
     }
 
+    public async Task<(InventoryItemDetailDto? Item, string? Error)> ArchiveItemPhotoAsync(
+        int id,
+        int photoId,
+        CancellationToken cancellationToken)
+    {
+        var item = await db.Items.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (item is null)
+        {
+            return (null, null);
+        }
+
+        var photo = await db.Photos.FirstOrDefaultAsync(photo => photo.Id == photoId
+            && photo.EntityType == PhotoEntityType.Item
+            && photo.EntityId == id
+            && photo.Status == PhotoStatus.Active,
+            cancellationToken);
+        if (photo is null)
+        {
+            return (null, "La foto no existe para este ítem.");
+        }
+
+        await ArchivePhotoAsync(photo, item, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetItemDetailAsync(id, cancellationToken), null);
+    }
+
+    public async Task<(InventoryItemDetailDto? Item, int? InboxId, string? Error)> ReturnItemPhotoToInboxAsync(
+        int id,
+        int photoId,
+        CancellationToken cancellationToken)
+    {
+        var item = await db.Items.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (item is null)
+        {
+            return (null, null, null);
+        }
+
+        var photo = await db.Photos.FirstOrDefaultAsync(photo => photo.Id == photoId
+            && photo.EntityType == PhotoEntityType.Item
+            && photo.EntityId == id
+            && photo.Status == PhotoStatus.Active,
+            cancellationToken);
+        if (photo is null)
+        {
+            return (null, null, "La foto no existe para este ítem.");
+        }
+
+        var inbox = await RestorePhotoInboxAsync(photo, item.BoxId, cancellationToken);
+        await ArchivePhotoAsync(photo, item, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetItemDetailAsync(id, cancellationToken), inbox.Id, null);
+    }
+
+    public async Task<(InventoryBoxDetailDto? Box, string? Error)> SetBoxCoverPhotoAsync(
+        int id,
+        int photoId,
+        CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes.FirstOrDefaultAsync(box => box.Id == id, cancellationToken);
+        if (box is null)
+        {
+            return (null, null);
+        }
+
+        var photo = await db.Photos.AsNoTracking()
+            .FirstOrDefaultAsync(photo => photo.Id == photoId
+                && photo.EntityType == PhotoEntityType.Box
+                && photo.EntityId == id
+                && photo.Status == PhotoStatus.Active,
+                cancellationToken);
+        if (photo is null)
+        {
+            return (null, "La foto no existe para este contenedor.");
+        }
+
+        box.CoverPhoto = photo.Filename;
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetBoxDetailAsync(box.Code, cancellationToken), null);
+    }
+
+    public async Task<(InventoryBoxDetailDto? Box, string? Error)> RotateBoxPhotoAsync(
+        int id,
+        int photoId,
+        int delta,
+        CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes.AsNoTracking().FirstOrDefaultAsync(box => box.Id == id, cancellationToken);
+        if (box is null)
+        {
+            return (null, null);
+        }
+
+        var photo = await db.Photos.FirstOrDefaultAsync(photo => photo.Id == photoId
+            && photo.EntityType == PhotoEntityType.Box
+            && photo.EntityId == id
+            && photo.Status == PhotoStatus.Active,
+            cancellationToken);
+        if (photo is null)
+        {
+            return (null, "La foto no existe para este contenedor.");
+        }
+
+        await photoStorage.RotateStoredPhotoAsync(photo.Filename, delta, cancellationToken);
+        await PhotoStorage.ResetRotationMetadataAsync(db, photo.Filename, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetBoxDetailAsync(box.Code, cancellationToken), null);
+    }
+
+    public async Task<(InventoryBoxDetailDto? Box, string? Error)> ArchiveBoxPhotoAsync(
+        int id,
+        int photoId,
+        CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes.FirstOrDefaultAsync(box => box.Id == id, cancellationToken);
+        if (box is null)
+        {
+            return (null, null);
+        }
+
+        var photo = await db.Photos.FirstOrDefaultAsync(photo => photo.Id == photoId
+            && photo.EntityType == PhotoEntityType.Box
+            && photo.EntityId == id
+            && photo.Status == PhotoStatus.Active,
+            cancellationToken);
+        if (photo is null)
+        {
+            return (null, "La foto no existe para este contenedor.");
+        }
+
+        await ArchivePhotoAsync(photo, box, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetBoxDetailAsync(box.Code, cancellationToken), null);
+    }
+
+    public async Task<(InventoryBoxDetailDto? Box, int? InboxId, string? Error)> ReturnBoxPhotoToInboxAsync(
+        int id,
+        int photoId,
+        CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes.FirstOrDefaultAsync(box => box.Id == id, cancellationToken);
+        if (box is null)
+        {
+            return (null, null, null);
+        }
+
+        var photo = await db.Photos.FirstOrDefaultAsync(photo => photo.Id == photoId
+            && photo.EntityType == PhotoEntityType.Box
+            && photo.EntityId == id
+            && photo.Status == PhotoStatus.Active,
+            cancellationToken);
+        if (photo is null)
+        {
+            return (null, null, "La foto no existe para este contenedor.");
+        }
+
+        var inbox = await RestorePhotoInboxAsync(photo, box.Id, cancellationToken);
+        await ArchivePhotoAsync(photo, box, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetBoxDetailAsync(box.Code, cancellationToken), inbox.Id, null);
+    }
+
     public async Task<TagsResponseDto> GetTagsAsync(CancellationToken cancellationToken)
     {
         var tags = await db.Tags.AsNoTracking()
@@ -1258,6 +1419,66 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             .ThenByDescending(photo => photo.Id)
             .Take(24)
             .ToListAsync(cancellationToken);
+    }
+
+    private async Task ArchivePhotoAsync(Photo photo, Item item, CancellationToken cancellationToken)
+    {
+        photo.Status = PhotoStatus.Archived;
+        photo.ArchivedAt = DateTime.UtcNow;
+        if (item.CoverPhoto == photo.Filename)
+        {
+            item.CoverPhoto = await db.Photos
+                .Where(candidate => candidate.EntityType == PhotoEntityType.Item
+                    && candidate.EntityId == item.Id
+                    && candidate.Id != photo.Id
+                    && candidate.Status == PhotoStatus.Active)
+                .OrderByDescending(candidate => candidate.CreatedAt)
+                .ThenByDescending(candidate => candidate.Id)
+                .Select(candidate => candidate.Filename)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+    }
+
+    private async Task ArchivePhotoAsync(Photo photo, Box box, CancellationToken cancellationToken)
+    {
+        photo.Status = PhotoStatus.Archived;
+        photo.ArchivedAt = DateTime.UtcNow;
+        if (box.CoverPhoto == photo.Filename)
+        {
+            box.CoverPhoto = await db.Photos
+                .Where(candidate => candidate.EntityType == PhotoEntityType.Box
+                    && candidate.EntityId == box.Id
+                    && candidate.Id != photo.Id
+                    && candidate.Status == PhotoStatus.Active)
+                .OrderByDescending(candidate => candidate.CreatedAt)
+                .ThenByDescending(candidate => candidate.Id)
+                .Select(candidate => candidate.Filename)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+    }
+
+    private async Task<PhotoInbox> RestorePhotoInboxAsync(Photo photo, int? sourceBoxId, CancellationToken cancellationToken)
+    {
+        var inbox = photo.SourceInboxId is int sourceInboxId
+            ? await db.PhotoInboxes.FirstOrDefaultAsync(candidate => candidate.Id == sourceInboxId, cancellationToken)
+            : await db.PhotoInboxes.FirstOrDefaultAsync(candidate => candidate.Filename == photo.Filename, cancellationToken);
+
+        if (inbox is null)
+        {
+            inbox = new PhotoInbox
+            {
+                Filename = photo.Filename,
+                OriginalFilename = string.IsNullOrWhiteSpace(photo.Caption) ? Path.GetFileName(photo.Filename) : photo.Caption,
+                ImportedAt = DateTime.UtcNow
+            };
+            db.PhotoInboxes.Add(inbox);
+        }
+
+        inbox.Status = PhotoInboxStatus.Pending;
+        inbox.ProcessedAt = null;
+        inbox.SourceBoxId = sourceBoxId;
+        inbox.RotationDegrees = photo.RotationDegrees;
+        return inbox;
     }
 
     private static List<InventoryPhotoDto> ToPhotoDtos(
