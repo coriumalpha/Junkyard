@@ -27,6 +27,10 @@ export const routes: Routes = [
     loadComponent: () => import('./photo-inbox-page.component').then((m) => m.PhotoInboxPageComponent)
   },
   {
+    path: 'photos/review',
+    loadComponent: () => import('./photo-review-page.component').then((m) => m.PhotoReviewPageComponent)
+  },
+  {
     path: 'locations',
     loadComponent: () => import('./locations-page.component').then((m) => m.LocationsPageComponent)
   },

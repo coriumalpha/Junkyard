@@ -337,6 +337,42 @@ export interface PhotoInboxItem {
   legacyReviewUrl: string;
 }
 
+export interface PhotoReviewResponse {
+  pendingCount: number;
+  processedCount: number;
+  previousId: number | null;
+  nextId: number | null;
+  current: PhotoReviewPhoto | null;
+  pending: PhotoReviewPhoto[];
+}
+
+export interface PhotoReviewMutationResponse {
+  review: PhotoReviewResponse;
+  affectedIds: number[];
+}
+
+export interface PhotoReviewPhoto {
+  id: number;
+  thumbUrl: string;
+  previewUrl: string;
+  fullUrl: string;
+  rotationDegrees: number;
+  originalFilename: string;
+  importedAt: string;
+  sourceBox: InventoryBoxLink | null;
+  notes: string | null;
+}
+
+export interface PhotoReviewCreateItem {
+  ids: number[];
+  boxId: number | null;
+  name: string;
+  notes: string;
+  quantity: number;
+  unit: string;
+  tagIds: number[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class InventoryApiService {
   private readonly http = inject(HttpClient);
@@ -456,5 +492,38 @@ export class InventoryApiService {
 
   restoreInboxPhoto(id: number): Observable<PhotoInboxItem> {
     return this.http.post<PhotoInboxItem>(`/api/photos/inbox/${id}/pending`, {});
+  }
+
+  fetchPhotoReview(id: number | null): Observable<PhotoReviewResponse> {
+    let params = new HttpParams();
+    if (id !== null) {
+      params = params.set('id', String(id));
+    }
+
+    return this.http.get<PhotoReviewResponse>('/api/photos/review', { params });
+  }
+
+  rotateReviewPhotos(id: number, ids: number[], delta: number): Observable<PhotoReviewMutationResponse> {
+    return this.http.post<PhotoReviewMutationResponse>(`/api/photos/review/${id}/rotate`, { ids, delta });
+  }
+
+  discardReviewPhotos(id: number, ids: number[]): Observable<PhotoReviewMutationResponse> {
+    return this.http.post<PhotoReviewMutationResponse>(`/api/photos/review/${id}/discard`, { ids, delta: 0 });
+  }
+
+  assignReviewPhotosToBox(id: number, ids: number[], boxId: number): Observable<PhotoReviewMutationResponse> {
+    return this.http.post<PhotoReviewMutationResponse>(`/api/photos/review/${id}/assign-box`, { ids, boxId });
+  }
+
+  assignReviewPhotosToItem(id: number, ids: number[], itemId: number): Observable<PhotoReviewMutationResponse> {
+    return this.http.post<PhotoReviewMutationResponse>(`/api/photos/review/${id}/assign-item`, { ids, itemId });
+  }
+
+  createItemFromReviewPhotos(id: number, input: PhotoReviewCreateItem): Observable<PhotoReviewMutationResponse> {
+    return this.http.post<PhotoReviewMutationResponse>(`/api/photos/review/${id}/create-item`, input);
+  }
+
+  undoReviewPhotos(ids: number[]): Observable<PhotoReviewResponse> {
+    return this.http.post<PhotoReviewResponse>('/api/photos/review/undo', { ids });
   }
 }

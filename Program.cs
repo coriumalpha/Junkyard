@@ -304,6 +304,67 @@ app.MapPost("/api/photos/inbox/{id:int}/pending", async (
 
     return photo is null ? Results.NotFound() : Results.Json(photo);
 });
+app.MapGet("/api/photos/review", async (
+    HttpContext httpContext,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetPhotoReviewAsync(int.TryParse(httpContext.Request.Query["id"], out var id) ? id : null, cancellationToken);
+    return Results.Json(response);
+});
+app.MapPost("/api/photos/review/{id:int}/rotate", async (
+    int id,
+    PhotoReviewSelectionDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (review, affectedIds, error) = await queryService.RotateReviewPhotosAsync(id, input, cancellationToken);
+    return error is null ? Results.Json(new { review, affectedIds }) : Results.BadRequest(new { error });
+});
+app.MapPost("/api/photos/review/{id:int}/discard", async (
+    int id,
+    PhotoReviewSelectionDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (review, affectedIds, error) = await queryService.DiscardReviewPhotosAsync(id, input, cancellationToken);
+    return error is null ? Results.Json(new { review, affectedIds }) : Results.BadRequest(new { error });
+});
+app.MapPost("/api/photos/review/{id:int}/assign-box", async (
+    int id,
+    PhotoReviewAssignBoxDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (review, affectedIds, error) = await queryService.AssignReviewPhotosToBoxAsync(id, input, cancellationToken);
+    return error is null ? Results.Json(new { review, affectedIds }) : Results.BadRequest(new { error });
+});
+app.MapPost("/api/photos/review/{id:int}/assign-item", async (
+    int id,
+    PhotoReviewAssignItemDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (review, affectedIds, error) = await queryService.AssignReviewPhotosToItemAsync(id, input, cancellationToken);
+    return error is null ? Results.Json(new { review, affectedIds }) : Results.BadRequest(new { error });
+});
+app.MapPost("/api/photos/review/{id:int}/create-item", async (
+    int id,
+    PhotoReviewCreateItemDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (review, affectedIds, error) = await queryService.CreateItemFromReviewPhotosAsync(id, input, cancellationToken);
+    return error is null ? Results.Json(new { review, affectedIds }) : Results.BadRequest(new { error });
+});
+app.MapPost("/api/photos/review/undo", async (
+    PhotoReviewUndoDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.UndoReviewPhotosAsync(input, cancellationToken);
+    return Results.Json(response);
+});
 app.MapGet("/api/dashboard", async (
     InventoryLiveQueryService queryService,
     CancellationToken cancellationToken) =>

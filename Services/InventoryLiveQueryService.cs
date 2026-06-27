@@ -476,6 +476,210 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             $"/Photos/Review?id={photo.Id}"), null);
     }
 
+    public async Task<PhotoReviewDto> GetPhotoReviewAsync(int? id, CancellationToken cancellationToken)
+    {
+        var ordered = await db.PhotoInboxes.AsNoTracking()
+            .Include(photo => photo.SourceBox)
+            .Where(photo => photo.Status == PhotoInboxStatus.Pending)
+            .OrderBy(photo => photo.ImportedAt)
+            .ThenBy(photo => photo.Id)
+            .ToListAsync(cancellationToken);
+        var currentId = id is int requestedId && ordered.Any(photo => photo.Id == requestedId)
+            ? requestedId
+            : ordered.FirstOrDefault()?.Id;
+        var currentIndex = currentId is int selectedId ? ordered.FindIndex(photo => photo.Id == selectedId) : -1;
+        var start = currentIndex < 0 ? 0 : Math.Max(0, currentIndex - 18);
+        var filmstrip = ordered.Skip(start).Take(42).Select(ToReviewPhotoDto).ToList();
+
+        return new PhotoReviewDto(
+            ordered.Count,
+            await db.PhotoInboxes.CountAsync(photo => photo.Status != PhotoInboxStatus.Pending, cancellationToken),
+            currentIndex > 0 ? ordered[currentIndex - 1].Id : null,
+            currentIndex >= 0 && currentIndex < ordered.Count - 1 ? ordered[currentIndex + 1].Id : null,
+            currentIndex >= 0 ? ToReviewPhotoDto(ordered[currentIndex]) : null,
+            filmstrip);
+    }
+
+    public async Task<(PhotoReviewDto Review, List<int> AffectedIds, string? Error)> RotateReviewPhotosAsync(
+        int currentId,
+        PhotoReviewSelectionDto input,
+        CancellationToken cancellationToken)
+    {
+        var ids = ReviewSelectedIds(currentId, input.Ids);
+        var photos = await db.PhotoInboxes.Where(photo => ids.Contains(photo.Id) && photo.Status == PhotoInboxStatus.Pending).ToListAsync(cancellationToken);
+        foreach (var photo in photos)
+        {
+            await photoStorage.RotateStoredPhotoAsync(photo.Filename, input.Delta < 0 ? -90 : 90, cancellationToken);
+            await PhotoStorage.ResetRotationMetadataAsync(db, photo.Filename, cancellationToken);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetPhotoReviewAsync(currentId, cancellationToken), photos.Select(photo => photo.Id).ToList(), null);
+    }
+
+    public async Task<(PhotoReviewDto Review, List<int> AffectedIds, string? Error)> DiscardReviewPhotosAsync(
+        int currentId,
+        PhotoReviewSelectionDto input,
+        CancellationToken cancellationToken)
+    {
+        var ids = ReviewSelectedIds(currentId, input.Ids);
+        var photos = await db.PhotoInboxes.Where(photo => ids.Contains(photo.Id) && photo.Status == PhotoInboxStatus.Pending).ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        foreach (var photo in photos)
+        {
+            photo.Status = PhotoInboxStatus.Discarded;
+            photo.ProcessedAt = now;
+            photo.UpdatedAt = now;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetPhotoReviewAsync(null, cancellationToken), photos.Select(photo => photo.Id).ToList(), null);
+    }
+
+    public async Task<(PhotoReviewDto Review, List<int> AffectedIds, string? Error)> AssignReviewPhotosToBoxAsync(
+        int currentId,
+        PhotoReviewAssignBoxDto input,
+        CancellationToken cancellationToken)
+    {
+        var ids = ReviewSelectedIds(currentId, input.Ids);
+        var box = await db.Boxes.FirstOrDefaultAsync(box => box.Id == input.BoxId, cancellationToken);
+        if (box is null)
+        {
+            return (await GetPhotoReviewAsync(currentId, cancellationToken), [], "Selecciona un contenedor válido.");
+        }
+
+        var photos = await db.PhotoInboxes.Where(photo => ids.Contains(photo.Id) && photo.Status == PhotoInboxStatus.Pending).ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        foreach (var inbox in photos)
+        {
+            db.Photos.Add(new Photo { EntityType = PhotoEntityType.Box, EntityId = box.Id, SourceInboxId = inbox.Id, Filename = inbox.Filename, Caption = inbox.OriginalFilename, RotationDegrees = inbox.RotationDegrees });
+            box.CoverPhoto ??= inbox.Filename;
+            inbox.Status = PhotoInboxStatus.Assigned;
+            inbox.ProcessedAt = now;
+            inbox.UpdatedAt = now;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetPhotoReviewAsync(null, cancellationToken), photos.Select(photo => photo.Id).ToList(), null);
+    }
+
+    public async Task<(PhotoReviewDto Review, List<int> AffectedIds, string? Error)> AssignReviewPhotosToItemAsync(
+        int currentId,
+        PhotoReviewAssignItemDto input,
+        CancellationToken cancellationToken)
+    {
+        var ids = ReviewSelectedIds(currentId, input.Ids);
+        var item = await db.Items.FirstOrDefaultAsync(item => item.Id == input.ItemId, cancellationToken);
+        if (item is null)
+        {
+            return (await GetPhotoReviewAsync(currentId, cancellationToken), [], "Selecciona un ítem válido.");
+        }
+
+        var photos = await db.PhotoInboxes.Where(photo => ids.Contains(photo.Id) && photo.Status == PhotoInboxStatus.Pending).ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        foreach (var inbox in photos)
+        {
+            db.Photos.Add(new Photo { EntityType = PhotoEntityType.Item, EntityId = item.Id, SourceInboxId = inbox.Id, Filename = inbox.Filename, Caption = inbox.OriginalFilename, RotationDegrees = inbox.RotationDegrees });
+            item.CoverPhoto ??= inbox.Filename;
+            inbox.Status = PhotoInboxStatus.Assigned;
+            inbox.ProcessedAt = now;
+            inbox.UpdatedAt = now;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetPhotoReviewAsync(null, cancellationToken), photos.Select(photo => photo.Id).ToList(), null);
+    }
+
+    public async Task<(PhotoReviewDto Review, List<int> AffectedIds, string? Error)> CreateItemFromReviewPhotosAsync(
+        int currentId,
+        PhotoReviewCreateItemDto input,
+        CancellationToken cancellationToken)
+    {
+        var name = (input.Name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return (await GetPhotoReviewAsync(currentId, cancellationToken), [], "El nombre es obligatorio.");
+        }
+
+        if (input.BoxId is int boxId && boxId > 0 && !await db.Boxes.AnyAsync(box => box.Id == boxId, cancellationToken))
+        {
+            return (await GetPhotoReviewAsync(currentId, cancellationToken), [], "Selecciona un contenedor válido o deja el ítem sin contenedor.");
+        }
+
+        var tagIds = input.TagIds?.Where(tagId => tagId > 0).Distinct().ToList() ?? [];
+        var tags = tagIds.Count == 0
+            ? [await GetOrCreateDefaultTagAsync(cancellationToken)]
+            : await db.Tags.Where(tag => tagIds.Contains(tag.Id)).ToListAsync(cancellationToken);
+        if (tags.Count != Math.Max(1, tagIds.Count))
+        {
+            return (await GetPhotoReviewAsync(currentId, cancellationToken), [], "Algún tag seleccionado no existe.");
+        }
+
+        var ids = ReviewSelectedIds(currentId, input.Ids);
+        var item = new Item
+        {
+            BoxId = input.BoxId is > 0 ? input.BoxId : null,
+            Name = name,
+            Category = tags.OrderBy(tag => tag.Name).First().Name,
+            Quantity = input.Quantity <= 0 ? 1 : input.Quantity,
+            Unit = string.IsNullOrWhiteSpace(input.Unit) ? "uds" : input.Unit.Trim(),
+            Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim()
+        };
+        foreach (var tag in tags.OrderBy(tag => tag.Name))
+        {
+            item.ItemTags.Add(new ItemTag { TagId = tag.Id });
+        }
+
+        db.Items.Add(item);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var photos = await db.PhotoInboxes.Where(photo => ids.Contains(photo.Id) && photo.Status == PhotoInboxStatus.Pending).ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        foreach (var inbox in photos)
+        {
+            db.Photos.Add(new Photo { EntityType = PhotoEntityType.Item, EntityId = item.Id, SourceInboxId = inbox.Id, Filename = inbox.Filename, Caption = inbox.OriginalFilename, RotationDegrees = inbox.RotationDegrees });
+            item.CoverPhoto ??= inbox.Filename;
+            inbox.Status = PhotoInboxStatus.Assigned;
+            inbox.ProcessedAt = now;
+            inbox.UpdatedAt = now;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetPhotoReviewAsync(null, cancellationToken), photos.Select(photo => photo.Id).ToList(), null);
+    }
+
+    public async Task<PhotoReviewDto> UndoReviewPhotosAsync(PhotoReviewUndoDto input, CancellationToken cancellationToken)
+    {
+        var ids = input.Ids?.Where(id => id > 0).Distinct().ToList() ?? [];
+        if (ids.Count == 0)
+        {
+            return await GetPhotoReviewAsync(null, cancellationToken);
+        }
+
+        var inboxPhotos = await db.PhotoInboxes.Where(photo => ids.Contains(photo.Id)).ToListAsync(cancellationToken);
+        foreach (var inbox in inboxPhotos)
+        {
+            inbox.Status = PhotoInboxStatus.Pending;
+            inbox.ProcessedAt = null;
+            inbox.UpdatedAt = DateTime.UtcNow;
+        }
+
+        var filenames = inboxPhotos.Select(photo => photo.Filename).ToList();
+        var createdPhotos = await db.Photos
+            .Where(photo => ids.Contains(photo.SourceInboxId ?? 0) || filenames.Contains(photo.Filename))
+            .ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        foreach (var photo in createdPhotos)
+        {
+            photo.Status = PhotoStatus.Archived;
+            photo.ArchivedAt = now;
+        }
+
+        await ClearArchivedCoverPhotosAsync(createdPhotos.Select(photo => photo.Filename).Distinct().ToList(), cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return await GetPhotoReviewAsync(ids.FirstOrDefault(), cancellationToken);
+    }
+
     public async Task<DashboardDto> GetDashboardAsync(CancellationToken cancellationToken)
     {
         var locationCount = await db.Locations.CountAsync(cancellationToken);
@@ -976,6 +1180,75 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             ]);
     }
 
+    private static List<int> ReviewSelectedIds(int currentId, List<int>? ids)
+    {
+        var selected = ids?.Where(id => id > 0).Distinct().ToList() ?? [];
+        if (selected.Count == 0)
+        {
+            selected.Add(currentId);
+        }
+
+        return selected;
+    }
+
+    private static PhotoReviewPhotoDto ToReviewPhotoDto(PhotoInbox photo)
+    {
+        return new PhotoReviewPhotoDto(
+            photo.Id,
+            PhotoStorage.ThumbUrl(photo.Filename, photo.UpdatedAt),
+            PhotoStorage.PreviewUrl(photo.Filename, photo.UpdatedAt),
+            PhotoStorage.PublicUrl(photo.Filename, photo.UpdatedAt),
+            photo.RotationDegrees,
+            photo.OriginalFilename,
+            photo.ImportedAt,
+            photo.SourceBox is null ? null : new InventoryBoxLinkDto(photo.SourceBox.Id, photo.SourceBox.Code, photo.SourceBox.Name),
+            photo.Notes);
+    }
+
+    private async Task<Tag> GetOrCreateDefaultTagAsync(CancellationToken cancellationToken)
+    {
+        var tag = await db.Tags.FirstOrDefaultAsync(tag => tag.Name == "Otros", cancellationToken);
+        if (tag is not null)
+        {
+            return tag;
+        }
+
+        tag = new Tag { Name = "Otros", Color = "#48ffb0" };
+        db.Tags.Add(tag);
+        await db.SaveChangesAsync(cancellationToken);
+        return tag;
+    }
+
+    private async Task ClearArchivedCoverPhotosAsync(List<string> archivedFilenames, CancellationToken cancellationToken)
+    {
+        if (archivedFilenames.Count == 0)
+        {
+            return;
+        }
+
+        var boxes = await db.Boxes.Where(box => box.CoverPhoto != null && archivedFilenames.Contains(box.CoverPhoto)).ToListAsync(cancellationToken);
+        foreach (var box in boxes)
+        {
+            box.CoverPhoto = await db.Photos
+                .Where(photo => photo.EntityType == PhotoEntityType.Box && photo.EntityId == box.Id && photo.Status == PhotoStatus.Active && !archivedFilenames.Contains(photo.Filename))
+                .OrderByDescending(photo => photo.CreatedAt)
+                .ThenByDescending(photo => photo.Id)
+                .Select(photo => photo.Filename)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        var items = await db.Items.Where(item => item.CoverPhoto != null && archivedFilenames.Contains(item.CoverPhoto)).ToListAsync(cancellationToken);
+        foreach (var item in items)
+        {
+            item.CoverPhoto = await db.Photos
+                .Where(photo => photo.EntityType == PhotoEntityType.Item && photo.EntityId == item.Id && photo.Status == PhotoStatus.Active && !archivedFilenames.Contains(photo.Filename))
+                .OrderByDescending(photo => photo.CreatedAt)
+                .ThenByDescending(photo => photo.Id)
+                .Select(photo => photo.Filename)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+    }
+
     private async Task<List<Photo>> EntityPhotosAsync(PhotoEntityType entityType, int entityId, string? coverPhoto, CancellationToken cancellationToken)
     {
         return await db.Photos.AsNoTracking()
@@ -1330,6 +1603,42 @@ public record PhotoInboxItemDto(
     InventoryBoxLinkDto? SourceBox,
     string? Notes,
     string LegacyReviewUrl);
+
+public record PhotoReviewDto(
+    int PendingCount,
+    int ProcessedCount,
+    int? PreviousId,
+    int? NextId,
+    PhotoReviewPhotoDto? Current,
+    List<PhotoReviewPhotoDto> Pending);
+
+public record PhotoReviewPhotoDto(
+    int Id,
+    string ThumbUrl,
+    string PreviewUrl,
+    string FullUrl,
+    int RotationDegrees,
+    string OriginalFilename,
+    DateTime ImportedAt,
+    InventoryBoxLinkDto? SourceBox,
+    string? Notes);
+
+public record PhotoReviewSelectionDto(List<int>? Ids, int Delta);
+
+public record PhotoReviewAssignBoxDto(List<int>? Ids, int BoxId);
+
+public record PhotoReviewAssignItemDto(List<int>? Ids, int ItemId);
+
+public record PhotoReviewCreateItemDto(
+    List<int>? Ids,
+    int? BoxId,
+    string? Name,
+    string? Notes,
+    decimal Quantity,
+    string? Unit,
+    List<int>? TagIds);
+
+public record PhotoReviewUndoDto(List<int>? Ids);
 
 public record DashboardBoxDto(
     int Id,

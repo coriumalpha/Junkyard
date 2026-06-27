@@ -3,13 +3,13 @@
     <div>
       <p class="eyebrow">Inventario / Angular SPA</p>
       <h1>Bandeja de fotos</h1>
-      <p>Lectura rápida de imágenes pendientes, asignadas y descartadas. La revisión y subida siguen en legacy hasta migrar formularios.</p>
+      <p>Lectura rápida de imágenes pendientes, asignadas y descartadas.</p>
     </div>
 
     <nav class="header-actions" aria-label="Acciones de fotos">
-      <a mat-flat-button [href]="legacyUrl('/Photos/Review')" target="_blank" rel="noreferrer">
+      <a mat-flat-button routerLink="/photos/review">
         <mat-icon>rate_review</mat-icon>
-        Revisar legacy
+        Revisar
       </a>
     </nav>
   </header>
