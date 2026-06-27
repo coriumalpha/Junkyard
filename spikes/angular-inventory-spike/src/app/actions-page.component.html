@@ -32,24 +32,22 @@
         <button mat-stroked-button type="button" [class.active]="linkMode() === 'item'" (click)="setLinkMode('item')">Ítem</button>
       </div>
       @if (linkMode() === 'box') {
-        <mat-form-field appearance="outline" class="wide">
-          <mat-label>Contenedor</mat-label>
-          <app-searchable-select
-            [value]="linkedBoxId()"
-            [options]="boxOptions()"
-            placeholder="Buscar contenedor..."
-            (valueChange)="linkedBoxId.set($any($event))" />
-        </mat-form-field>
+        <app-searchable-select
+          class="wide"
+          label="Contenedor"
+          [value]="linkedBoxId()"
+          [options]="boxOptions()"
+          placeholder="Buscar contenedor..."
+          (valueChange)="linkedBoxId.set($any($event))" />
       }
       @if (linkMode() === 'item') {
-        <mat-form-field appearance="outline" class="wide">
-          <mat-label>Ítem</mat-label>
-          <app-searchable-select
-            [value]="linkedItemId()"
-            [options]="itemOptions()"
-            placeholder="Buscar ítem..."
-            (valueChange)="linkedItemId.set($any($event))" />
-        </mat-form-field>
+        <app-searchable-select
+          class="wide"
+          label="Ítem"
+          [value]="linkedItemId()"
+          [options]="itemOptions()"
+          placeholder="Buscar ítem..."
+          (valueChange)="linkedItemId.set($any($event))" />
       }
       <mat-form-field appearance="outline" class="wide">
         <mat-label>Detalle opcional</mat-label>

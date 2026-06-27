@@ -97,28 +97,24 @@
 
         @if (panel() === 'assignBox') {
           <mat-card class="action-card">
-            <mat-form-field appearance="outline">
-              <mat-label>Contenedor</mat-label>
-              <app-searchable-select
-                [value]="assignBoxId()"
-                [options]="boxOptions()"
-                placeholder="Buscar contenedor..."
-                (valueChange)="assignBoxId.set($any($event))" />
-            </mat-form-field>
+            <app-searchable-select
+              label="Contenedor"
+              [value]="assignBoxId()"
+              [options]="boxOptions()"
+              placeholder="Buscar contenedor..."
+              (valueChange)="assignBoxId.set($any($event))" />
             <button mat-flat-button type="button" (click)="assignBox()" [disabled]="busy()">Asignar</button>
           </mat-card>
         }
 
         @if (panel() === 'assignItem') {
           <mat-card class="action-card">
-            <mat-form-field appearance="outline">
-              <mat-label>Ítem</mat-label>
-              <app-searchable-select
-                [value]="assignItemId()"
-                [options]="itemOptions()"
-                placeholder="Buscar ítem..."
-                (valueChange)="assignItemId.set($any($event))" />
-            </mat-form-field>
+            <app-searchable-select
+              label="Ítem"
+              [value]="assignItemId()"
+              [options]="itemOptions()"
+              placeholder="Buscar ítem..."
+              (valueChange)="assignItemId.set($any($event))" />
             <button mat-flat-button type="button" (click)="assignItem()" [disabled]="busy()">Asignar</button>
           </mat-card>
         }
@@ -129,24 +125,20 @@
               <mat-label>Nombre</mat-label>
               <input matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" />
             </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Tags</mat-label>
-              <app-searchable-select
-                [value]="draftTagIds()"
-                [options]="tagOptions()"
-                [multiple]="true"
-                placeholder="Buscar tag..."
-                (valueChange)="draftTagIds.set($any($event))" />
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Contenedor</mat-label>
-              <app-searchable-select
-                [value]="draftBoxId()"
-                [options]="boxOptions()"
-                noneLabel="Sin caja"
-                placeholder="Buscar contenedor..."
-                (valueChange)="draftBoxId.set($any($event))" />
-            </mat-form-field>
+            <app-searchable-select
+              label="Tags"
+              [value]="draftTagIds()"
+              [options]="tagOptions()"
+              [multiple]="true"
+              placeholder="Buscar tag..."
+              (valueChange)="draftTagIds.set($any($event))" />
+            <app-searchable-select
+              label="Contenedor"
+              [value]="draftBoxId()"
+              [options]="boxOptions()"
+              noneLabel="Sin caja"
+              placeholder="Buscar contenedor..."
+              (valueChange)="draftBoxId.set($any($event))" />
             <div class="two-cols">
               <mat-form-field appearance="outline">
                 <mat-label>Cantidad</mat-label>

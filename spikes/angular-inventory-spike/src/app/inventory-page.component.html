@@ -115,15 +115,13 @@
         </mat-expansion-panel-header>
 
         <div class="advanced-grid">
-          <mat-form-field appearance="outline">
-            <mat-label>Tags</mat-label>
-            <app-searchable-select
-              [value]="state().tagIds"
-              [options]="tagOptions()"
-              [multiple]="true"
-              placeholder="Buscar tag..."
-              (valueChange)="setTagIds($any($event))" />
-          </mat-form-field>
+          <app-searchable-select
+            label="Tags"
+            [value]="state().tagIds"
+            [options]="tagOptions()"
+            [multiple]="true"
+            placeholder="Buscar tag..."
+            (valueChange)="setTagIds($any($event))" />
 
           @if (state().tagIds.length) {
             <div class="selected-boxes wide-control">
@@ -143,25 +141,22 @@
             </div>
           }
 
-          <mat-form-field appearance="outline">
-            <mat-label>Ubicación efectiva</mat-label>
-            <app-searchable-select
-              [value]="state().locationId"
-              [options]="locationOptions()"
-              noneLabel="Todas"
-              placeholder="Buscar ubicación..."
-              (valueChange)="setLocationId($any($event))" />
-          </mat-form-field>
+          <app-searchable-select
+            label="Ubicación efectiva"
+            [value]="state().locationId"
+            [options]="locationOptions()"
+            noneLabel="Todas"
+            placeholder="Buscar ubicación..."
+            (valueChange)="setLocationId($any($event))" />
 
-          <mat-form-field appearance="outline" class="wide-control">
-            <mat-label>Contenedores múltiples</mat-label>
-            <app-searchable-select
-              [value]="state().boxIds"
-              [options]="boxOptions()"
-              [multiple]="true"
-              placeholder="Buscar contenedor..."
-              (valueChange)="setBoxIds($any($event))" />
-          </mat-form-field>
+          <app-searchable-select
+            class="wide-control"
+            label="Contenedores múltiples"
+            [value]="state().boxIds"
+            [options]="boxOptions()"
+            [multiple]="true"
+            placeholder="Buscar contenedor..."
+            (valueChange)="setBoxIds($any($event))" />
 
           @if (selectedBoxOptions().length) {
             <div class="selected-boxes wide-control">

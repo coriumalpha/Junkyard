@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 
@@ -15,7 +16,7 @@ export interface SearchableSelectOption {
 @Component({
   selector: 'app-searchable-select',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, MatSelectModule],
+  imports: [CommonModule, FormsModule, MatFormFieldModule, MatIconModule, MatSelectModule],
   templateUrl: './searchable-select.component.html',
   styleUrl: './searchable-select.component.scss'
 })
@@ -23,6 +24,8 @@ export class SearchableSelectComponent {
   @Input() options: SearchableSelectOption[] = [];
   @Input() value: SearchableSelectValue | SearchableSelectValue[] = null;
   @Input() multiple = false;
+  @Input() label = '';
+  @Input() appearance: 'fill' | 'outline' = 'outline';
   @Input() placeholder = 'Buscar...';
   @Input() noneLabel: string | null = null;
   @Input() disabled = false;

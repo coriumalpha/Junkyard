@@ -178,15 +178,13 @@
               <input matInput [ngModel]="itemForm().name" (ngModelChange)="patchItemForm({ name: $event })" />
             </mat-form-field>
 
-            <mat-form-field appearance="outline">
-              <mat-label>Tags</mat-label>
-              <app-searchable-select
-                [value]="itemForm().tagIds"
-                [options]="tagOptions()"
-                [multiple]="true"
-                placeholder="Buscar tag..."
-                (valueChange)="patchItemForm({ tagIds: $any($event) })" />
-            </mat-form-field>
+            <app-searchable-select
+              label="Tags"
+              [value]="itemForm().tagIds"
+              [options]="tagOptions()"
+              [multiple]="true"
+              placeholder="Buscar tag..."
+              (valueChange)="patchItemForm({ tagIds: $any($event) })" />
 
             <div class="quick-tag wide">
               <mat-form-field appearance="outline">
@@ -203,15 +201,13 @@
               </button>
             </div>
 
-            <mat-form-field appearance="outline">
-              <mat-label>Contenedor</mat-label>
-              <app-searchable-select
-                [value]="itemForm().boxId"
-                [options]="boxOptions()"
-                noneLabel="Sin caja"
-                placeholder="Buscar contenedor..."
-                (valueChange)="patchItemForm({ boxId: $any($event) })" />
-            </mat-form-field>
+            <app-searchable-select
+              label="Contenedor"
+              [value]="itemForm().boxId"
+              [options]="boxOptions()"
+              noneLabel="Sin caja"
+              placeholder="Buscar contenedor..."
+              (valueChange)="patchItemForm({ boxId: $any($event) })" />
 
             <mat-form-field appearance="outline">
               <mat-label>Cantidad</mat-label>
@@ -436,43 +432,35 @@
               <input matInput [ngModel]="boxForm().name" (ngModelChange)="patchBoxForm({ name: $event })" />
             </mat-form-field>
 
-            <mat-form-field appearance="outline">
-              <mat-label>Tipo</mat-label>
-              <app-searchable-select
-                [value]="boxForm().containerType"
-                [options]="containerTypeOptions"
-                placeholder="Buscar tipo..."
-                (valueChange)="patchBoxForm({ containerType: $any($event) })" />
-            </mat-form-field>
+            <app-searchable-select
+              label="Tipo"
+              [value]="boxForm().containerType"
+              [options]="containerTypeOptions"
+              placeholder="Buscar tipo..."
+              (valueChange)="patchBoxForm({ containerType: $any($event) })" />
 
-            <mat-form-field appearance="outline">
-              <mat-label>Ubicación raíz</mat-label>
-              <app-searchable-select
-                [value]="boxForm().locationId"
-                [options]="locationOptions()"
-                [disabled]="boxForm().parentBoxId !== null"
-                placeholder="Buscar ubicación..."
-                (valueChange)="patchBoxForm({ locationId: $any($event) })" />
-            </mat-form-field>
+            <app-searchable-select
+              label="Ubicación raíz"
+              [value]="boxForm().locationId"
+              [options]="locationOptions()"
+              [disabled]="boxForm().parentBoxId !== null"
+              placeholder="Buscar ubicación..."
+              (valueChange)="patchBoxForm({ locationId: $any($event) })" />
 
-            <mat-form-field appearance="outline">
-              <mat-label>Dentro de</mat-label>
-              <app-searchable-select
-                [value]="boxForm().parentBoxId"
-                [options]="parentBoxOptions()"
-                noneLabel="Primer nivel"
-                placeholder="Buscar contenedor..."
-                (valueChange)="patchBoxForm({ parentBoxId: $any($event) })" />
-            </mat-form-field>
+            <app-searchable-select
+              label="Dentro de"
+              [value]="boxForm().parentBoxId"
+              [options]="parentBoxOptions()"
+              noneLabel="Primer nivel"
+              placeholder="Buscar contenedor..."
+              (valueChange)="patchBoxForm({ parentBoxId: $any($event) })" />
 
-            <mat-form-field appearance="outline">
-              <mat-label>Estado</mat-label>
-              <app-searchable-select
-                [value]="boxForm().status"
-                [options]="boxStatusOptions"
-                placeholder="Buscar estado..."
-                (valueChange)="patchBoxForm({ status: $any($event) })" />
-            </mat-form-field>
+            <app-searchable-select
+              label="Estado"
+              [value]="boxForm().status"
+              [options]="boxStatusOptions"
+              placeholder="Buscar estado..."
+              (valueChange)="patchBoxForm({ status: $any($event) })" />
 
             <mat-form-field appearance="outline" class="wide">
               <mat-label>Descripción</mat-label>

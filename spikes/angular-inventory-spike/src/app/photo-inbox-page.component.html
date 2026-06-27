@@ -19,15 +19,13 @@
       <p class="eyebrow">Importar</p>
       <strong>Subida a pendientes</strong>
     </div>
-    <mat-form-field appearance="outline">
-      <mat-label>Caja origen</mat-label>
-      <app-searchable-select
-        [value]="uploadSourceBoxId()"
-        [options]="boxOptions()"
-        noneLabel="Sin caja origen"
-        placeholder="Buscar caja..."
-        (valueChange)="uploadSourceBoxId.set($any($event))" />
-    </mat-form-field>
+    <app-searchable-select
+      label="Caja origen"
+      [value]="uploadSourceBoxId()"
+      [options]="boxOptions()"
+      noneLabel="Sin caja origen"
+      placeholder="Buscar caja..."
+      (valueChange)="uploadSourceBoxId.set($any($event))" />
     <label class="upload-button">
       <input type="file" accept="image/*" multiple (change)="uploadFiles($event)" [disabled]="uploading()" />
       <mat-icon>upload</mat-icon>
