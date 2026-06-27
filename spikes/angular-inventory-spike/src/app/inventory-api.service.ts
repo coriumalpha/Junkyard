@@ -401,6 +401,10 @@ export class InventoryApiService {
     return this.http.put<InventoryTag>(`/api/tags/${id}`, input);
   }
 
+  deleteTag(id: number): Observable<void> {
+    return this.http.delete<void>(`/api/tags/${id}`);
+  }
+
   fetchDashboard(): Observable<DashboardResponse> {
     return this.http.get<DashboardResponse>('/api/dashboard');
   }
@@ -423,6 +427,14 @@ export class InventoryApiService {
 
   updateItem(id: number, input: InventoryItemUpdate): Observable<InventoryItemDetail> {
     return this.http.put<InventoryItemDetail>(`/api/items/${id}`, input);
+  }
+
+  setItemCoverPhoto(id: number, photoId: number): Observable<InventoryItemDetail> {
+    return this.http.post<InventoryItemDetail>(`/api/items/${id}/photos/${photoId}/cover`, {});
+  }
+
+  rotateItemPhoto(id: number, photoId: number, delta: number): Observable<InventoryItemDetail> {
+    return this.http.post<InventoryItemDetail>(`/api/items/${id}/photos/${photoId}/rotate`, { delta });
   }
 
   fetchBox(code: string): Observable<InventoryBoxDetail> {

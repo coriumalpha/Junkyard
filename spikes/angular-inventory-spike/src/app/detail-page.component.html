@@ -55,19 +55,35 @@
             @for (photo of item()!.photos; track photoTrack($index, photo)) {
               <button type="button" class="thumb-button" [class.active]="$index === activePhotoIndex()" (click)="selectPhoto($index)">
                 <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || item()!.name" />
+                @if (isItemCover(photo)) {
+                  <span class="cover-dot" aria-label="Foto principal"></span>
+                }
               </button>
             }
           </div>
-          <div class="main-photo"
-               (mousemove)="updateZoomOrigin($event)"
-               (mouseleave)="stopZoom()"
-               (click)="openPhotoModal(activePhoto())"
-               role="button"
-               tabindex="0">
-            <img [src]="assetUrl(activePhoto()!.previewUrl || activePhoto()!.url)!"
-                 [style.transform]="activePhotoTransform(activePhoto()!)"
-                 [style.transform-origin]="zoomOriginX() + ' ' + zoomOriginY()"
-                 [alt]="activePhoto()!.caption || item()!.name" />
+          <div class="main-photo-stack">
+            <div class="photo-toolbar">
+              <button mat-icon-button type="button" (click)="setItemCover(activePhoto()!)" [disabled]="saving() || isItemCover(activePhoto()!)" aria-label="Usar como foto principal">
+                <mat-icon>star</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="rotateItemPhoto(activePhoto()!, -90)" [disabled]="saving()" aria-label="Girar a la izquierda">
+                <mat-icon>rotate_left</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="rotateItemPhoto(activePhoto()!, 90)" [disabled]="saving()" aria-label="Girar a la derecha">
+                <mat-icon>rotate_right</mat-icon>
+              </button>
+            </div>
+            <div class="main-photo"
+                 (mousemove)="updateZoomOrigin($event)"
+                 (mouseleave)="stopZoom()"
+                 (click)="openPhotoModal(activePhoto())"
+                 role="button"
+                 tabindex="0">
+              <img [src]="assetUrl(activePhoto()!.previewUrl || activePhoto()!.url)!"
+                   [style.transform]="activePhotoTransform(activePhoto()!)"
+                   [style.transform-origin]="zoomOriginX() + ' ' + zoomOriginY()"
+                   [alt]="activePhoto()!.caption || item()!.name" />
+            </div>
           </div>
         } @else {
           <div class="hero-placeholder">{{ firstLetter(item()!.name) }}</div>
@@ -392,22 +408,56 @@
 
     <section class="items-panel">
       <div class="section-head">
-        <p class="eyebrow">Ítems directos</p>
-        <strong>{{ box()!.items.length }}</strong>
+        <div>
+          <p class="eyebrow">Ítems directos</p>
+          <strong>{{ box()!.items.length }}</strong>
+        </div>
+        <div class="view-switcher" aria-label="Vista de ítems directos">
+          <button mat-icon-button type="button" [class.active]="boxItemsView() === 'list'" (click)="setBoxItemsView('list')" aria-label="Vista lista">
+            <mat-icon>view_list</mat-icon>
+          </button>
+          <button mat-icon-button type="button" [class.active]="boxItemsView() === 'gallery'" (click)="setBoxItemsView('gallery')" aria-label="Vista galería">
+            <mat-icon>grid_view</mat-icon>
+          </button>
+          <button mat-icon-button type="button" [class.active]="boxItemsView() === 'table'" (click)="setBoxItemsView('table')" aria-label="Vista tabla">
+            <mat-icon>table_rows</mat-icon>
+          </button>
+        </div>
       </div>
-      <div class="item-list">
-        @for (item of box()!.items; track item.id) {
-          <app-entity-mini-card
-            [title]="item.name"
-            [subtitle]="tagSummary(item) + ' · ' + item.quantityLabel"
-            [imageUrl]="assetUrl(item.coverUrl)"
-            [rotationDegrees]="item.rotationDegrees"
-            [placeholder]="firstLetter(item.name)"
-            [routerLink]="['/item', item.id]" />
-        } @empty {
-          <div class="empty">Sin ítems directos.</div>
-        }
-      </div>
+      @if (boxItemsView() === 'table') {
+        <div class="items-table" role="table">
+          <div class="items-table-head" role="row">
+            <button type="button" (click)="sortBoxItems('code')">IT <mat-icon>{{ sortLabel('code') }}</mat-icon></button>
+            <button type="button" (click)="sortBoxItems('name')">Nombre <mat-icon>{{ sortLabel('name') }}</mat-icon></button>
+            <button type="button" (click)="sortBoxItems('tags')">Tags <mat-icon>{{ sortLabel('tags') }}</mat-icon></button>
+            <button type="button" (click)="sortBoxItems('quantity')">Cantidad <mat-icon>{{ sortLabel('quantity') }}</mat-icon></button>
+          </div>
+          @for (item of sortedBoxItems(); track item.id) {
+            <a class="items-table-row" [routerLink]="['/item', item.id]" role="row">
+              <span>{{ item.code }}</span>
+              <strong>{{ item.name }}</strong>
+              <span>{{ tagSummary(item) }}</span>
+              <span>{{ item.quantityLabel }}</span>
+            </a>
+          } @empty {
+            <div class="empty">Sin ítems directos.</div>
+          }
+        </div>
+      } @else {
+        <div class="item-list" [class.gallery-mode]="boxItemsView() === 'gallery'">
+          @for (item of sortedBoxItems(); track item.id) {
+            <app-entity-mini-card
+              [title]="item.name"
+              [subtitle]="item.code + ' · ' + tagSummary(item) + ' · ' + item.quantityLabel"
+              [imageUrl]="assetUrl(item.coverUrl)"
+              [rotationDegrees]="item.rotationDegrees"
+              [placeholder]="firstLetter(item.name)"
+              [routerLink]="['/item', item.id]" />
+          } @empty {
+            <div class="empty">Sin ítems directos.</div>
+          }
+        </div>
+      }
     </section>
 
   }

@@ -46,6 +46,9 @@
           <span>Color</span>
           <input type="color" [ngModel]="tag.color" (ngModelChange)="updateTag(tag, { color: $event })" />
         </label>
+        <button mat-icon-button type="button" (click)="deleteTag(tag)" [disabled]="saving()" aria-label="Eliminar tag">
+          <mat-icon>delete</mat-icon>
+        </button>
       </mat-card>
     } @empty {
       @if (!loading()) {

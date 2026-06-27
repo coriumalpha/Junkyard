@@ -86,6 +86,25 @@ export class SettingsTagsPageComponent {
     ).subscribe();
   }
 
+  protected deleteTag(tag: InventoryTag): void {
+    if (this.saving()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.error.set(null);
+    this.api.deleteTag(tag.id).pipe(
+      tap(() => this.tags.update((current) => current.filter((item) => item.id !== tag.id))),
+      catchError((error: unknown) => {
+        this.error.set(error instanceof Error ? error.message : 'No se pudo eliminar el tag. Sólo se pueden borrar tags sin ítems asignados.');
+        this.reload();
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
   protected setDraftName(value: string): void {
     this.draftName.set(value);
   }

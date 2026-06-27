@@ -98,6 +98,7 @@
 }
 
 .thumb-button {
+  position: relative;
   width: 66px;
   height: 66px;
   padding: 0;
@@ -106,6 +107,32 @@
   overflow: hidden;
   background: rgba(255, 255, 255, 0.045);
   cursor: pointer;
+}
+
+.cover-dot {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(5, 10, 18, 0.92);
+  border-radius: 999px;
+  background: #ffc86b;
+  box-shadow: 0 0 12px rgba(255, 200, 107, 0.45);
+}
+
+.main-photo-stack {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.photo-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 40px;
 }
 
 .thumb-button.active {
@@ -373,6 +400,83 @@
 .item-list {
   display: grid;
   gap: 8px;
+}
+
+.item-list.gallery-mode {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.view-switcher {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.view-switcher button.active {
+  color: var(--app-accent);
+  background: rgba(72, 255, 176, 0.12);
+}
+
+.items-table {
+  display: grid;
+  overflow-x: auto;
+}
+
+.items-table-head,
+.items-table-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.65fr) minmax(220px, 1.4fr) minmax(180px, 1fr) minmax(110px, 0.6fr);
+  gap: 10px;
+  min-width: 760px;
+  align-items: center;
+}
+
+.items-table-head {
+  padding: 0 10px 8px;
+}
+
+.items-table-head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  color: var(--app-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.items-table-head mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.items-table-row {
+  padding: 11px 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.075);
+  color: inherit;
+  text-decoration: none;
+}
+
+.items-table-row:hover {
+  background: rgba(72, 255, 176, 0.055);
+}
+
+.items-table-row span,
+.items-table-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .child-container-list {

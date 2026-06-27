@@ -3,12 +3,8 @@
 }
 
 .hierarchy-trail {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  min-width: 0;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  display: grid;
+  gap: 8px;
 }
 
 .hierarchy-node {
@@ -16,8 +12,7 @@
   grid-template-columns: auto minmax(130px, 1fr) auto;
   gap: 10px;
   align-items: center;
-  flex: 0 0 min(280px, 78vw);
-  min-width: 210px;
+  min-width: 0;
   padding: 11px 12px;
   border: 1px solid var(--app-border);
   border-radius: 14px;
@@ -86,8 +81,8 @@ a.hierarchy-node:hover {
 }
 
 .hierarchy-connector {
-  align-self: center;
-  flex: 0 0 34px;
-  height: 2px;
-  background: linear-gradient(90deg, rgba(72, 255, 176, 0.5), rgba(255, 79, 216, 0.35));
+  width: 2px;
+  height: 18px;
+  margin-left: 21px;
+  background: linear-gradient(180deg, rgba(72, 255, 176, 0.5), rgba(255, 79, 216, 0.35));
 }

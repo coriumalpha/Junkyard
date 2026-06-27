@@ -181,6 +181,14 @@ app.MapPut("/api/tags/{id:int}", async (
 
     return tag is null ? Results.NotFound() : Results.Json(tag);
 });
+app.MapDelete("/api/tags/{id:int}", async (
+    int id,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var error = await queryService.DeleteTagAsync(id, cancellationToken);
+    return error is null ? Results.NoContent() : Results.BadRequest(new { error });
+});
 app.MapGet("/api/inventory/options", async (
     InventoryLiveQueryService queryService,
     CancellationToken cancellationToken) =>
@@ -203,6 +211,36 @@ app.MapPut("/api/items/{id:int}", async (
     CancellationToken cancellationToken) =>
 {
     var (item, error) = await queryService.UpdateItemAsync(id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return item is null ? Results.NotFound() : Results.Json(item);
+});
+app.MapPost("/api/items/{id:int}/photos/{photoId:int}/cover", async (
+    int id,
+    int photoId,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (item, error) = await queryService.SetItemCoverPhotoAsync(id, photoId, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return item is null ? Results.NotFound() : Results.Json(item);
+});
+app.MapPost("/api/items/{id:int}/photos/{photoId:int}/rotate", async (
+    int id,
+    int photoId,
+    PhotoRotateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var delta = input.Delta < 0 ? -90 : 90;
+    var (item, error) = await queryService.RotateItemPhotoAsync(id, photoId, delta, cancellationToken);
     if (error is not null)
     {
         return Results.BadRequest(new { error });
@@ -360,3 +398,5 @@ static async Task GeneratePhotoDerivativesAsync(IServiceProvider services)
 
     Console.WriteLine($"generated derivatives for {generated} photo files");
 }
+
+public record PhotoRotateDto(int Delta);

@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Inventario.Services;
 
-public sealed class InventoryLiveQueryService(InventoryDbContext db)
+public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorage photoStorage)
 {
     public async Task<InventoryItemDetailDto?> GetItemDetailAsync(int id, CancellationToken cancellationToken)
     {
@@ -20,7 +20,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         }
 
         var locationLookup = await BoxHierarchyService.BuildLocationLookupAsync(db, cancellationToken);
-        var photos = await EntityPhotosAsync(PhotoEntityType.Item, item.Id, cancellationToken);
+        var photos = await EntityPhotosAsync(PhotoEntityType.Item, item.Id, item.CoverPhoto, cancellationToken);
         var photoStates = await PhotoStorage.LoadViewStatesAsync(db, photos.Select(photo => photo.Filename).ToList(), cancellationToken);
         var locationName = item.Box is not null && locationLookup.TryGetValue(item.Box.Id, out var location)
             ? location.LocationName
@@ -133,6 +133,61 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         return (await GetItemDetailAsync(id, cancellationToken), null);
     }
 
+    public async Task<(InventoryItemDetailDto? Item, string? Error)> SetItemCoverPhotoAsync(
+        int id,
+        int photoId,
+        CancellationToken cancellationToken)
+    {
+        var item = await db.Items.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (item is null)
+        {
+            return (null, null);
+        }
+
+        var photo = await db.Photos.AsNoTracking()
+            .FirstOrDefaultAsync(photo => photo.Id == photoId
+                && photo.EntityType == PhotoEntityType.Item
+                && photo.EntityId == id
+                && photo.Status == PhotoStatus.Active,
+                cancellationToken);
+        if (photo is null)
+        {
+            return (null, "La foto no existe para este ítem.");
+        }
+
+        item.CoverPhoto = photo.Filename;
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetItemDetailAsync(id, cancellationToken), null);
+    }
+
+    public async Task<(InventoryItemDetailDto? Item, string? Error)> RotateItemPhotoAsync(
+        int id,
+        int photoId,
+        int delta,
+        CancellationToken cancellationToken)
+    {
+        var itemExists = await db.Items.AnyAsync(item => item.Id == id, cancellationToken);
+        if (!itemExists)
+        {
+            return (null, null);
+        }
+
+        var photo = await db.Photos.FirstOrDefaultAsync(photo => photo.Id == photoId
+            && photo.EntityType == PhotoEntityType.Item
+            && photo.EntityId == id
+            && photo.Status == PhotoStatus.Active,
+            cancellationToken);
+        if (photo is null)
+        {
+            return (null, "La foto no existe para este ítem.");
+        }
+
+        await photoStorage.RotateStoredPhotoAsync(photo.Filename, delta, cancellationToken);
+        await PhotoStorage.ResetRotationMetadataAsync(db, photo.Filename, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetItemDetailAsync(id, cancellationToken), null);
+    }
+
     public async Task<TagsResponseDto> GetTagsAsync(CancellationToken cancellationToken)
     {
         var tags = await db.Tags.AsNoTracking()
@@ -185,6 +240,25 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         return (new TagDto(tag.Id, tag.Name, tag.Color), null);
     }
 
+    public async Task<string?> DeleteTagAsync(int id, CancellationToken cancellationToken)
+    {
+        var tag = await db.Tags.FirstOrDefaultAsync(tag => tag.Id == id, cancellationToken);
+        if (tag is null)
+        {
+            return null;
+        }
+
+        var used = await db.ItemTags.AnyAsync(itemTag => itemTag.TagId == id, cancellationToken);
+        if (used)
+        {
+            return "No se puede eliminar un tag con ítems asignados.";
+        }
+
+        db.Tags.Remove(tag);
+        await db.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
     public async Task<InventoryBoxDetailDto?> GetBoxDetailAsync(string code, CancellationToken cancellationToken)
     {
         var normalizedCode = Box.NormalizePublicCode(code);
@@ -221,7 +295,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
                 .Select(group => new { ItemId = group.Key, Count = group.Count() })
                 .ToDictionaryAsync(entry => entry.ItemId, entry => entry.Count, cancellationToken);
 
-        var photos = await EntityPhotosAsync(PhotoEntityType.Box, box.Id, cancellationToken);
+        var photos = await EntityPhotosAsync(PhotoEntityType.Box, box.Id, box.CoverPhoto, cancellationToken);
         var filenames = photos.Select(photo => photo.Filename)
             .Concat(box.Items.Select(item => item.CoverPhoto).Where(filename => !string.IsNullOrWhiteSpace(filename)).Select(filename => filename!))
             .Distinct()
@@ -902,11 +976,13 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             ]);
     }
 
-    private async Task<List<Photo>> EntityPhotosAsync(PhotoEntityType entityType, int entityId, CancellationToken cancellationToken)
+    private async Task<List<Photo>> EntityPhotosAsync(PhotoEntityType entityType, int entityId, string? coverPhoto, CancellationToken cancellationToken)
     {
         return await db.Photos.AsNoTracking()
             .Where(photo => photo.EntityType == entityType && photo.EntityId == entityId && photo.Status == PhotoStatus.Active)
-            .OrderByDescending(photo => photo.CreatedAt)
+            .OrderByDescending(photo => coverPhoto != null && photo.Filename == coverPhoto)
+            .ThenByDescending(photo => photo.CreatedAt)
+            .ThenByDescending(photo => photo.Id)
             .Take(24)
             .ToListAsync(cancellationToken);
     }

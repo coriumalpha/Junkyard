@@ -63,10 +63,10 @@
 }
 
 .tag-card {
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    "swatch name"
-    "swatch color";
+    "swatch name delete"
+    "swatch color delete";
   align-items: start;
 }
 
@@ -87,6 +87,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.tag-card button {
+  grid-area: delete;
+  align-self: center;
 }
 
 .color-pick {

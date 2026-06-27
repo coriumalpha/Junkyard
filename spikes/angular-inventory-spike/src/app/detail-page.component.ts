@@ -21,6 +21,8 @@ import { InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryH
 import { legacyUrl } from './legacy-url';
 
 type DetailKind = 'item' | 'box';
+type BoxItemsView = 'list' | 'gallery' | 'table';
+type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
 
 @Component({
   selector: 'app-detail-page',
@@ -63,6 +65,9 @@ export class DetailPageComponent {
   protected readonly newTagColor = signal('#48ffb0');
   protected readonly activePhotoIndex = signal(0);
   protected readonly modalPhoto = signal<InventoryPhoto | null>(null);
+  protected readonly boxItemsView = signal<BoxItemsView>('list');
+  protected readonly boxItemSortKey = signal<BoxItemSortKey>('name');
+  protected readonly boxItemSortDirection = signal<'asc' | 'desc'>('asc');
   protected readonly zooming = signal(false);
   protected readonly zoomOriginX = signal('50%');
   protected readonly zoomOriginY = signal('50%');
@@ -83,6 +88,16 @@ export class DetailPageComponent {
   protected readonly title = computed(() => this.item()?.name ?? this.box()?.name ?? 'Detalle');
   protected readonly currentPhotos = computed(() => this.item()?.photos ?? this.box()?.photos ?? []);
   protected readonly activePhoto = computed(() => this.currentPhotos()[this.activePhotoIndex()] ?? null);
+  protected readonly sortedBoxItems = computed(() => {
+    const items = [...(this.box()?.items ?? [])];
+    const key = this.boxItemSortKey();
+    const direction = this.boxItemSortDirection() === 'asc' ? 1 : -1;
+    return items.sort((left, right) => {
+      const leftValue = this.boxItemSortValue(left, key);
+      const rightValue = this.boxItemSortValue(right, key);
+      return leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: 'base' }) * direction;
+    });
+  });
   protected readonly itemHierarchyNodes = computed<HierarchyTrailNode[]>(() => {
     const item = this.item();
     if (!item) {
@@ -422,6 +437,58 @@ export class DetailPageComponent {
     this.zooming.set(false);
   }
 
+  protected isItemCover(photo: InventoryPhoto): boolean {
+    const item = this.item();
+    return Boolean(item?.photos[0]?.id === photo.id);
+  }
+
+  protected setItemCover(photo: InventoryPhoto): void {
+    const item = this.item();
+    if (!item || this.saving()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    this.api.setItemCoverPhoto(item.id, photo.id).pipe(
+      tap((updated) => {
+        this.item.set(updated);
+        this.activePhotoIndex.set(0);
+        this.saveMessage.set('Foto principal actualizada.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo fijar la foto principal.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected rotateItemPhoto(photo: InventoryPhoto, delta: number): void {
+    const item = this.item();
+    if (!item || this.saving()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    this.api.rotateItemPhoto(item.id, photo.id, delta).pipe(
+      tap((updated) => {
+        this.item.set(updated);
+        const nextIndex = Math.max(0, updated.photos.findIndex((candidate) => candidate.id === photo.id));
+        this.activePhotoIndex.set(nextIndex);
+        this.saveMessage.set('Foto girada.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo girar la foto.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
   protected activePhotoTransform(photo: InventoryPhoto): string {
     const scale = this.zooming() ? 1.85 : 1;
     return `rotate(${photo.rotationDegrees}deg) scale(${scale})`;
@@ -502,6 +569,28 @@ export class DetailPageComponent {
     return item.tags.length ? item.tags.map((tag) => tag.name).join(', ') : item.category;
   }
 
+  protected setBoxItemsView(view: BoxItemsView): void {
+    this.boxItemsView.set(view);
+  }
+
+  protected sortBoxItems(key: BoxItemSortKey): void {
+    if (this.boxItemSortKey() === key) {
+      this.boxItemSortDirection.update((direction) => direction === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+
+    this.boxItemSortKey.set(key);
+    this.boxItemSortDirection.set('asc');
+  }
+
+  protected sortLabel(key: BoxItemSortKey): string {
+    if (this.boxItemSortKey() !== key) {
+      return '';
+    }
+
+    return this.boxItemSortDirection() === 'asc' ? 'arrow_upward' : 'arrow_downward';
+  }
+
   protected primaryTagName(tagIds: number[]): string {
     const first = this.options().tags.find((tag) => tagIds.includes(tag.id));
     return first?.name ?? 'Otros';
@@ -524,6 +613,20 @@ export class DetailPageComponent {
       notes: '',
       boxId: null
     };
+  }
+
+  private boxItemSortValue(item: InventoryItem, key: BoxItemSortKey): string {
+    switch (key) {
+      case 'code':
+        return item.code;
+      case 'tags':
+        return this.tagSummary(item);
+      case 'quantity':
+        return item.quantityLabel;
+      case 'name':
+      default:
+        return item.name;
+    }
   }
 
   private toHierarchyNode(node: InventoryHierarchyNode): HierarchyTrailNode {
