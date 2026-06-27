@@ -7,6 +7,7 @@ namespace Inventario.Services;
 public static class SearchText
 {
     private static readonly Regex AcronymRegex = new(@"[A-Z0-9]{2,}", RegexOptions.Compiled);
+    private static readonly Regex TokenRegex = new(@"[\p{L}\p{N}]+", RegexOptions.Compiled);
 
     public static string Normalize(string? value)
     {
@@ -30,8 +31,9 @@ public static class SearchText
 
     public static List<string> Tokenize(string? value)
     {
-        return Normalize(value)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        return TokenRegex.Matches(Normalize(value))
+            .Select(match => match.Value)
+            .Where(token => token.Length > 0)
             .Distinct(StringComparer.Ordinal)
             .ToList();
     }

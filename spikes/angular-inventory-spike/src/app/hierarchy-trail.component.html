@@ -6,23 +6,33 @@
 
     @if (node.routerLink) {
       <a class="hierarchy-node" [ngClass]="'tone-' + (node.tone || 'muted')" [routerLink]="node.routerLink">
-        <mat-icon>{{ node.icon }}</mat-icon>
+        <span class="node-marker">
+          <mat-icon>{{ node.icon }}</mat-icon>
+        </span>
         <span>
           <strong>{{ node.label }}</strong>
           @if (node.sublabel) {
             <small>{{ node.sublabel }}</small>
           }
         </span>
+        @if (node.coverUrl) {
+          <img class="node-cover" [src]="node.coverUrl" [style.transform]="'rotate(' + (node.rotationDegrees || 0) + 'deg)'" alt="" />
+        }
       </a>
     } @else {
       <span class="hierarchy-node" [ngClass]="'tone-' + (node.tone || 'muted')">
-        <mat-icon>{{ node.icon }}</mat-icon>
+        <span class="node-marker">
+          <mat-icon>{{ node.icon }}</mat-icon>
+        </span>
         <span>
           <strong>{{ node.label }}</strong>
           @if (node.sublabel) {
             <small>{{ node.sublabel }}</small>
           }
         </span>
+        @if (node.coverUrl) {
+          <img class="node-cover" [src]="node.coverUrl" [style.transform]="'rotate(' + (node.rotationDegrees || 0) + 'deg)'" alt="" />
+        }
       </span>
     }
   }

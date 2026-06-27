@@ -119,6 +119,7 @@ export interface InventoryGroup {
 
 export interface InventoryItem {
   id: number;
+  code: string;
   name: string;
   url: string;
   coverUrl: string | null;
@@ -204,6 +205,7 @@ export interface InventoryAction {
 
 export interface InventoryItemDetail {
   id: number;
+  code: string;
   name: string;
   category: string;
   tags: InventoryTag[];
@@ -227,6 +229,7 @@ export interface InventoryItemDetail {
 }
 
 export interface InventoryItemUpdate {
+  code: string;
   name: string;
   category: string;
   tagIds: number[];
@@ -250,6 +253,7 @@ export interface InventoryItemBox {
   locationName: string | null;
   locationSourceLabel: string | null;
   containerTypeLabel: string;
+  hierarchy: InventoryHierarchyNode[];
 }
 
 export interface InventoryBoxDetail {
@@ -264,6 +268,7 @@ export interface InventoryBoxDetail {
   locationId: number;
   locationName: string | null;
   locationSourceLabel: string | null;
+  hierarchy: InventoryHierarchyNode[];
   parent: InventoryBoxLink | null;
   children: InventoryBoxLink[];
   items: InventoryItem[];
@@ -293,9 +298,20 @@ export interface InventoryPhoto {
   id: number;
   url: string;
   previewUrl: string;
+  fullUrl: string;
   rotationDegrees: number;
   caption: string | null;
   createdAt: string;
+}
+
+export interface InventoryHierarchyNode {
+  label: string;
+  sublabel: string | null;
+  icon: string;
+  tone: 'location' | 'box' | 'item' | 'current' | 'muted';
+  routerLink: string | null;
+  coverUrl: string | null;
+  rotationDegrees: number;
 }
 
 export type PhotoInboxStatus = 'Pending' | 'Assigned' | 'Discarded' | 'All';

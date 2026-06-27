@@ -17,7 +17,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { EntityMiniCardComponent } from './entity-mini-card.component';
 import { HierarchyTrailComponent, HierarchyTrailNode } from './hierarchy-trail.component';
-import { InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryOptionsResponse, InventoryPhoto } from './inventory-api.service';
+import { InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryOptionsResponse, InventoryPhoto } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
 
 type DetailKind = 'item' | 'box';
@@ -62,6 +62,7 @@ export class DetailPageComponent {
   protected readonly newTagName = signal('');
   protected readonly newTagColor = signal('#48ffb0');
   protected readonly activePhotoIndex = signal(0);
+  protected readonly modalPhoto = signal<InventoryPhoto | null>(null);
   protected readonly zooming = signal(false);
   protected readonly zoomOriginX = signal('50%');
   protected readonly zoomOriginY = signal('50%');
@@ -88,37 +89,24 @@ export class DetailPageComponent {
       return [];
     }
 
-    const nodes: HierarchyTrailNode[] = [];
     if (item.box) {
-      nodes.push({
-        label: item.box.locationName || 'Sin ubicación',
-        sublabel: item.box.locationSourceLabel,
-        icon: 'place',
-        routerLink: item.box.locationName ? ['/locations'] : null,
-        tone: 'location'
-      });
-      nodes.push({
-        label: `${item.box.code} · ${item.box.name}`,
-        sublabel: item.box.path,
-        icon: 'inventory_2',
-        routerLink: ['/boxes', item.box.code],
-        tone: 'box'
-      });
-    } else {
-      nodes.push({
+      return item.box.hierarchy.map((node) => this.toHierarchyNode(node));
+    }
+
+    const nodes: HierarchyTrailNode[] = [
+      {
         label: 'Sin contenedor',
         sublabel: 'Pendiente de clasificar',
         icon: 'location_off',
         tone: 'muted'
-      });
-    }
-
-    nodes.push({
-      label: item.name,
-      sublabel: this.tagSummary(item),
-      icon: 'category',
-      tone: 'item'
-    });
+      },
+      {
+        label: item.name,
+        sublabel: this.tagSummary(item),
+        icon: 'category',
+        tone: 'item'
+      }
+    ];
     return nodes;
   });
   protected readonly boxHierarchyNodes = computed<HierarchyTrailNode[]>(() => {
@@ -127,30 +115,7 @@ export class DetailPageComponent {
       return [];
     }
 
-    const nodes: HierarchyTrailNode[] = [{
-      label: box.locationName || 'Sin ubicación',
-      sublabel: box.locationSourceLabel,
-      icon: 'place',
-      routerLink: box.locationName ? ['/locations'] : null,
-      tone: 'location'
-    }];
-
-    if (box.parent) {
-      nodes.push({
-        label: `${box.parent.code} · ${box.parent.name}`,
-        icon: 'inventory_2',
-        routerLink: ['/boxes', box.parent.code],
-        tone: 'box'
-      });
-    }
-
-    nodes.push({
-      label: `${box.code} · ${box.name}`,
-      sublabel: box.path,
-      icon: 'inventory_2',
-      tone: 'current'
-    });
-    return nodes;
+    return box.hierarchy.map((node) => this.toHierarchyNode(node));
   });
   protected readonly subtitle = computed(() => {
     const item = this.item();
@@ -180,6 +145,7 @@ export class DetailPageComponent {
         this.item.set(null);
         this.box.set(null);
         this.activePhotoIndex.set(0);
+        this.modalPhoto.set(null);
         this.zooming.set(false);
         this.editingItem.set(false);
         this.editingBox.set(false);
@@ -238,6 +204,7 @@ export class DetailPageComponent {
 
     this.itemForm.set({
       name: item.name,
+      code: item.code,
       category: item.category,
       tagIds: item.tags.map((tag) => tag.id),
       quantity: item.quantity,
@@ -316,6 +283,7 @@ export class DetailPageComponent {
     this.saveMessage.set(null);
     this.api.updateItem(item.id, {
       ...form,
+      code: form.code.trim(),
       name: form.name.trim(),
       category: this.primaryTagName(form.tagIds),
       unit: form.unit.trim(),
@@ -328,6 +296,7 @@ export class DetailPageComponent {
         this.item.set(updated);
         this.itemForm.set({
           name: updated.name,
+          code: updated.code,
           category: updated.category,
           tagIds: updated.tags.map((tag) => tag.id),
           quantity: updated.quantity,
@@ -478,6 +447,19 @@ export class DetailPageComponent {
     this.zoomOriginY.set('50%');
   }
 
+  protected openPhotoModal(photo: InventoryPhoto | null): void {
+    if (!photo) {
+      return;
+    }
+
+    this.modalPhoto.set(photo);
+    this.zooming.set(false);
+  }
+
+  protected closePhotoModal(): void {
+    this.modalPhoto.set(null);
+  }
+
   protected quickCreateTag(): void {
     const name = this.newTagName().trim();
     if (!name || this.saving()) {
@@ -527,6 +509,7 @@ export class DetailPageComponent {
 
   private emptyItemForm(): InventoryItemUpdate {
     return {
+      code: '',
       name: '',
       category: 'Otros',
       tagIds: [],
@@ -540,6 +523,18 @@ export class DetailPageComponent {
       obsolete: false,
       notes: '',
       boxId: null
+    };
+  }
+
+  private toHierarchyNode(node: InventoryHierarchyNode): HierarchyTrailNode {
+    return {
+      label: node.label,
+      sublabel: node.sublabel,
+      icon: node.icon,
+      routerLink: node.routerLink,
+      tone: node.tone,
+      coverUrl: node.coverUrl,
+      rotationDegrees: node.rotationDegrees
     };
   }
 

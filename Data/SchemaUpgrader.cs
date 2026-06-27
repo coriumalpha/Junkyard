@@ -19,6 +19,7 @@ public static class SchemaUpgrader
         AddColumn(db, "Photos", "UpdatedAt", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'");
         AddColumn(db, "Photos", "SourceInboxId", "INTEGER NULL");
         AddColumn(db, "Items", "ArchivedAt", "TEXT NULL");
+        AddColumn(db, "Items", "Code", "TEXT NULL");
         EnsureNullableItemBoxId(db);
         EnsureTags(db);
         EnsureInventoryActions(db);
@@ -27,6 +28,8 @@ public static class SchemaUpgrader
         AddColumn(db, "PhotoInboxes", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");
         AddColumn(db, "PhotoInboxes", "UpdatedAt", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'");
         AddColumn(db, "PhotoInboxes", "ProcessedAt", "TEXT NULL");
+        BackfillItemCodes(db);
+        db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Items_Code_Active" ON "Items" ("Code") WHERE "ArchivedAt" IS NULL AND "Code" IS NOT NULL AND trim("Code") <> '';""");
         NormalizeContainerTypes(db);
         BackfillCategoryTags(db);
         BackfillTimestamps(db);
@@ -129,6 +132,15 @@ public static class SchemaUpgrader
             """);
     }
 
+    private static void BackfillItemCodes(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            UPDATE "Items"
+            SET "Code" = 'IT-' || printf('%03d', "Id" / 1000) || '-' || printf('%03d', "Id" % 1000)
+            WHERE "Code" IS NULL OR trim("Code") = '';
+            """);
+    }
+
     private static void EnsureNullableItemBoxId(InventoryDbContext db)
     {
         var notNull = db.Database.SqlQueryRaw<int>(
@@ -142,6 +154,7 @@ public static class SchemaUpgrader
             PRAGMA foreign_keys=OFF;
             CREATE TABLE "Items_new" (
                 "Id" INTEGER NOT NULL CONSTRAINT "PK_Items" PRIMARY KEY AUTOINCREMENT,
+                "Code" TEXT NULL,
                 "BoxId" INTEGER NULL,
                 "Name" TEXT NOT NULL,
                 "Category" TEXT NOT NULL,
@@ -160,8 +173,8 @@ public static class SchemaUpgrader
                 "UpdatedAt" TEXT NOT NULL,
                 CONSTRAINT "FK_Items_Boxes_BoxId" FOREIGN KEY ("BoxId") REFERENCES "Boxes" ("Id") ON DELETE SET NULL
             );
-            INSERT INTO "Items_new" ("Id","BoxId","Name","Category","Quantity","Condition","Retention","Sentimental","Obsolete","Consumable","MinQuantity","Unit","Notes","CoverPhoto","ArchivedAt","CreatedAt","UpdatedAt")
-                SELECT "Id","BoxId","Name","Category","Quantity","Condition","Retention","Sentimental","Obsolete","Consumable","MinQuantity","Unit","Notes","CoverPhoto","ArchivedAt","CreatedAt","UpdatedAt" FROM "Items";
+            INSERT INTO "Items_new" ("Id","Code","BoxId","Name","Category","Quantity","Condition","Retention","Sentimental","Obsolete","Consumable","MinQuantity","Unit","Notes","CoverPhoto","ArchivedAt","CreatedAt","UpdatedAt")
+                SELECT "Id","Code","BoxId","Name","Category","Quantity","Condition","Retention","Sentimental","Obsolete","Consumable","MinQuantity","Unit","Notes","CoverPhoto","ArchivedAt","CreatedAt","UpdatedAt" FROM "Items";
             DROP TABLE "Items";
             ALTER TABLE "Items_new" RENAME TO "Items";
             CREATE INDEX IF NOT EXISTS "IX_Items_BoxId" ON "Items" ("BoxId");

@@ -60,7 +60,10 @@
           </div>
           <div class="main-photo"
                (mousemove)="updateZoomOrigin($event)"
-               (mouseleave)="stopZoom()">
+               (mouseleave)="stopZoom()"
+               (click)="openPhotoModal(activePhoto())"
+               role="button"
+               tabindex="0">
             <img [src]="assetUrl(activePhoto()!.previewUrl || activePhoto()!.url)!"
                  [style.transform]="activePhotoTransform(activePhoto()!)"
                  [style.transform-origin]="zoomOriginX() + ' ' + zoomOriginY()"
@@ -75,7 +78,15 @@
         <p class="eyebrow">Ítem</p>
         <h2>{{ item()!.name }}</h2>
         <div class="meta-grid">
-          <span>Tags</span><strong>{{ tagSummary(item()!) }}</strong>
+          <span>IT</span><strong>{{ item()!.code }}</strong>
+          <span>Tags</span>
+          <strong class="tag-chip-row">
+            @for (tag of item()!.tags; track tag.id) {
+              <span class="tag-pill" [style.--tag-color]="tag.color">{{ tag.name }}</span>
+            } @empty {
+              {{ item()!.category }}
+            }
+          </strong>
           <span>Cantidad</span><strong>{{ item()!.quantityLabel }}</strong>
           <span>Mínimo</span><strong>{{ item()!.minQuantity ?? 'Sin mínimo' }}</strong>
           <span>Estado</span><strong>{{ item()!.condition || 'Sin estado' }}</strong>
@@ -89,7 +100,10 @@
         </mat-chip-set>
         @if (item()!.notes) {
           <mat-divider />
-          <p class="notes">{{ item()!.notes }}</p>
+          <section class="description-block">
+            <p class="eyebrow">Descripción</p>
+            <p class="notes">{{ item()!.notes }}</p>
+          </section>
         }
       </mat-card>
 
@@ -110,6 +124,11 @@
           }
 
           <div class="edit-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>IT público</mat-label>
+              <input matInput [ngModel]="itemForm().code" (ngModelChange)="patchItemForm({ code: $event })" />
+            </mat-form-field>
+
             <mat-form-field appearance="outline">
               <mat-label>Nombre</mat-label>
               <input matInput [ngModel]="itemForm().name" (ngModelChange)="patchItemForm({ name: $event })" />
@@ -175,7 +194,7 @@
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="wide">
-              <mat-label>Notas</mat-label>
+              <mat-label>Descripción</mat-label>
               <textarea matInput rows="4" [ngModel]="itemForm().notes" (ngModelChange)="patchItemForm({ notes: $event })"></textarea>
             </mat-form-field>
 
@@ -222,7 +241,10 @@
           </div>
           <div class="main-photo"
                (mousemove)="updateZoomOrigin($event)"
-               (mouseleave)="stopZoom()">
+               (mouseleave)="stopZoom()"
+               (click)="openPhotoModal(activePhoto())"
+               role="button"
+               tabindex="0">
             <img [src]="assetUrl(activePhoto()!.previewUrl || activePhoto()!.url)!"
                  [style.transform]="activePhotoTransform(activePhoto()!)"
                  [style.transform-origin]="zoomOriginX() + ' ' + zoomOriginY()"
@@ -388,5 +410,16 @@
       </div>
     </section>
 
+  }
+
+  @if (modalPhoto()) {
+    <div class="photo-modal" (click)="closePhotoModal()">
+      <button mat-icon-button type="button" class="modal-close" (click)="closePhotoModal(); $event.stopPropagation()" aria-label="Cerrar imagen">
+        <mat-icon>close</mat-icon>
+      </button>
+      <img [src]="assetUrl(modalPhoto()!.fullUrl || modalPhoto()!.previewUrl || modalPhoto()!.url)!"
+           [style.transform]="'rotate(' + modalPhoto()!.rotationDegrees + 'deg)'"
+           [alt]="modalPhoto()!.caption || title()" />
+    </div>
   }
 </main>

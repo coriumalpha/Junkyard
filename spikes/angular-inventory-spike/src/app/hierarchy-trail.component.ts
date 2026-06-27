@@ -9,6 +9,8 @@ export interface HierarchyTrailNode {
   icon: string;
   routerLink?: string | unknown[] | null;
   tone?: 'location' | 'box' | 'item' | 'current' | 'muted';
+  coverUrl?: string | null;
+  rotationDegrees?: number;
 }
 
 @Component({

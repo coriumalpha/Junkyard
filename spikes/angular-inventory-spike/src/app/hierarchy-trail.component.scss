@@ -3,16 +3,21 @@
 }
 
 .hierarchy-trail {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .hierarchy-node {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(130px, 1fr) auto;
   gap: 10px;
   align-items: center;
-  min-width: 0;
+  flex: 0 0 min(280px, 78vw);
+  min-width: 210px;
   padding: 11px 12px;
   border: 1px solid var(--app-border);
   border-radius: 14px;
@@ -27,8 +32,20 @@ a.hierarchy-node:hover {
   background: rgba(72, 255, 176, 0.075);
 }
 
-.hierarchy-node mat-icon {
+.node-marker {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.node-marker mat-icon {
   color: var(--app-accent);
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
 }
 
 .hierarchy-node span {
@@ -45,6 +62,15 @@ a.hierarchy-node:hover {
   color: var(--app-muted);
 }
 
+.node-cover {
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .tone-current {
   border-color: rgba(72, 255, 176, 0.34);
   background: rgba(72, 255, 176, 0.085);
@@ -55,13 +81,13 @@ a.hierarchy-node:hover {
   background: rgba(255, 79, 216, 0.07);
 }
 
-.tone-location mat-icon {
+.tone-location .node-marker mat-icon {
   color: #ffc86b;
 }
 
 .hierarchy-connector {
-  width: 2px;
-  height: 18px;
-  margin-left: 21px;
-  background: linear-gradient(180deg, rgba(72, 255, 176, 0.5), rgba(255, 79, 216, 0.35));
+  align-self: center;
+  flex: 0 0 34px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(72, 255, 176, 0.5), rgba(255, 79, 216, 0.35));
 }

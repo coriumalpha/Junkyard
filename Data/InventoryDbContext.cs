@@ -38,12 +38,16 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
 
         modelBuilder.Entity<Item>(entity =>
         {
+            entity.Property(x => x.Code).HasMaxLength(40).IsRequired();
             entity.Property(x => x.Name).HasMaxLength(180).IsRequired();
             entity.Property(x => x.Category).HasMaxLength(80).IsRequired();
             entity.Property(x => x.Quantity).HasPrecision(18, 3);
             entity.Property(x => x.MinQuantity).HasPrecision(18, 3);
             entity.HasQueryFilter(x => x.ArchivedAt == null);
             entity.HasOne(x => x.Box).WithMany(x => x.Items).HasForeignKey(x => x.BoxId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => x.Code)
+                .IsUnique()
+                .HasFilter("\"ArchivedAt\" IS NULL");
             entity.HasIndex(x => x.Name);
             entity.HasIndex(x => x.Category);
         });
@@ -115,6 +119,8 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
 
     private void StampUpdatedEntities()
     {
+        AssignItemCodes();
+
         var now = DateTime.UtcNow;
         foreach (var entry in ChangeTracker.Entries().Where(e => e.State is EntityState.Added or EntityState.Modified))
         {
@@ -127,6 +133,45 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             {
                 entry.Property("CreatedAt").CurrentValue = now;
             }
+        }
+    }
+
+    private void AssignItemCodes()
+    {
+        var itemEntries = ChangeTracker.Entries<Item>()
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified)
+            .ToList();
+        if (itemEntries.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var entry in itemEntries.Where(entry => !string.IsNullOrWhiteSpace(entry.Entity.Code)))
+        {
+            entry.Entity.Code = Item.NormalizePublicCode(entry.Entity.Code);
+        }
+
+        var pending = itemEntries
+            .Where(entry => entry.State == EntityState.Added && string.IsNullOrWhiteSpace(entry.Entity.Code))
+            .Select(entry => entry.Entity)
+            .ToList();
+        if (pending.Count == 0)
+        {
+            return;
+        }
+
+        var maxSequence = Items
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Select(item => item.Code)
+            .AsEnumerable()
+            .Select(code => Item.TryParseItSequence(code, out var sequence) ? sequence : 0)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        foreach (var item in pending)
+        {
+            item.Code = Item.FormatItCode(++maxSequence);
         }
     }
 }

@@ -31,6 +31,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
 
         return new InventoryItemDetailDto(
             item.Id,
+            item.Code,
             item.Name,
             item.Category,
             ToTagDtos(item),
@@ -55,7 +56,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
                 BuildBoxPath(item.Box),
                 locationName,
                 locationSourceLabel,
-                item.Box.ContainerTypeLabel),
+                item.Box.ContainerTypeLabel,
+                await BuildHierarchyNodesAsync(item.Box, item.Name, "category", "item", locationLookup, cancellationToken)),
             $"/Items/Edit?id={item.Id}",
             ToPhotoDtos(photos, photoStates));
     }
@@ -97,6 +99,18 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         }
 
         item.BoxId = input.BoxId is > 0 ? input.BoxId : null;
+        var normalizedCode = string.IsNullOrWhiteSpace(input.Code) ? item.Code : Item.NormalizePublicCode(input.Code);
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            return (null, "El IT es obligatorio.");
+        }
+
+        if (await db.Items.IgnoreQueryFilters().AnyAsync(existing => existing.Id != id && existing.ArchivedAt == null && existing.Code == normalizedCode, cancellationToken))
+        {
+            return (null, "Ese IT ya existe.");
+        }
+
+        item.Code = normalizedCode;
         item.Name = name;
         item.Category = tags.OrderBy(tag => tag.Name).First().Name;
         item.Quantity = input.Quantity;
@@ -226,6 +240,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             box.LocationId,
             box.LocationDisplay,
             box.EffectiveLocationSourceLabel,
+            await BuildHierarchyNodesAsync(box, null, "inventory_2", "current", locationLookup, cancellationToken),
             box.ParentBox is null ? null : new InventoryBoxLinkDto(box.ParentBox.Id, box.ParentBox.Code, box.ParentBox.Name),
             box.ChildBoxes.OrderBy(child => child.Code)
                 .Select(child => new InventoryBoxLinkDto(child.Id, child.Code, child.Name))
@@ -702,16 +717,6 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             query = query.Where(i => i.BoxId == null);
         }
 
-        if (!string.IsNullOrWhiteSpace(queryValue))
-        {
-            var term = queryValue.ToLowerInvariant();
-            query = query.Where(i => i.Name.ToLower().Contains(term)
-                || i.Category.ToLower().Contains(term)
-                || i.ItemTags.Any(itemTag => itemTag.Tag.Name.ToLower().Contains(term))
-                || (i.Notes != null && i.Notes.ToLower().Contains(term))
-                || (i.Box != null && (i.Box.Code.ToLower().Contains(term) || i.Box.Name.ToLower().Contains(term))));
-        }
-
         if (!string.IsNullOrWhiteSpace(categoryValue))
         {
             query = query.Where(i => i.Category == categoryValue);
@@ -726,8 +731,21 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             .OrderBy(i => i.Box == null ? "ZZZ" : i.Box.Code)
             .ThenBy(i => i.Category)
             .ThenBy(i => i.Name)
-            .Take(500)
+            .Take(string.IsNullOrWhiteSpace(queryValue) ? 500 : 2000)
             .ToListAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(queryValue))
+        {
+            items = items
+                .Select(item => new { Item = item, Score = ScoreItemSearch(item, queryValue) })
+                .Where(entry => entry.Score > int.MinValue)
+                .OrderByDescending(entry => entry.Score)
+                .ThenBy(entry => entry.Item.Box == null ? "ZZZ" : entry.Item.Box.Code)
+                .ThenBy(entry => entry.Item.Name)
+                .Take(500)
+                .Select(entry => entry.Item)
+                .ToList();
+        }
 
         var itemIds = items.Select(i => i.Id).ToList();
         var itemPhotoCounts = itemIds.Count == 0
@@ -845,6 +863,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             : item.Box?.Location?.Name;
         return new InventoryItemDto(
             item.Id,
+            item.Code,
             item.Name,
             $"/Items/Edit?id={item.Id}",
             ThumbUrl(photoStates, item.CoverPhoto),
@@ -860,6 +879,27 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
             item.MinQuantity != null && item.Quantity <= item.MinQuantity,
             item.Sentimental,
             item.Obsolete);
+    }
+
+    private static int ScoreItemSearch(Item item, string query)
+    {
+        var normalizedQuery = SearchText.Normalize(query);
+        var itemCode = Item.NormalizePublicCode(query);
+        var codeDigits = Item.TryParseItSequence(query, out var sequence) ? sequence.ToString() : null;
+        return SearchText.ScoreEntry(
+            query,
+            normalizedQuery,
+            SearchText.Tokenize(query),
+            itemCode,
+            codeDigits,
+            [
+                (item.Code, 120),
+                (item.Name, 80),
+                (item.Category, 35),
+                (string.Join(' ', item.ItemTags.Select(itemTag => itemTag.Tag.Name)), 55),
+                (item.Notes, 30),
+                (item.Unit, 10)
+            ]);
     }
 
     private async Task<List<Photo>> EntityPhotosAsync(PhotoEntityType entityType, int entityId, CancellationToken cancellationToken)
@@ -879,6 +919,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
                 photo.Id,
                 PhotoStorage.ThumbUrl(photo.Filename, photoStates.GetValueOrDefault(photo.Filename)?.UpdatedAt ?? photo.UpdatedAt),
                 PhotoStorage.PreviewUrl(photo.Filename, photoStates.GetValueOrDefault(photo.Filename)?.UpdatedAt ?? photo.UpdatedAt),
+                PhotoStorage.PublicUrl(photo.Filename, photoStates.GetValueOrDefault(photo.Filename)?.UpdatedAt ?? photo.UpdatedAt),
                 photoStates.TryGetValue(photo.Filename, out var state) ? state.RotationDegrees : photo.RotationDegrees,
                 photo.Caption,
                 photo.CreatedAt))
@@ -946,6 +987,89 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db)
         }
 
         return string.Join(" / ", parts);
+    }
+
+    private async Task<List<InventoryHierarchyNodeDto>> BuildHierarchyNodesAsync(
+        Box? box,
+        string? currentLabel,
+        string currentIcon,
+        string currentTone,
+        IReadOnlyDictionary<int, BoxLocationResolution> locationLookup,
+        CancellationToken cancellationToken)
+    {
+        if (box is null)
+        {
+            return currentLabel is null
+                ? []
+                :
+                [
+                    new InventoryHierarchyNodeDto(
+                        currentLabel,
+                        "Sin contenedor",
+                        currentIcon,
+                        currentTone,
+                        null,
+                        null,
+                        0)
+                ];
+        }
+
+        var boxes = await db.Boxes.AsNoTracking()
+            .Include(candidate => candidate.Location)
+            .ToListAsync(cancellationToken);
+        var byId = boxes.ToDictionary(candidate => candidate.Id);
+        var chain = new Stack<Box>();
+        var current = byId.GetValueOrDefault(box.Id) ?? box;
+        var guard = 0;
+        while (current is not null && guard++ < 20)
+        {
+            chain.Push(current);
+            current = current.ParentBoxId is int parentId && byId.TryGetValue(parentId, out var parent) ? parent : null;
+        }
+
+        var coverNames = chain
+            .Select(node => node.CoverPhoto)
+            .Where(filename => !string.IsNullOrWhiteSpace(filename))
+            .Select(filename => filename!)
+            .Distinct()
+            .ToList();
+        var photoStates = await PhotoStorage.LoadViewStatesAsync(db, coverNames, cancellationToken);
+        var nodes = new List<InventoryHierarchyNodeDto>();
+        var location = locationLookup.TryGetValue(box.Id, out var locationResolution) ? locationResolution : null;
+        nodes.Add(new InventoryHierarchyNodeDto(
+            location?.LocationName ?? box.Location?.Name ?? "Sin ubicación",
+            location?.SourceLabel,
+            "place",
+            "location",
+            null,
+            null,
+            0));
+
+        foreach (var node in chain)
+        {
+            nodes.Add(new InventoryHierarchyNodeDto(
+                $"{node.Code} · {node.Name}",
+                node.ContainerTypeLabel,
+                "inventory_2",
+                node.Id == box.Id && currentLabel is null ? currentTone : "box",
+                $"/boxes/{Uri.EscapeDataString(node.Code)}",
+                ThumbUrl(photoStates, node.CoverPhoto),
+                RotationFor(photoStates, node.CoverPhoto)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(currentLabel))
+        {
+            nodes.Add(new InventoryHierarchyNodeDto(
+                currentLabel,
+                null,
+                currentIcon,
+                currentTone,
+                null,
+                null,
+                0));
+        }
+
+        return nodes;
     }
 
     private static InventoryActionDto ToActionDto(
@@ -1020,6 +1144,7 @@ public record DashboardDto(
 
 public record InventoryItemDetailDto(
     int Id,
+    string Code,
     string Name,
     string Category,
     List<TagDto> Tags,
@@ -1042,6 +1167,7 @@ public record InventoryItemDetailDto(
     List<InventoryPhotoDto> Photos);
 
 public record InventoryItemUpdateDto(
+    string? Code,
     string? Name,
     string? Category,
     List<int>? TagIds,
@@ -1063,7 +1189,8 @@ public record InventoryItemBoxDto(
     string Path,
     string? LocationName,
     string? LocationSourceLabel,
-    string ContainerTypeLabel);
+    string ContainerTypeLabel,
+    List<InventoryHierarchyNodeDto> Hierarchy);
 
 public record InventoryBoxDetailDto(
     int Id,
@@ -1077,6 +1204,7 @@ public record InventoryBoxDetailDto(
     int LocationId,
     string? LocationName,
     string? LocationSourceLabel,
+    List<InventoryHierarchyNodeDto> Hierarchy,
     InventoryBoxLinkDto? Parent,
     List<InventoryBoxLinkDto> Children,
     List<InventoryItemDto> Items,
@@ -1103,6 +1231,7 @@ public record InventoryPhotoDto(
     int Id,
     string Url,
     string PreviewUrl,
+    string FullUrl,
     int RotationDegrees,
     string? Caption,
     DateTime CreatedAt);
@@ -1233,6 +1362,7 @@ public record InventoryGroupDto(
 
 public record InventoryItemDto(
     int Id,
+    string Code,
     string Name,
     string Url,
     string? CoverUrl,
@@ -1248,6 +1378,15 @@ public record InventoryItemDto(
     bool LowStock,
     bool Sentimental,
     bool Obsolete);
+
+public record InventoryHierarchyNodeDto(
+    string Label,
+    string? Sublabel,
+    string Icon,
+    string Tone,
+    string? RouterLink,
+    string? CoverUrl,
+    int RotationDegrees);
 
 public record TagsResponseDto(List<TagDto> Tags);
 

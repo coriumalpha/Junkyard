@@ -58,18 +58,35 @@
 
 .tag-grid {
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
 }
 
 .tag-card {
-  grid-template-columns: auto minmax(240px, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "swatch name"
+    "swatch color";
+  align-items: start;
 }
 
 .tag-swatch {
+  grid-area: swatch;
   width: 42px;
   height: 42px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.tag-card mat-form-field {
+  grid-area: name;
+}
+
+.tag-card .color-pick {
+  grid-area: color;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .color-pick {
