@@ -1,25 +1,23 @@
 import { CommonModule } from '@angular/common';
-import { BreakpointObserver } from '@angular/cdk/layout';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, ParamMap, Router } from '@angular/router';
+import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { catchError, distinctUntilChanged, EMPTY, finalize, map, switchMap, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 
-import { InventoryApiService, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
+import { InventoryApiService, InventoryBoxOption, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
+import { legacyUrl } from './legacy-url';
 
 interface FocusVisual {
   kind: 'group' | 'item' | 'summary';
@@ -43,7 +41,11 @@ interface InventoryGroupNode extends InventoryGroup {
 
 const DEFAULT_STATE: InventoryQueryState = {
   q: '',
+  category: '',
+  tagIds: [],
   box: '',
+  boxIds: [],
+  locationId: null,
   includeChildren: false,
   onlyConsumable: false,
   onlyOrphans: false,
@@ -94,35 +96,35 @@ const LAYOUT_TO_VIEW: Record<InventoryLayoutMode, InventoryViewMode> = {
     MatButtonToggleModule,
     MatCardModule,
     MatChipsModule,
-    MatDividerModule,
     MatExpansionModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
-    MatListModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
     MatSlideToggleModule,
-    MatSidenavModule,
-    MatToolbarModule
+    MatToolbarModule,
+    RouterLink
   ],
   templateUrl: './inventory-page.component.html',
   styleUrl: './inventory-page.component.scss'
 })
 export class InventoryPageComponent {
-  protected readonly backendOrigin = `${globalThis.location?.protocol ?? 'http:'}//${globalThis.location?.hostname ?? '127.0.0.1'}:8089`;
   protected readonly state = signal<InventoryQueryState>({ ...DEFAULT_STATE });
   protected readonly data = signal<InventoryLiveResponse | null>(null);
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], locations: [], boxes: [] });
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
-  protected readonly drawerCollapsed = signal(false);
-  protected readonly drawerOpen = signal(true);
-  protected readonly handset = signal(false);
   protected readonly expandedGroups = signal<Record<string, boolean>>({});
   protected readonly groupPages = signal<Record<string, number>>({});
   protected readonly groups = computed(() => this.data()?.groups ?? []);
   protected readonly groupTree = computed(() => this.buildGroupTree(this.groups()));
   protected readonly items = computed(() => this.data()?.items ?? []);
   protected readonly focusVisuals = computed(() => this.buildFocusVisuals());
+  protected readonly selectedBoxOptions = computed(() => {
+    const selected = new Set(this.state().boxIds);
+    return this.options().boxes.filter((box) => selected.has(box.id));
+  });
   protected readonly layoutOptions = LAYOUT_OPTIONS;
   protected readonly groupPageSize = 12;
 
@@ -130,7 +132,6 @@ export class InventoryPageComponent {
   private readonly router = inject(Router);
   private readonly api = inject(InventoryApiService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly breakpointObserver = inject(BreakpointObserver);
   private readonly stateKey = (state: InventoryQueryState) => JSON.stringify(state);
 
   constructor() {
@@ -154,33 +155,52 @@ export class InventoryPageComponent {
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
 
-    this.breakpointObserver.observe(['(max-width: 1024px)']).pipe(
-      map((result) => result.matches),
-      distinctUntilChanged(),
-      tap((matches) => {
-        this.handset.set(matches);
-        this.drawerOpen.set(!matches);
-        if (matches) {
-          this.drawerCollapsed.set(false);
-        }
-      }),
+    this.api.fetchOptions().pipe(
+      tap((options) => this.options.set(options)),
+      catchError(() => EMPTY),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
+
   }
 
   protected setQuery(value: string): void {
     this.navigate({ q: value });
   }
 
+  protected setCategory(value: string): void {
+    this.navigate({ category: value });
+  }
+
+  protected setTagIds(value: number[]): void {
+    this.navigate({ tagIds: [...value], category: '' });
+  }
+
+  protected removeTagId(value: number): void {
+    this.navigate({ tagIds: this.state().tagIds.filter((tagId) => tagId !== value) });
+  }
+
   protected setBox(value: string): void {
-    this.navigate({ box: value });
+    this.navigate({ box: value, boxIds: [] });
+  }
+
+  protected setBoxIds(value: number[]): void {
+    this.navigate({ boxIds: [...value], box: '' });
+  }
+
+  protected removeBoxId(value: number): void {
+    this.navigate({ boxIds: this.state().boxIds.filter((boxId) => boxId !== value) });
+  }
+
+  protected clearBoxIds(): void {
+    this.navigate({ boxIds: [], box: '' });
+  }
+
+  protected setLocationId(value: number | null): void {
+    this.navigate({ locationId: value });
   }
 
   protected setLayout(value: InventoryLayoutMode): void {
     this.navigate({ layout: value, view: this.deriveBackendView(value) });
-    if (this.handset()) {
-      this.drawerOpen.set(false);
-    }
   }
 
   protected setIncludeChildren(value: boolean): void {
@@ -201,35 +221,8 @@ export class InventoryPageComponent {
     });
   }
 
-  protected toggleDrawer(): void {
-    if (this.handset()) {
-      this.drawerOpen.update((value) => !value);
-      return;
-    }
-
-    this.drawerCollapsed.update((value) => !value);
-  }
-
-  protected openDrawer(): void {
-    this.drawerOpen.set(true);
-  }
-
-  protected closeDrawer(): void {
-    if (this.handset()) {
-      this.drawerOpen.set(false);
-    }
-  }
-
   protected backendUrl(path: string | null | undefined): string {
-    if (!path) {
-      return this.backendOrigin;
-    }
-
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
-    }
-
-    return `${this.backendOrigin}${path.startsWith('/') ? '' : '/'}${path}`;
+    return legacyUrl(path);
   }
 
   protected assetUrl(path: string | null | undefined): string | null {
@@ -248,8 +241,40 @@ export class InventoryPageComponent {
     const state = this.state();
     const params = new URLSearchParams();
 
+    if (state.q.trim()) {
+      params.set('q', state.q.trim());
+    }
+
     if (state.box.trim()) {
       params.set('box', state.box.trim());
+    }
+
+    for (const boxId of state.boxIds) {
+      params.append('boxIds', String(boxId));
+    }
+
+    if (state.category.trim()) {
+      params.set('category', state.category.trim());
+    }
+
+    for (const tagId of state.tagIds) {
+      params.append('tagIds', String(tagId));
+    }
+
+    if (state.locationId !== null) {
+      params.set('locationId', String(state.locationId));
+    }
+
+    if (state.includeChildren) {
+      params.set('includeChildren', 'true');
+    }
+
+    if (state.onlyConsumable) {
+      params.set('onlyConsumable', 'true');
+    }
+
+    if (state.onlyOrphans) {
+      params.set('onlyOrphans', 'true');
     }
 
     params.set('view', state.view);
@@ -284,8 +309,24 @@ export class InventoryPageComponent {
       summary.push(`q=${state.q.trim()}`);
     }
 
+    if (state.category.trim()) {
+      summary.push(`categoría=${state.category.trim()}`);
+    }
+
+    if (state.tagIds.length) {
+      summary.push(`${state.tagIds.length} tags`);
+    }
+
     if (state.box.trim()) {
       summary.push(`box=${state.box.trim()}`);
+    }
+
+    if (state.boxIds.length) {
+      summary.push(`${state.boxIds.length} CT`);
+    }
+
+    if (state.locationId !== null) {
+      summary.push(this.locationLabel(state.locationId));
     }
 
     if (state.includeChildren) {
@@ -393,6 +434,20 @@ export class InventoryPageComponent {
     return group.children.length > 0;
   }
 
+  protected boxOptionLabel(box: InventoryBoxOption): string {
+    return `${box.code} · ${box.name}`;
+  }
+
+  protected boxOptionHint(box: InventoryBoxOption): string {
+    return [box.containerTypeLabel, box.locationName, box.path]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  protected locationLabel(locationId: number): string {
+    return this.options().locations.find((location) => location.id === locationId)?.name ?? `ubicación ${locationId}`;
+  }
+
   protected layoutGridClass(): string {
     return `layout-${this.state().layout}`;
   }
@@ -413,6 +468,9 @@ export class InventoryPageComponent {
       }
     }
 
+    next.boxIds = Array.from(new Set(next.boxIds.filter((boxId) => boxId > 0))).sort((left, right) => left - right);
+    next.tagIds = Array.from(new Set(next.tagIds.filter((tagId) => tagId > 0))).sort((left, right) => left - right);
+
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: this.buildQueryParams(next)
@@ -429,8 +487,24 @@ export class InventoryPageComponent {
       params['q'] = state.q.trim();
     }
 
+    if (state.category.trim()) {
+      params['category'] = state.category.trim();
+    }
+
+    if (state.tagIds.length) {
+      params['tagIds'] = state.tagIds.join(',');
+    }
+
     if (state.box.trim()) {
       params['box'] = state.box.trim();
+    }
+
+    if (state.boxIds.length) {
+      params['boxIds'] = state.boxIds.join(',');
+    }
+
+    if (state.locationId !== null) {
+      params['locationId'] = String(state.locationId);
     }
 
     if (state.includeChildren) {
@@ -455,13 +529,37 @@ export class InventoryPageComponent {
 
     return {
       q: params.get('q') ?? '',
+      category: params.get('category') ?? '',
+      tagIds: this.parseIds(params, 'tagIds'),
       box: params.get('box') ?? '',
+      boxIds: this.parseBoxIds(params),
+      locationId: this.parseNumber(params.get('locationId')),
       includeChildren: params.get('includeChildren') === 'true',
       onlyConsumable: params.get('onlyConsumable') === 'true',
       onlyOrphans: params.get('onlyOrphans') === 'true',
       layout,
       view: this.deriveBackendView(layout)
     };
+  }
+
+  private parseBoxIds(params: ParamMap): number[] {
+    return this.parseIds(params, 'boxIds');
+  }
+
+  private parseIds(params: ParamMap, key: string): number[] {
+    return params.getAll(key)
+      .flatMap((value) => value.split(','))
+      .map((value) => Number.parseInt(value, 10))
+      .filter((value) => Number.isInteger(value) && value > 0);
+  }
+
+  private parseNumber(value: string | null): number | null {
+    if (!value) {
+      return null;
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }
 
   private isLayoutMode(value: string | null): value is InventoryLayoutMode {
@@ -508,7 +606,7 @@ export class InventoryPageComponent {
         visuals.push({
           kind: 'item',
           title: item.name,
-          subtitle: item.boxCode || item.category,
+          subtitle: item.boxCode || this.tagSummary(item),
           imageUrl: this.assetUrl(item.coverUrl),
           rotationDegrees: item.rotationDegrees,
           fallback: item.generatedLabel || item.name.slice(0, 1)
@@ -530,6 +628,14 @@ export class InventoryPageComponent {
     });
 
     return visuals.slice(0, 4);
+  }
+
+  protected selectedTagLabel(tagId: number): string {
+    return this.options().tags.find((tag) => tag.id === tagId)?.name ?? `tag ${tagId}`;
+  }
+
+  protected tagSummary(item: InventoryItem): string {
+    return item.tags.length ? item.tags.map((tag) => tag.name).join(', ') : item.category;
   }
 
   private buildGroupTree(groups: InventoryGroup[]): InventoryGroupNode[] {

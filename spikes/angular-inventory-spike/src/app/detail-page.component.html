@@ -1,0 +1,544 @@
+<main class="detail-shell">
+  <header class="detail-header">
+    <div>
+      <p class="eyebrow">Inventario / Angular SPA</p>
+      <h1>{{ title() }}</h1>
+      <p>{{ subtitle() }}</p>
+    </div>
+
+    <nav class="detail-actions" aria-label="Acciones de detalle">
+      @if (kind() === 'item' && item()) {
+        <button mat-flat-button type="button" (click)="startItemEdit()">
+          <mat-icon>edit</mat-icon>
+          Editar
+        </button>
+        <a mat-stroked-button [href]="itemLegacyUrl()" target="_blank" rel="noreferrer">
+          <mat-icon>open_in_new</mat-icon>
+          Legacy
+        </a>
+      }
+      @if (kind() === 'box' && box()) {
+        <button mat-flat-button type="button" (click)="startBoxEdit()">
+          <mat-icon>edit</mat-icon>
+          Editar
+        </button>
+        <a mat-stroked-button [href]="boxLegacyUrl()" target="_blank" rel="noreferrer">
+          <mat-icon>open_in_new</mat-icon>
+          Legacy
+        </a>
+      }
+    </nav>
+  </header>
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="48" />
+      <span>Cargando detalle...</span>
+    </section>
+  } @else if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  } @else if (item()) {
+    @if (saveMessage()) {
+      <section class="state-panel success">
+        <mat-icon>check_circle</mat-icon>
+        <span>{{ saveMessage() }}</span>
+      </section>
+    }
+
+    <section class="detail-grid">
+      <mat-card class="product-gallery">
+        @if (activePhoto()) {
+          <div class="thumb-rail" aria-label="Fotos del ítem">
+            @for (photo of item()!.photos; track photoTrack($index, photo)) {
+              <button type="button" class="thumb-button" [class.active]="$index === activePhotoIndex()" (click)="selectPhoto($index)">
+                <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || item()!.name" />
+                @if (isItemCover(photo)) {
+                  <span class="cover-dot" aria-label="Foto principal"></span>
+                }
+              </button>
+            }
+          </div>
+          <div class="main-photo-stack">
+            <div class="photo-toolbar">
+              <button mat-icon-button type="button" (click)="setCoverPhoto(activePhoto()!)" [disabled]="saving() || isCoverPhoto(activePhoto()!)" aria-label="Usar como foto principal">
+                <mat-icon>star</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="rotatePhoto(activePhoto()!, -90)" [disabled]="saving()" aria-label="Girar a la izquierda">
+                <mat-icon>rotate_left</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="rotatePhoto(activePhoto()!, 90)" [disabled]="saving()" aria-label="Girar a la derecha">
+                <mat-icon>rotate_right</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="returnPhotoToInbox(activePhoto()!)" [disabled]="saving()" aria-label="Devolver a revisión">
+                <mat-icon>move_to_inbox</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="archivePhoto(activePhoto()!)" [disabled]="saving()" aria-label="Archivar foto">
+                <mat-icon>archive</mat-icon>
+              </button>
+            </div>
+            <div class="main-photo"
+                 (mousemove)="updateZoomOrigin($event)"
+                 (mouseleave)="stopZoom()"
+                 (click)="openPhotoModal(activePhoto())"
+                 role="button"
+                 tabindex="0">
+              <img [src]="assetUrl(activePhoto()!.previewUrl || activePhoto()!.url)!"
+                   [style.transform]="activePhotoTransform(activePhoto()!)"
+                   [style.transform-origin]="zoomOriginX() + ' ' + zoomOriginY()"
+                   [alt]="activePhoto()!.caption || item()!.name" />
+            </div>
+          </div>
+          <div class="gallery-upload">
+            <mat-form-field appearance="outline">
+              <mat-label>Caption</mat-label>
+              <input matInput [ngModel]="uploadCaption()" (ngModelChange)="uploadCaption.set($event)" />
+            </mat-form-field>
+            <label class="gallery-upload-button">
+              <input type="file" accept="image/*" multiple (change)="uploadDetailPhotos($event)" [disabled]="saving()" />
+              <mat-icon>upload</mat-icon>
+              <span>Subir</span>
+            </label>
+          </div>
+        } @else {
+          <div class="hero-placeholder">{{ firstLetter(item()!.name) }}</div>
+          <div class="gallery-upload">
+            <mat-form-field appearance="outline">
+              <mat-label>Caption</mat-label>
+              <input matInput [ngModel]="uploadCaption()" (ngModelChange)="uploadCaption.set($event)" />
+            </mat-form-field>
+            <label class="gallery-upload-button">
+              <input type="file" accept="image/*" multiple (change)="uploadDetailPhotos($event)" [disabled]="saving()" />
+              <mat-icon>upload</mat-icon>
+              <span>Subir fotos</span>
+            </label>
+          </div>
+        }
+      </mat-card>
+
+      <mat-card class="info-card">
+        <p class="eyebrow">Ítem</p>
+        <h2>{{ item()!.name }}</h2>
+        <div class="meta-grid">
+          <span>IT</span><strong>{{ item()!.code }}</strong>
+          <span>Tags</span>
+          <strong class="tag-chip-row">
+            @for (tag of item()!.tags; track tag.id) {
+              <span class="tag-pill" [style.--tag-color]="tag.color">{{ tag.name }}</span>
+            } @empty {
+              {{ item()!.category }}
+            }
+          </strong>
+          <span>Cantidad</span><strong>{{ item()!.quantityLabel }}</strong>
+          <span>Mínimo</span><strong>{{ item()!.minQuantity ?? 'Sin mínimo' }}</strong>
+          <span>Estado</span><strong>{{ item()!.condition || 'Sin estado' }}</strong>
+          <span>Retención</span><strong>{{ item()!.retention || 'Sin retención' }}</strong>
+          <span>Actualizado</span><strong>{{ item()!.updatedAt | date:'short' }}</strong>
+        </div>
+        <mat-chip-set>
+          @for (flag of itemFlags(item()!); track flag) {
+            <mat-chip>{{ flag }}</mat-chip>
+          }
+        </mat-chip-set>
+        @if (item()!.notes) {
+          <mat-divider />
+          <section class="description-block">
+            <p class="eyebrow">Descripción</p>
+            <p class="notes">{{ item()!.notes }}</p>
+          </section>
+        }
+      </mat-card>
+
+      @if (editingItem()) {
+        <mat-card class="edit-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Edición Angular</p>
+              <h2>Ficha editable</h2>
+            </div>
+            <button mat-icon-button type="button" (click)="cancelItemEdit()" aria-label="Cerrar edición">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          @if (formError()) {
+            <div class="inline-error">{{ formError() }}</div>
+          }
+
+          <div class="edit-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>IT público</mat-label>
+              <input matInput [ngModel]="itemForm().code" (ngModelChange)="patchItemForm({ code: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre</mat-label>
+              <input matInput [ngModel]="itemForm().name" (ngModelChange)="patchItemForm({ name: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Tags</mat-label>
+              <mat-select [ngModel]="itemForm().tagIds" (ngModelChange)="patchItemForm({ tagIds: $event })" multiple>
+                @for (tag of options().tags; track tag.id) {
+                  <mat-option [value]="tag.id">{{ tag.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <div class="quick-tag wide">
+              <mat-form-field appearance="outline">
+                <mat-label>Nuevo tag</mat-label>
+                <input matInput [ngModel]="newTagName()" (ngModelChange)="setNewTagName($event)" />
+              </mat-form-field>
+              <label class="color-pick">
+                <span>Color</span>
+                <input type="color" [ngModel]="newTagColor()" (ngModelChange)="setNewTagColor($event)" />
+              </label>
+              <button mat-stroked-button type="button" (click)="quickCreateTag()" [disabled]="!newTagName().trim() || saving()">
+                <mat-icon>add</mat-icon>
+                Crear y asignar
+              </button>
+            </div>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Contenedor</mat-label>
+              <mat-select [ngModel]="itemForm().boxId" (ngModelChange)="patchItemForm({ boxId: $event })">
+                <mat-option [value]="null">Sin caja</mat-option>
+                @for (boxOption of options().boxes; track boxOption.id) {
+                  <mat-option [value]="boxOption.id">{{ boxOption.code }} · {{ boxOption.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Cantidad</mat-label>
+              <input matInput type="number" [ngModel]="itemForm().quantity" (ngModelChange)="patchItemForm({ quantity: +$event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Unidad</mat-label>
+              <input matInput [ngModel]="itemForm().unit" (ngModelChange)="patchItemForm({ unit: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Mínimo</mat-label>
+              <input matInput type="number" [ngModel]="itemForm().minQuantity" (ngModelChange)="patchItemForm({ minQuantity: $event === '' ? null : +$event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Estado</mat-label>
+              <input matInput [ngModel]="itemForm().condition" (ngModelChange)="patchItemForm({ condition: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Retención</mat-label>
+              <input matInput [ngModel]="itemForm().retention" (ngModelChange)="patchItemForm({ retention: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="wide">
+              <mat-label>Descripción</mat-label>
+              <textarea matInput rows="4" [ngModel]="itemForm().notes" (ngModelChange)="patchItemForm({ notes: $event })"></textarea>
+            </mat-form-field>
+
+            <div class="toggle-row wide">
+              <mat-slide-toggle [checked]="itemForm().consumable" (change)="patchItemForm({ consumable: $event.checked })">Consumible</mat-slide-toggle>
+              <mat-slide-toggle [checked]="itemForm().sentimental" (change)="patchItemForm({ sentimental: $event.checked })">Sentimental</mat-slide-toggle>
+              <mat-slide-toggle [checked]="itemForm().obsolete" (change)="patchItemForm({ obsolete: $event.checked })">Obsoleto</mat-slide-toggle>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button type="button" (click)="cancelItemEdit()">Cancelar</button>
+            <button mat-flat-button type="button" (click)="saveItem()" [disabled]="saving()">
+              <mat-icon>save</mat-icon>
+              {{ saving() ? 'Guardando...' : 'Guardar' }}
+            </button>
+          </div>
+        </mat-card>
+      }
+
+      <mat-card class="info-card">
+        <p class="eyebrow">Ubicación</p>
+        <app-hierarchy-trail [nodes]="itemHierarchyNodes()" />
+      </mat-card>
+    </section>
+
+  } @else if (box()) {
+    @if (saveMessage()) {
+      <section class="state-panel success">
+        <mat-icon>check_circle</mat-icon>
+        <span>{{ saveMessage() }}</span>
+      </section>
+    }
+
+    <section class="detail-grid">
+      <mat-card class="product-gallery">
+        @if (activePhoto()) {
+          <div class="thumb-rail" aria-label="Fotos del contenedor">
+            @for (photo of box()!.photos; track photoTrack($index, photo)) {
+              <button type="button" class="thumb-button" [class.active]="$index === activePhotoIndex()" (click)="selectPhoto($index)">
+                <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || box()!.name" />
+              </button>
+            }
+          </div>
+          <div class="main-photo-stack">
+            <div class="photo-toolbar">
+              <button mat-icon-button type="button" (click)="setCoverPhoto(activePhoto()!)" [disabled]="saving() || isCoverPhoto(activePhoto()!)" aria-label="Usar como foto principal">
+                <mat-icon>star</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="rotatePhoto(activePhoto()!, -90)" [disabled]="saving()" aria-label="Girar a la izquierda">
+                <mat-icon>rotate_left</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="rotatePhoto(activePhoto()!, 90)" [disabled]="saving()" aria-label="Girar a la derecha">
+                <mat-icon>rotate_right</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="returnPhotoToInbox(activePhoto()!)" [disabled]="saving()" aria-label="Devolver a revisión">
+                <mat-icon>move_to_inbox</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="archivePhoto(activePhoto()!)" [disabled]="saving()" aria-label="Archivar foto">
+                <mat-icon>archive</mat-icon>
+              </button>
+            </div>
+            <div class="main-photo"
+                 (mousemove)="updateZoomOrigin($event)"
+                 (mouseleave)="stopZoom()"
+                 (click)="openPhotoModal(activePhoto())"
+                 role="button"
+                 tabindex="0">
+              <img [src]="assetUrl(activePhoto()!.previewUrl || activePhoto()!.url)!"
+                   [style.transform]="activePhotoTransform(activePhoto()!)"
+                   [style.transform-origin]="zoomOriginX() + ' ' + zoomOriginY()"
+                   [alt]="activePhoto()!.caption || box()!.name" />
+            </div>
+          </div>
+          <div class="gallery-upload">
+            <mat-form-field appearance="outline">
+              <mat-label>Caption</mat-label>
+              <input matInput [ngModel]="uploadCaption()" (ngModelChange)="uploadCaption.set($event)" />
+            </mat-form-field>
+            <label class="gallery-upload-button">
+              <input type="file" accept="image/*" multiple (change)="uploadDetailPhotos($event)" [disabled]="saving()" />
+              <mat-icon>upload</mat-icon>
+              <span>Subir</span>
+            </label>
+          </div>
+        } @else {
+          <div class="hero-placeholder">{{ box()!.code }}</div>
+          <div class="gallery-upload">
+            <mat-form-field appearance="outline">
+              <mat-label>Caption</mat-label>
+              <input matInput [ngModel]="uploadCaption()" (ngModelChange)="uploadCaption.set($event)" />
+            </mat-form-field>
+            <label class="gallery-upload-button">
+              <input type="file" accept="image/*" multiple (change)="uploadDetailPhotos($event)" [disabled]="saving()" />
+              <mat-icon>upload</mat-icon>
+              <span>Subir fotos</span>
+            </label>
+          </div>
+        }
+      </mat-card>
+
+      @if (editingBox()) {
+        <mat-card class="edit-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Edición Angular</p>
+              <h2>Contenedor editable</h2>
+            </div>
+            <button mat-icon-button type="button" (click)="cancelBoxEdit()" aria-label="Cerrar edición">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          @if (formError()) {
+            <div class="inline-error">{{ formError() }}</div>
+          }
+
+          <div class="edit-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>CT público</mat-label>
+              <input matInput [ngModel]="boxForm().code" (ngModelChange)="patchBoxForm({ code: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre</mat-label>
+              <input matInput [ngModel]="boxForm().name" (ngModelChange)="patchBoxForm({ name: $event })" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Tipo</mat-label>
+              <mat-select [ngModel]="boxForm().containerType" (ngModelChange)="patchBoxForm({ containerType: $event })">
+                @for (type of containerTypes; track type.value) {
+                  <mat-option [value]="type.value">{{ type.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Ubicación raíz</mat-label>
+              <mat-select [ngModel]="boxForm().locationId" (ngModelChange)="patchBoxForm({ locationId: $event })" [disabled]="boxForm().parentBoxId !== null">
+                @for (location of options().locations; track location.id) {
+                  <mat-option [value]="location.id">{{ location.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Dentro de</mat-label>
+              <mat-select [ngModel]="boxForm().parentBoxId" (ngModelChange)="patchBoxForm({ parentBoxId: $event })">
+                <mat-option [value]="null">Primer nivel</mat-option>
+                @for (boxOption of options().boxes; track boxOption.id) {
+                  @if (boxOption.id !== box()!.id) {
+                    <mat-option [value]="boxOption.id">{{ boxOption.code }} · {{ boxOption.name }}</mat-option>
+                  }
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Estado</mat-label>
+              <mat-select [ngModel]="boxForm().status" (ngModelChange)="patchBoxForm({ status: $event })">
+                @for (status of boxStatuses; track status) {
+                  <mat-option [value]="status">{{ status }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="wide">
+              <mat-label>Descripción</mat-label>
+              <textarea matInput rows="4" [ngModel]="boxForm().description" (ngModelChange)="patchBoxForm({ description: $event })"></textarea>
+            </mat-form-field>
+          </div>
+
+          <div class="form-actions">
+            <button mat-stroked-button type="button" (click)="cancelBoxEdit()">Cancelar</button>
+            <button mat-flat-button type="button" (click)="saveBox()" [disabled]="saving()">
+              <mat-icon>save</mat-icon>
+              {{ saving() ? 'Guardando...' : 'Guardar' }}
+            </button>
+          </div>
+        </mat-card>
+      }
+
+      <mat-card class="info-card container-summary-card">
+        <p class="eyebrow">Contenedor</p>
+        <h2>{{ box()!.code }} · {{ box()!.name }}</h2>
+        <div class="container-stat-grid">
+          <span>
+            <small>Tipo</small>
+            <strong>{{ box()!.containerTypeLabel }}</strong>
+          </span>
+          <span>
+            <small>Estado</small>
+            <strong>{{ box()!.status }}</strong>
+          </span>
+          <span>
+            <small>Ítems</small>
+            <strong>{{ box()!.items.length }}</strong>
+          </span>
+          <span>
+            <small>Hijos</small>
+            <strong>{{ box()!.children.length }}</strong>
+          </span>
+          <span class="wide">
+            <small>Ubicación</small>
+            <strong>{{ box()!.locationName || 'Sin ubicación' }}</strong>
+          </span>
+          <span class="wide">
+            <small>Actualizado</small>
+            <strong>{{ box()!.updatedAt | date:'short' }}</strong>
+          </span>
+        </div>
+        @if (box()!.description) {
+          <mat-divider />
+          <p class="notes">{{ box()!.description }}</p>
+        }
+      </mat-card>
+
+      <mat-card class="info-card">
+        <p class="eyebrow">Ubicación y jerarquía</p>
+        <app-hierarchy-trail [nodes]="boxHierarchyNodes()" />
+        @if (box()!.children.length) {
+          <div class="child-container-list">
+            <p class="subsection-label">Dentro de este contenedor</p>
+          @for (child of box()!.children; track child.id) {
+              <app-entity-mini-card
+                [title]="child.name"
+                [subtitle]="child.code"
+                [placeholder]="child.code.slice(-2)"
+                [routerLink]="['/boxes', child.code]" />
+          }
+          </div>
+        }
+      </mat-card>
+    </section>
+
+    <section class="items-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Ítems directos</p>
+          <strong>{{ box()!.items.length }}</strong>
+        </div>
+        <div class="view-switcher" aria-label="Vista de ítems directos">
+          <button mat-icon-button type="button" [class.active]="boxItemsView() === 'list'" (click)="setBoxItemsView('list')" aria-label="Vista lista">
+            <mat-icon>view_list</mat-icon>
+          </button>
+          <button mat-icon-button type="button" [class.active]="boxItemsView() === 'gallery'" (click)="setBoxItemsView('gallery')" aria-label="Vista galería">
+            <mat-icon>grid_view</mat-icon>
+          </button>
+          <button mat-icon-button type="button" [class.active]="boxItemsView() === 'table'" (click)="setBoxItemsView('table')" aria-label="Vista tabla">
+            <mat-icon>table_rows</mat-icon>
+          </button>
+        </div>
+      </div>
+      @if (boxItemsView() === 'table') {
+        <div class="items-table" role="table">
+          <div class="items-table-head" role="row">
+            <button type="button" (click)="sortBoxItems('code')">IT <mat-icon>{{ sortLabel('code') }}</mat-icon></button>
+            <button type="button" (click)="sortBoxItems('name')">Nombre <mat-icon>{{ sortLabel('name') }}</mat-icon></button>
+            <button type="button" (click)="sortBoxItems('tags')">Tags <mat-icon>{{ sortLabel('tags') }}</mat-icon></button>
+            <button type="button" (click)="sortBoxItems('quantity')">Cantidad <mat-icon>{{ sortLabel('quantity') }}</mat-icon></button>
+          </div>
+          @for (item of sortedBoxItems(); track item.id) {
+            <a class="items-table-row" [routerLink]="['/item', item.id]" role="row">
+              <span>{{ item.code }}</span>
+              <strong>{{ item.name }}</strong>
+              <span>{{ tagSummary(item) }}</span>
+              <span>{{ item.quantityLabel }}</span>
+            </a>
+          } @empty {
+            <div class="empty">Sin ítems directos.</div>
+          }
+        </div>
+      } @else {
+        <div class="item-list" [class.gallery-mode]="boxItemsView() === 'gallery'">
+          @for (item of sortedBoxItems(); track item.id) {
+            <app-entity-mini-card
+              [title]="item.name"
+              [subtitle]="item.code + ' · ' + tagSummary(item) + ' · ' + item.quantityLabel"
+              [imageUrl]="assetUrl(item.coverUrl)"
+              [rotationDegrees]="item.rotationDegrees"
+              [placeholder]="firstLetter(item.name)"
+              [routerLink]="['/item', item.id]" />
+          } @empty {
+            <div class="empty">Sin ítems directos.</div>
+          }
+        </div>
+      }
+    </section>
+
+  }
+
+  @if (modalPhoto()) {
+    <div class="photo-modal" (click)="closePhotoModal()">
+      <button mat-icon-button type="button" class="modal-close" (click)="closePhotoModal(); $event.stopPropagation()" aria-label="Cerrar imagen">
+        <mat-icon>close</mat-icon>
+      </button>
+      <img [src]="assetUrl(modalPhoto()!.fullUrl || modalPhoto()!.previewUrl || modalPhoto()!.url)!"
+           [style.transform]="'rotate(' + modalPhoto()!.rotationDegrees + 'deg)'"
+           [alt]="modalPhoto()!.caption || title()" />
+    </div>
+  }
+</main>

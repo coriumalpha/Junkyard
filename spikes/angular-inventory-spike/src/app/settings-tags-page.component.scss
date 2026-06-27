@@ -1,0 +1,132 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  color: var(--app-text);
+}
+
+.settings-shell {
+  width: min(1500px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 20px 0 34px;
+}
+
+.settings-header,
+.tag-create-card,
+.tag-card,
+.state-panel {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-raised);
+  box-shadow: var(--app-shadow-md);
+}
+
+.settings-header {
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+}
+
+.settings-header h1 {
+  margin: 0;
+}
+
+.settings-header p:not(.eyebrow),
+.state-panel {
+  color: var(--app-muted);
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.tag-create-card,
+.tag-card {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.tag-create-card {
+  margin-bottom: 14px;
+}
+
+.tag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.tag-card {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "swatch name delete"
+    "swatch color delete";
+  align-items: start;
+}
+
+.tag-swatch {
+  grid-area: swatch;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.tag-card mat-form-field {
+  grid-area: name;
+}
+
+.tag-card .color-pick {
+  grid-area: color;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tag-card button {
+  grid-area: delete;
+  align-self: center;
+}
+
+.color-pick {
+  display: grid;
+  gap: 6px;
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.color-pick input {
+  width: 48px;
+  height: 44px;
+  padding: 3px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.state-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 18px;
+}
+
+.state-panel.error mat-icon {
+  color: #ffd39f;
+}
+
+@media (max-width: 760px) {
+  .tag-create-card,
+  .tag-card {
+    grid-template-columns: 1fr;
+  }
+}

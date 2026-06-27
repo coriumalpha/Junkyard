@@ -1,0 +1,70 @@
+<main class="locations-shell">
+  <header class="locations-header">
+    <div>
+      <p class="eyebrow">Junkyard / Angular SPA</p>
+      <h1>Ubicaciones</h1>
+      <p>Vista de consulta para entrar al inventario por ubicación efectiva.</p>
+    </div>
+
+    <a mat-stroked-button [href]="legacyLocationsUrl" target="_blank" rel="noreferrer">
+      <mat-icon>open_in_new</mat-icon>
+      Editar en legacy
+    </a>
+  </header>
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="48" />
+      <span>Cargando ubicaciones...</span>
+    </section>
+  } @else if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  } @else {
+    <section class="locations-grid">
+      @for (card of cards(); track card.location.id) {
+        <mat-card class="location-card">
+          <div class="location-card-head">
+            <span class="location-mark">
+              <mat-icon>place</mat-icon>
+            </span>
+            <div>
+              <h2>{{ card.location.name }}</h2>
+              <p>{{ card.boxes.length }} contenedores raíz o efectivos</p>
+            </div>
+          </div>
+
+          <div class="box-preview-list">
+            @for (box of card.boxes.slice(0, 4); track box.id) {
+              <app-entity-mini-card
+                [title]="box.name"
+                [subtitle]="box.code + ' · ' + box.containerTypeLabel"
+                [meta]="box.path"
+                [imageUrl]="assetUrl(box.coverUrl)"
+                [rotationDegrees]="box.rotationDegrees"
+                [placeholder]="box.code.slice(-2)"
+                [routerLink]="['/boxes', box.code]" />
+            }
+            @if (card.boxes.length > 4) {
+              <div class="more-boxes">+{{ card.boxes.length - 4 }} contenedores más</div>
+            }
+          </div>
+
+          <mat-card-actions align="end">
+            <a mat-button routerLink="/inventory" [queryParams]="{ locationId: card.location.id, layout: 'grouped', view: 'grouped' }">
+              <mat-icon>inventory_2</mat-icon>
+              Ver inventario
+            </a>
+          </mat-card-actions>
+        </mat-card>
+      } @empty {
+        <section class="state-panel empty">
+          <mat-icon>place</mat-icon>
+          <span>No hay ubicaciones registradas.</span>
+        </section>
+      }
+    </section>
+  }
+</main>

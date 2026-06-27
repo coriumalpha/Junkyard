@@ -27,6 +27,14 @@
             <label asp-for="Input.Title">Título</label>
             <input asp-for="Input.Title" placeholder="Ej. Revisar fotos de CT-000001" />
         </div>
+        <div class="field">
+            <label asp-for="Input.Kind">Tipo</label>
+            <select asp-for="Input.Kind">
+                <option value="@Inventario.Models.InventoryActionKind.Task">Tarea</option>
+                <option value="@Inventario.Models.InventoryActionKind.Comment">Comentario</option>
+                <option value="@Inventario.Models.InventoryActionKind.ArchiveReason">Motivo de archivado</option>
+            </select>
+        </div>
         <div class="field full">
             <label asp-for="Input.Description">Descripción</label>
             <textarea asp-for="Input.Description" placeholder="Notas cortas opcionales"></textarea>

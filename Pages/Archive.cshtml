@@ -23,7 +23,11 @@
             @foreach (var box in Model.Boxes)
             {
                 <form class="row" method="post" asp-page-handler="RestoreBox" asp-route-id="@box.Id">
-                    <span><strong>@box.Code · @box.Name</strong></span>
+                    <span>
+                        <strong>@box.Code · @box.Name</strong><br />
+                        <small class="muted">Archivada @box.ArchivedAt?.ToString("dd MMM yyyy HH:mm")</small>
+                    </span>
+                    <a class="btn" asp-page="/Boxes/Details" asp-route-code="@box.Code">Abrir</a>
                     <button class="btn" type="submit">Restaurar</button>
                 </form>
             }
@@ -37,7 +41,12 @@
             @foreach (var item in Model.Items)
             {
                 <form class="row" method="post" asp-page-handler="RestoreItem" asp-route-id="@item.Id">
-                    <span><strong>@item.Name</strong><br /><small class="muted">@item.Category</small></span>
+                    <span>
+                        <strong>@item.Name</strong><br />
+                        <small class="muted">@item.Category</small><br />
+                        <small class="muted">Archivado @item.ArchivedAt?.ToString("dd MMM yyyy HH:mm")</small>
+                    </span>
+                    <a class="btn" asp-page="/Items/Edit" asp-route-id="@item.Id" asp-route-mode="archive">Abrir</a>
                     <button class="btn" type="submit">Restaurar</button>
                 </form>
             }

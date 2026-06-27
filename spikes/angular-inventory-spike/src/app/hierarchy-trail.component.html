@@ -1,0 +1,39 @@
+<div class="hierarchy-trail">
+  @for (node of nodes; track $index) {
+    @if ($index > 0) {
+      <span class="hierarchy-connector" aria-hidden="true"></span>
+    }
+
+    @if (node.routerLink) {
+      <a class="hierarchy-node" [ngClass]="'tone-' + (node.tone || 'muted')" [routerLink]="node.routerLink">
+        <span class="node-marker">
+          <mat-icon>{{ node.icon }}</mat-icon>
+        </span>
+        <span>
+          <strong>{{ node.label }}</strong>
+          @if (node.sublabel) {
+            <small>{{ node.sublabel }}</small>
+          }
+        </span>
+        @if (node.coverUrl) {
+          <img class="node-cover" [src]="node.coverUrl" [style.transform]="'rotate(' + (node.rotationDegrees || 0) + 'deg)'" alt="" />
+        }
+      </a>
+    } @else {
+      <span class="hierarchy-node" [ngClass]="'tone-' + (node.tone || 'muted')">
+        <span class="node-marker">
+          <mat-icon>{{ node.icon }}</mat-icon>
+        </span>
+        <span>
+          <strong>{{ node.label }}</strong>
+          @if (node.sublabel) {
+            <small>{{ node.sublabel }}</small>
+          }
+        </span>
+        @if (node.coverUrl) {
+          <img class="node-cover" [src]="node.coverUrl" [style.transform]="'rotate(' + (node.rotationDegrees || 0) + 'deg)'" alt="" />
+        }
+      </span>
+    }
+  }
+</div>

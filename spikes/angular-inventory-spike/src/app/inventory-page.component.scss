@@ -12,108 +12,6 @@
   color: var(--app-text);
 }
 
-.inventory-drawer {
-  width: 292px;
-  padding: 16px 14px 18px;
-  border-right: 1px solid var(--app-border);
-  background: rgba(7, 12, 26, 0.95);
-  backdrop-filter: blur(18px);
-  color: var(--app-text);
-}
-
-.inventory-drawer.collapsed {
-  width: 92px;
-}
-
-.drawer-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.drawer-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.drawer-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(160deg, rgba(138, 214, 255, 0.16), rgba(255, 155, 200, 0.18));
-  border: 1px solid var(--app-border);
-  color: var(--app-text);
-}
-
-.drawer-brand-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.drawer-brand-copy strong {
-  font-size: 0.98rem;
-}
-
-.drawer-brand-copy span,
-.drawer-label {
-  color: var(--app-muted);
-  font-size: 0.8rem;
-}
-
-.drawer-nav {
-  display: grid;
-  gap: 4px;
-}
-
-.inventory-drawer.collapsed .drawer-brand-copy,
-.inventory-drawer.collapsed .drawer-stack,
-.inventory-drawer.collapsed .mat-mdc-list-item-line,
-.inventory-drawer.collapsed .mat-mdc-list-item-title {
-  display: none;
-}
-
-.drawer-stack {
-  display: grid;
-  gap: 12px;
-  padding: 16px 0 0;
-}
-
-.drawer-stack.compact {
-  gap: 10px;
-}
-
-.drawer-stat {
-  display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--app-border);
-}
-
-.drawer-stat span {
-  color: var(--app-muted);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-
-.drawer-stat strong {
-  font-size: 1.3rem;
-}
-
-.drawer-label {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-
 .inventory-main {
   padding: 18px 22px 32px;
 }
@@ -202,6 +100,39 @@
 
 .ghost-link {
   border-color: rgba(255, 255, 255, 0.14);
+}
+
+::ng-deep app-inventory-page .mat-mdc-button,
+::ng-deep app-inventory-page .mat-mdc-outlined-button,
+::ng-deep app-inventory-page .mat-mdc-unelevated-button {
+  min-height: 40px;
+  border-radius: 999px;
+  letter-spacing: 0;
+}
+
+::ng-deep app-inventory-page .mat-mdc-button .mdc-button__label,
+::ng-deep app-inventory-page .mat-mdc-outlined-button .mdc-button__label,
+::ng-deep app-inventory-page .mat-mdc-unelevated-button .mdc-button__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+::ng-deep app-inventory-page .mat-mdc-outlined-button {
+  border-color: rgba(138, 214, 255, 0.24);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+::ng-deep app-inventory-page .mat-mdc-outlined-button:hover,
+::ng-deep app-inventory-page .mat-mdc-button:hover {
+  background: rgba(138, 214, 255, 0.11);
+}
+
+::ng-deep app-inventory-page .mat-mdc-unelevated-button,
+::ng-deep app-inventory-page .mat-mdc-button.mat-primary {
+  background: linear-gradient(135deg, rgba(138, 214, 255, 0.22), rgba(255, 155, 200, 0.16));
+  color: var(--app-text);
 }
 
 .focus-strip {
@@ -364,11 +295,28 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--app-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .mode-row mat-button-toggle {
   flex: 1 1 150px;
   min-width: 130px;
+  border: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  color: var(--app-muted);
+  background: transparent;
+}
+
+.mode-row mat-button-toggle.mat-button-toggle-checked {
+  color: var(--app-text);
+  background:
+    linear-gradient(135deg, rgba(138, 214, 255, 0.24), rgba(255, 155, 200, 0.16)),
+    rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(138, 214, 255, 0.22), 0 12px 28px rgba(0, 0, 0, 0.16);
 }
 
 .mode-row mat-button-toggle .mat-button-toggle-label-content {
@@ -380,7 +328,12 @@
   white-space: normal;
   text-align: center;
   line-height: 1.15;
+  min-height: 42px;
   padding: 0 12px;
+}
+
+.mode-row mat-button-toggle mat-icon {
+  color: var(--app-accent);
 }
 
 .advanced-panel {
@@ -391,10 +344,56 @@
 }
 
 .advanced-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 14px 18px;
   padding-top: 8px;
+  align-items: start;
+}
+
+.advanced-grid mat-slide-toggle {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+}
+
+.wide-control {
+  grid-column: 1 / -1;
+}
+
+.selected-boxes {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--app-border);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.selected-boxes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--app-muted);
+  font-size: 0.86rem;
+}
+
+.selected-boxes-head button {
+  border-radius: 999px;
+}
+
+::ng-deep .mat-mdc-option .mdc-list-item__primary-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+::ng-deep .mat-mdc-option small {
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scope-card {
@@ -661,12 +660,27 @@
   gap: 6px;
   flex: 0 0 auto;
   color: var(--app-muted);
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(7, 12, 26, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .group-pager span {
   min-width: 52px;
   text-align: center;
   font-size: 0.86rem;
+}
+
+.group-pager button {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  color: var(--app-text);
+}
+
+.group-pager button:not(:disabled) {
+  background: rgba(138, 214, 255, 0.12);
 }
 
 .group-items-list {
@@ -835,10 +849,37 @@
 .panel-actions {
   display: flex;
   justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.panel-actions a,
+.group-item-row > a,
+.item-card mat-card-actions a,
+.table-actions a {
+  min-width: 0;
+  border-radius: 999px;
+  color: #dff5ff;
+  background: rgba(138, 214, 255, 0.1);
+}
+
+.panel-actions a:hover,
+.group-item-row > a:hover,
+.item-card mat-card-actions a:hover,
+.table-actions a:hover {
+  background: rgba(138, 214, 255, 0.18);
+}
+
+.group-item-row > a,
+.table-actions a {
+  justify-self: end;
 }
 
 .item-card {
   background: rgba(10, 15, 28, 0.84);
+}
+
+.item-card mat-card-actions {
+  padding: 12px 16px 16px;
 }
 
 .item-card-top {
@@ -1083,6 +1124,10 @@ mat-form-field {
     grid-template-columns: 1fr;
   }
 
+  .advanced-grid {
+    grid-template-columns: 1fr;
+  }
+
   .item-card-top {
     grid-template-columns: 1fr;
   }
@@ -1119,10 +1164,6 @@ mat-form-field {
 @media (max-width: 720px) {
   .inventory-main {
     padding: 16px;
-  }
-
-  .inventory-drawer {
-    width: min(100vw, 320px);
   }
 
   .focus-strip {

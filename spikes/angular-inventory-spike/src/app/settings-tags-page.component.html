@@ -1,0 +1,62 @@
+<main class="settings-shell">
+  <header class="settings-header app-page-header">
+    <div>
+      <p class="eyebrow">Configuración</p>
+      <h1>Tags</h1>
+      <p>Etiquetas de inventario con color, reutilizables en búsqueda y edición.</p>
+    </div>
+  </header>
+
+  <mat-card class="tag-create-card">
+    <mat-form-field appearance="outline">
+      <mat-label>Nuevo tag</mat-label>
+      <input matInput [ngModel]="draftName()" (ngModelChange)="setDraftName($event)" />
+    </mat-form-field>
+    <label class="color-pick">
+      <span>Color</span>
+      <input type="color" [ngModel]="draftColor()" (ngModelChange)="setDraftColor($event)" />
+    </label>
+    <button mat-flat-button type="button" (click)="createTag()" [disabled]="!draftName().trim() || saving()">
+      <mat-icon>add</mat-icon>
+      Crear
+    </button>
+  </mat-card>
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="44" />
+      <span>Cargando tags...</span>
+    </section>
+  } @else if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  }
+
+  <section class="tag-grid">
+    @for (tag of tags(); track tag.id) {
+      <mat-card class="tag-card">
+        <span class="tag-swatch" [style.background]="tag.color"></span>
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre</mat-label>
+          <input matInput [ngModel]="tag.name" (blur)="updateTag(tag, { name: ($any($event.target)).value })" />
+        </mat-form-field>
+        <label class="color-pick">
+          <span>Color</span>
+          <input type="color" [ngModel]="tag.color" (ngModelChange)="updateTag(tag, { color: $event })" />
+        </label>
+        <button mat-icon-button type="button" (click)="deleteTag(tag)" [disabled]="saving()" aria-label="Eliminar tag">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </mat-card>
+    } @empty {
+      @if (!loading()) {
+        <section class="state-panel empty">
+          <mat-icon>sell</mat-icon>
+          <span>No hay tags todavía.</span>
+        </section>
+      }
+    }
+  </section>
+</main>

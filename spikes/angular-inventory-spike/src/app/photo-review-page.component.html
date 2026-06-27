@@ -1,0 +1,178 @@
+<main class="review-shell">
+  <header class="review-header">
+    <div>
+      <p class="eyebrow">Fotos</p>
+      <h1>Revisión</h1>
+      <p>{{ review()?.pendingCount ?? 0 }} pendientes · {{ review()?.processedCount ?? 0 }} procesadas</p>
+    </div>
+    <div class="shortcut-bar">
+      <span>Q/E girar</span>
+      <span>A ítem</span>
+      <span>B caja</span>
+      <span>N nuevo</span>
+      <span>D descartar</span>
+      <span>S saltar</span>
+    </div>
+  </header>
+
+  @if (message()) {
+    <section class="state-panel success">
+      <mat-icon>check_circle</mat-icon>
+      <span>{{ message() }}</span>
+      @if (lastAffectedIds().length) {
+        <button mat-button type="button" (click)="undo()" [disabled]="busy()">Deshacer</button>
+      }
+    </section>
+  }
+
+  @if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  }
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="48" />
+      <span>Cargando revisión...</span>
+    </section>
+  } @else if (!current()) {
+    <section class="state-panel empty">
+      <mat-icon>task_alt</mat-icon>
+      <span>No hay fotos pendientes.</span>
+    </section>
+  } @else {
+    <section class="review-grid">
+      <mat-card class="review-photo-card">
+        <div class="review-photo-frame">
+          <img [src]="assetUrl(current()!.previewUrl)!" [style.transform]="'rotate(' + current()!.rotationDegrees + 'deg)'" [alt]="current()!.originalFilename" />
+        </div>
+        <div class="photo-caption">
+          <strong>{{ current()!.originalFilename }}</strong>
+          <small>{{ current()!.importedAt | date:'short' }}</small>
+          @if (current()!.sourceBox) {
+            <span>{{ current()!.sourceBox!.code }} · {{ current()!.sourceBox!.name }}</span>
+          }
+        </div>
+      </mat-card>
+
+      <aside class="review-actions">
+        <mat-card class="action-card">
+          <button mat-flat-button type="button" (click)="openPanel('create')" [disabled]="busy()">
+            <mat-icon>add_box</mat-icon>
+            Crear ítem
+          </button>
+          <button mat-stroked-button type="button" (click)="openPanel('assignItem')" [disabled]="busy()">
+            <mat-icon>category</mat-icon>
+            Asociar a ítem
+          </button>
+          <button mat-stroked-button type="button" (click)="openPanel('assignBox')" [disabled]="busy()">
+            <mat-icon>inventory_2</mat-icon>
+            Asociar a caja
+          </button>
+          <div class="split-actions">
+            <button mat-stroked-button type="button" (click)="rotate(-90)" [disabled]="busy()">
+              <mat-icon>rotate_left</mat-icon>
+              Q
+            </button>
+            <button mat-stroked-button type="button" (click)="rotate(90)" [disabled]="busy()">
+              <mat-icon>rotate_right</mat-icon>
+              E
+            </button>
+          </div>
+          <button mat-stroked-button type="button" (click)="discard()" [disabled]="busy()">
+            <mat-icon>delete</mat-icon>
+            Descartar
+          </button>
+          <div class="split-actions">
+            <button mat-button type="button" (click)="skip(-1)" [disabled]="!review()?.previousId">
+              <mat-icon>arrow_back</mat-icon>
+            </button>
+            <button mat-button type="button" (click)="skip(1)" [disabled]="!review()?.nextId">
+              <mat-icon>arrow_forward</mat-icon>
+            </button>
+          </div>
+        </mat-card>
+
+        @if (panel() === 'assignBox') {
+          <mat-card class="action-card">
+            <mat-form-field appearance="outline">
+              <mat-label>Contenedor</mat-label>
+              <mat-select [ngModel]="assignBoxId()" (ngModelChange)="assignBoxId.set($event)">
+                @for (box of options().boxes; track box.id) {
+                  <mat-option [value]="box.id">{{ box.code }} · {{ box.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button mat-flat-button type="button" (click)="assignBox()" [disabled]="busy()">Asignar</button>
+          </mat-card>
+        }
+
+        @if (panel() === 'assignItem') {
+          <mat-card class="action-card">
+            <mat-form-field appearance="outline">
+              <mat-label>Ítem</mat-label>
+              <mat-select [ngModel]="assignItemId()" (ngModelChange)="assignItemId.set($event)">
+                @for (item of items(); track item.id) {
+                  <mat-option [value]="item.id">{{ item.code }} · {{ item.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button mat-flat-button type="button" (click)="assignItem()" [disabled]="busy()">Asignar</button>
+          </mat-card>
+        }
+
+        @if (panel() === 'create') {
+          <mat-card class="action-card">
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre</mat-label>
+              <input matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Tags</mat-label>
+              <mat-select [ngModel]="draftTagIds()" (ngModelChange)="draftTagIds.set($event)" multiple>
+                @for (tag of options().tags; track tag.id) {
+                  <mat-option [value]="tag.id">{{ tag.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Contenedor</mat-label>
+              <mat-select [ngModel]="draftBoxId()" (ngModelChange)="draftBoxId.set($event)">
+                <mat-option [value]="null">Sin caja</mat-option>
+                @for (box of options().boxes; track box.id) {
+                  <mat-option [value]="box.id">{{ box.code }} · {{ box.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <div class="two-cols">
+              <mat-form-field appearance="outline">
+                <mat-label>Cantidad</mat-label>
+                <input matInput type="number" [ngModel]="draftQuantity()" (ngModelChange)="draftQuantity.set(+$event)" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Unidad</mat-label>
+                <input matInput [ngModel]="draftUnit()" (ngModelChange)="draftUnit.set($event)" />
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline">
+              <mat-label>Descripción</mat-label>
+              <textarea matInput rows="4" [ngModel]="draftNotes()" (ngModelChange)="draftNotes.set($event)"></textarea>
+            </mat-form-field>
+            <button mat-flat-button type="button" (click)="createItem()" [disabled]="busy()">Crear y asignar</button>
+          </mat-card>
+        }
+      </aside>
+    </section>
+
+    <section class="filmstrip" aria-label="Fotos pendientes cercanas">
+      @for (photo of review()!.pending; track photo.id) {
+        <button type="button" class="film" [class.current]="photo.id === current()!.id" [class.selected]="isSelected(photo)" (click)="selectOnly(photo)">
+          <img [src]="assetUrl(photo.thumbUrl)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.originalFilename" />
+          <span></span>
+        </button>
+      }
+    </section>
+  }
+</main>

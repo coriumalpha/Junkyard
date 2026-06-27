@@ -223,6 +223,59 @@
                 }
             </section>
 
+            <section class="panel comments-panel">
+                <div class="section-header compact">
+                    <div>
+                        <p class="eyebrow">Comentarios</p>
+                        <h2>Notas sobre el contenedor</h2>
+                        <p class="section-kicker">Contexto físico, incidencias o detalles útiles para seguir operando.</p>
+                    </div>
+                </div>
+                @if (TempData["InventoryCommentMessage"] is string inventoryCommentMessage)
+                {
+                    <div class="notice toast stack-top">@inventoryCommentMessage</div>
+                }
+                <form class="form-grid stack-top" method="post" asp-page-handler="AddComment" asp-route-code="@Model.Box.Code">
+                    <div class="field full">
+                        <label asp-for="CommentText">Nuevo comentario</label>
+                        <textarea asp-for="CommentText" rows="4" placeholder="Contexto, hallazgos, recordatorios..."></textarea>
+                    </div>
+                    <div class="actions full">
+                        <button class="btn primary" type="submit">Guardar comentario</button>
+                    </div>
+                </form>
+                @if (Model.Comments.Count == 0)
+                {
+                    <div class="empty stack-top">
+                        <strong>No hay comentarios aún.</strong>
+                        <span>Sirven para dejar contexto sin abrir una tarea nueva.</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="inventory-comments-list stack-top">
+                        @foreach (var comment in Model.Comments)
+                        {
+                            <article class="panel inventory-comment-card">
+                                <div class="section-header compact">
+                                    <div>
+                                        <div class="chips">
+                                            <span class="chip">@comment.KindLabel</span>
+                                            <span class="chip">@comment.CreatedAt.ToString("dd MMM yyyy HH:mm")</span>
+                                        </div>
+                                        <p class="caption">@comment.Title</p>
+                                        @if (!string.IsNullOrWhiteSpace(comment.Description))
+                                        {
+                                            <p class="item-description-text">@comment.Description</p>
+                                        }
+                                    </div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+            </section>
+
             <section class="panel">
                 <div class="section-header compact">
                     <div>

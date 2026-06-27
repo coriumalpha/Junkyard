@@ -1,0 +1,123 @@
+<main class="dashboard-shell">
+  <header class="dashboard-header">
+    <div>
+      <p class="eyebrow">Junkyard / Angular SPA</p>
+      <h1>Dashboard operativo</h1>
+      <p>Resumen compacto del inventario real: salud de clasificación, stock bajo, contenedores recientes y fotos.</p>
+    </div>
+
+    <nav class="header-actions" aria-label="Acciones del dashboard">
+      <a mat-stroked-button [href]="backendUrl('/')" target="_blank" rel="noreferrer">
+        <mat-icon>open_in_new</mat-icon>
+        Legacy
+      </a>
+    </nav>
+  </header>
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="48" />
+      <span>Cargando dashboard...</span>
+    </section>
+  } @else if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  } @else if (data()) {
+    <section class="stats-grid" aria-label="Resumen">
+      <mat-card class="stat-card"><span>Ubicaciones</span><strong>{{ data()!.locationCount }}</strong></mat-card>
+      <mat-card class="stat-card"><span>Contenedores</span><strong>{{ data()!.boxCount }}</strong></mat-card>
+      <mat-card class="stat-card"><span>Ítems</span><strong>{{ data()!.itemCount }}</strong></mat-card>
+      <mat-card class="stat-card urgent"><span>Bajo stock</span><strong>{{ data()!.lowStockCount }}</strong></mat-card>
+      <mat-card class="stat-card"><span>Sin clasificar</span><strong>{{ data()!.orphanCount }}</strong></mat-card>
+      <mat-card class="stat-card"><span>Fotos pendientes</span><strong>{{ data()!.photoInboxPendingCount }}</strong></mat-card>
+    </section>
+
+    <section class="work-grid">
+      <mat-card class="panel recent-panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Contenedores</p>
+            <h2>Actualizados recientemente</h2>
+          </div>
+          <a mat-button routerLink="/inventory">
+            <mat-icon>arrow_forward</mat-icon>
+            Ver inventario
+          </a>
+        </div>
+
+        <div class="box-grid">
+          @for (box of data()!.recentBoxes; track box.id) {
+            <a class="box-card" [routerLink]="['/boxes', box.code]">
+              @if (box.coverUrl) {
+                <img [src]="assetUrl(box.coverUrl)!" [style.transform]="'rotate(' + box.rotationDegrees + 'deg)'" [alt]="box.name" />
+              } @else {
+                <div class="placeholder">{{ box.code }}</div>
+              }
+              <div>
+                <mat-chip-set>
+                  <mat-chip>{{ box.code }}</mat-chip>
+                  <mat-chip>{{ box.containerTypeLabel }}</mat-chip>
+                </mat-chip-set>
+                <strong>{{ box.name }}</strong>
+                <span>{{ box.locationName || 'Sin ubicación' }} · {{ box.itemCount }} ítems</span>
+              </div>
+            </a>
+          } @empty {
+            <div class="empty">Sin contenedores todavía.</div>
+          }
+        </div>
+      </mat-card>
+
+      <aside class="side-stack">
+        <mat-card class="panel">
+          <div class="panel-head compact">
+            <div>
+              <p class="eyebrow">Stock</p>
+              <h2>Consumibles bajos</h2>
+            </div>
+            <a mat-button routerLink="/inventory" [queryParams]="{ onlyConsumable: 'true', layout: 'flat' }">Abrir</a>
+          </div>
+
+          <div class="list">
+            @for (item of data()!.lowStockItems; track item.id) {
+              <a class="list-row" [routerLink]="['/item', item.id]">
+                @if (item.coverUrl) {
+                  <img [src]="assetUrl(item.coverUrl)!" [style.transform]="'rotate(' + item.rotationDegrees + 'deg)'" [alt]="item.name" />
+                } @else {
+                  <span class="avatar">{{ firstLetter(item.name) }}</span>
+                }
+                <span>
+                  <strong>{{ item.name }}</strong>
+                  <small>{{ item.boxCode || 'Sin caja' }} · {{ item.category }}</small>
+                </span>
+                <mat-chip>{{ item.quantity }} / {{ item.minQuantity }} {{ item.unit }}</mat-chip>
+              </a>
+            } @empty {
+              <div class="empty">Sin consumibles bajo mínimo.</div>
+            }
+          </div>
+        </mat-card>
+
+        <mat-card class="panel">
+          <div class="panel-head compact">
+            <div>
+              <p class="eyebrow">Fotos</p>
+              <h2>Últimas imágenes</h2>
+            </div>
+            <a mat-button routerLink="/photos/inbox">Inbox</a>
+          </div>
+
+          <div class="photo-grid">
+            @for (photo of data()!.recentPhotos; track photo.id) {
+              <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || 'Foto de inventario'" />
+            } @empty {
+              <div class="empty">Sin fotos recientes.</div>
+            }
+          </div>
+        </mat-card>
+      </aside>
+    </section>
+  }
+</main>

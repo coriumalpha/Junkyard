@@ -1,0 +1,114 @@
+<main class="photo-inbox-shell">
+  <header class="photo-inbox-header">
+    <div>
+      <p class="eyebrow">Inventario / Angular SPA</p>
+      <h1>Bandeja de fotos</h1>
+      <p>Lectura rápida de imágenes pendientes, asignadas y descartadas.</p>
+    </div>
+
+    <nav class="header-actions" aria-label="Acciones de fotos">
+      <a mat-flat-button routerLink="/photos/review">
+        <mat-icon>rate_review</mat-icon>
+        Revisar
+      </a>
+    </nav>
+  </header>
+
+  <mat-card class="upload-card">
+    <div>
+      <p class="eyebrow">Importar</p>
+      <strong>Subida a pendientes</strong>
+    </div>
+    <mat-form-field appearance="outline">
+      <mat-label>Caja origen</mat-label>
+      <mat-select [ngModel]="uploadSourceBoxId()" (ngModelChange)="uploadSourceBoxId.set($event)">
+        <mat-option [value]="null">Sin caja origen</mat-option>
+        @for (box of options().boxes; track box.id) {
+          <mat-option [value]="box.id">{{ box.code }} · {{ box.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <label class="upload-button">
+      <input type="file" accept="image/*" multiple (change)="uploadFiles($event)" [disabled]="uploading()" />
+      <mat-icon>upload</mat-icon>
+      <span>{{ uploading() ? 'Subiendo...' : 'Seleccionar fotos' }}</span>
+    </label>
+  </mat-card>
+
+  <section class="stats-grid" aria-label="Estado de bandeja">
+    @for (option of statusOptions; track option.value) {
+      <button type="button" class="stat-card" [class.active]="isActive(option.value)" (click)="setStatus(option.value)">
+        <mat-icon>{{ option.icon }}</mat-icon>
+        <span>{{ option.label }}</span>
+        <strong>{{ countFor(option.value) }}</strong>
+      </button>
+    }
+  </section>
+
+  @if (actionMessage()) {
+    <section class="state-panel success">
+      <mat-icon>check_circle</mat-icon>
+      <span>{{ actionMessage() }}</span>
+    </section>
+  }
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="48" />
+      <span>Cargando bandeja...</span>
+    </section>
+  } @else if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  } @else if (data()) {
+    <section class="photo-grid">
+      @for (photo of data()!.photos; track photo.id) {
+        <mat-card class="photo-card">
+          <div class="photo-frame">
+            <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.originalFilename" />
+          </div>
+
+          <div class="photo-copy">
+            <div class="photo-topline">
+              <span [class]="statusClass(photo)">{{ photo.status }}</span>
+              @if (photo.sourceBox) {
+                <a class="box-chip" [routerLink]="['/boxes', photo.sourceBox.code]">{{ photo.sourceBox.code }}</a>
+              }
+            </div>
+            <strong>{{ photo.originalFilename }}</strong>
+            <small>{{ photo.importedAt | date:'short' }}</small>
+            @if (photo.notes) {
+              <p>{{ photo.notes }}</p>
+            }
+          </div>
+
+          <mat-card-actions align="end">
+            @if (photo.status === 'Pending') {
+              <button mat-button type="button" (click)="discard(photo)" [disabled]="busyPhotoId() === photo.id">
+                <mat-icon>delete</mat-icon>
+                Descartar
+              </button>
+            }
+            @if (photo.status === 'Discarded') {
+              <button mat-button type="button" (click)="restore(photo)" [disabled]="busyPhotoId() === photo.id">
+                <mat-icon>undo</mat-icon>
+                Pendiente
+              </button>
+            }
+            <a mat-button [href]="legacyUrl(photo.legacyReviewUrl)" target="_blank" rel="noreferrer">
+              <mat-icon>open_in_new</mat-icon>
+              Revisar
+            </a>
+          </mat-card-actions>
+        </mat-card>
+      } @empty {
+        <section class="state-panel empty">
+          <mat-icon>photo_library</mat-icon>
+          <span>No hay fotos para este filtro.</span>
+        </section>
+      }
+    </section>
+  }
+</main>

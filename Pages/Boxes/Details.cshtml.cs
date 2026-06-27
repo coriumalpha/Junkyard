@@ -35,6 +35,9 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
     [BindProperty]
     public int MoveTargetBoxId { get; set; }
 
+    [BindProperty]
+    public string? CommentText { get; set; }
+
     public async Task<IActionResult> OnGetAsync(string code, CancellationToken cancellationToken)
     {
         if (!await LoadAsync(code, cancellationToken))
@@ -129,6 +132,7 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
         var action = await db.InventoryActions.FirstOrDefaultAsync(a =>
             a.Id == actionId &&
             a.LinkedEntityType == InventoryActionLinkedEntityType.Box &&
+            a.Kind == InventoryActionKind.Task &&
             a.LinkedEntityId == box.Id, cancellationToken);
         if (action is null)
         {
@@ -139,6 +143,36 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
         action.CompletedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         TempData["InventoryActionMessage"] = "Acción completada.";
+        return RedirectToPage(new { code });
+    }
+
+    public async Task<IActionResult> OnPostAddCommentAsync(string code, CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes.AsNoTracking().FirstOrDefaultAsync(b => b.Code == code, cancellationToken);
+        if (box is null)
+        {
+            return NotFound();
+        }
+
+        var comment = CommentText?.Trim();
+        if (string.IsNullOrWhiteSpace(comment))
+        {
+            TempData["InventoryCommentMessage"] = "Escribe un comentario antes de guardar.";
+            return RedirectToPage(new { code });
+        }
+
+        db.InventoryActions.Add(new InventoryAction
+        {
+            Title = "Comentario",
+            Description = comment,
+            Kind = InventoryActionKind.Comment,
+            Status = InventoryActionStatus.Archived,
+            LinkedEntityType = InventoryActionLinkedEntityType.Box,
+            LinkedEntityId = box.Id
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        TempData["InventoryCommentMessage"] = "Comentario guardado.";
         return RedirectToPage(new { code });
     }
 
@@ -431,9 +465,13 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
             .ToList();
         PhotoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
         LinkedActions = await db.InventoryActions.AsNoTracking()
-            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Box && action.LinkedEntityId == Box.Id && action.Status == InventoryActionStatus.Open)
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Box && action.LinkedEntityId == Box.Id && action.Kind == InventoryActionKind.Task && action.Status == InventoryActionStatus.Open)
             .OrderByDescending(action => action.Priority)
             .ThenByDescending(action => action.CreatedAt)
+            .ToListAsync(cancellationToken);
+        Comments = await db.InventoryActions.AsNoTracking()
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Box && action.LinkedEntityId == Box.Id && action.Kind != InventoryActionKind.Task)
+            .OrderByDescending(action => action.CreatedAt)
             .ToListAsync(cancellationToken);
         return true;
     }
@@ -451,6 +489,8 @@ public class DetailsModel(InventoryDbContext db, PhotoStorage photos, QrCodeServ
             : "";
 
     public string ThumbUrl(Photo photo) => PhotoStorage.ThumbUrl(photo.Filename, photo.UpdatedAt);
+
+    public List<InventoryAction> Comments { get; private set; } = [];
 
     public class BulkEditInput
     {

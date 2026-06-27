@@ -48,6 +48,7 @@ public class PendientesModel(InventoryDbContext db) : PageModel
         {
             Title = Input.Title.Trim(),
             Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim(),
+            Kind = Input.Kind,
             Priority = Math.Clamp(Input.Priority, 1, 5),
             LinkedEntityType = Input.LinkedEntityType,
             LinkedEntityId = Input.LinkedEntityType switch
@@ -111,6 +112,7 @@ public class PendientesModel(InventoryDbContext db) : PageModel
             .ToList();
 
         var query = db.InventoryActions.AsNoTracking().AsQueryable();
+        query = query.Where(action => action.Kind == InventoryActionKind.Task);
         if (!string.IsNullOrWhiteSpace(Query))
         {
             var term = Query.ToLowerInvariant();
@@ -237,6 +239,8 @@ public class PendientesModel(InventoryDbContext db) : PageModel
         public string Title { get; set; } = "";
         [System.ComponentModel.DataAnnotations.StringLength(1000)]
         public string? Description { get; set; }
+        [System.ComponentModel.DataAnnotations.Required]
+        public InventoryActionKind Kind { get; set; } = InventoryActionKind.Task;
         [System.ComponentModel.DataAnnotations.Range(1, 5)]
         public int Priority { get; set; } = 3;
         public InventoryActionLinkedEntityType LinkedEntityType { get; set; } = InventoryActionLinkedEntityType.None;
