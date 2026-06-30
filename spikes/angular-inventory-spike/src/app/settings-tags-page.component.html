@@ -12,10 +12,7 @@
       <mat-label>Nuevo tag</mat-label>
       <input matInput [ngModel]="draftName()" (ngModelChange)="setDraftName($event)" />
     </mat-form-field>
-    <label class="color-pick">
-      <span>Color</span>
-      <input type="color" [ngModel]="draftColor()" (ngModelChange)="setDraftColor($event)" />
-    </label>
+    <app-color-picker label="Color nuevo tag" [value]="draftColor()" (valueChange)="setDraftColor($event)" />
     <button mat-flat-button type="button" (click)="createTag()" [disabled]="!draftName().trim() || saving()">
       <mat-icon>add</mat-icon>
       Crear
@@ -34,29 +31,60 @@
     </section>
   }
 
-  <section class="tag-grid">
-    @for (tag of tags(); track tag.id) {
-      <mat-card class="tag-card">
-        <span class="tag-swatch" [style.background]="tag.color"></span>
-        <mat-form-field appearance="outline">
-          <mat-label>Nombre</mat-label>
-          <input matInput [ngModel]="tag.name" (blur)="updateTag(tag, { name: ($any($event.target)).value })" />
-        </mat-form-field>
-        <label class="color-pick">
-          <span>Color</span>
-          <input type="color" [ngModel]="tag.color" (ngModelChange)="updateTag(tag, { color: $event })" />
-        </label>
-        <button mat-icon-button type="button" (click)="deleteTag(tag)" [disabled]="saving()" aria-label="Eliminar tag">
-          <mat-icon>delete</mat-icon>
-        </button>
-      </mat-card>
-    } @empty {
-      @if (!loading()) {
-        <section class="state-panel empty">
-          <mat-icon>sell</mat-icon>
-          <span>No hay tags todavía.</span>
-        </section>
+  <section class="tag-workspace">
+    <mat-card class="tag-table-card">
+      <div class="tag-table-head">
+        <span>Color</span>
+        <span>Tag</span>
+        <span>Hex</span>
+        <span>Acciones</span>
+      </div>
+      @for (tag of tags(); track tag.id) {
+        <div class="tag-table-row" [class.active]="editingTag()?.id === tag.id">
+          <span class="tag-swatch" [style.background]="tag.color"></span>
+          <strong>{{ tag.name }}</strong>
+          <span>{{ tag.color }}</span>
+          <div class="row-actions">
+            <button mat-stroked-button type="button" (click)="startEdit(tag)" [disabled]="saving()">
+              <mat-icon>edit</mat-icon>
+              Editar
+            </button>
+            <button mat-icon-button type="button" (click)="deleteTag(tag)" [disabled]="saving()" aria-label="Eliminar tag">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+      } @empty {
+        @if (!loading()) {
+          <section class="state-panel empty">
+            <mat-icon>sell</mat-icon>
+            <span>No hay tags todavía.</span>
+          </section>
+        }
       }
+    </mat-card>
+
+    @if (editingTag()) {
+      <mat-card class="tag-edit-card">
+        <div class="edit-head">
+          <div>
+            <p class="eyebrow">Edición</p>
+            <h2>{{ editingTag()!.name }}</h2>
+          </div>
+          <button mat-icon-button type="button" (click)="cancelEdit()" aria-label="Cerrar edición">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre del tag</mat-label>
+          <input matInput [ngModel]="editName()" (ngModelChange)="editName.set($event)" />
+        </mat-form-field>
+        <app-color-picker label="Color del tag" [value]="editColor()" (valueChange)="editColor.set($event)" />
+        <div class="edit-actions">
+          <button mat-stroked-button type="button" (click)="cancelEdit()" [disabled]="saving()">Cancelar</button>
+          <button mat-flat-button type="button" (click)="saveEdit()" [disabled]="!editName().trim() || saving()">Guardar</button>
+        </div>
+      </mat-card>
     }
   </section>
 </main>

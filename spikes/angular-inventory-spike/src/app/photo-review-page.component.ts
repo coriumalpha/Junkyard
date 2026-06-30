@@ -136,6 +136,10 @@ export class PhotoReviewPageComponent {
     }
 
     if (panel === 'create') {
+      this.draftName.set('');
+      this.draftNotes.set('');
+      this.draftQuantity.set(1);
+      this.draftUnit.set('uds');
       this.draftBoxId.set(current.sourceBox?.id ?? null);
       this.draftTagIds.set(this.options().tags.find((tag) => tag.name === 'Otros') ? [this.options().tags.find((tag) => tag.name === 'Otros')!.id] : []);
     }
@@ -335,7 +339,8 @@ export class PhotoReviewPageComponent {
 
   private applyReview(review: PhotoReviewResponse): void {
     this.review.set(review);
-    this.selectedIds.set(review.current ? [review.current.id] : []);
+    const pendingIds = new Set(review.pending.map((photo) => photo.id));
+    this.selectedIds.update((current) => current.filter((id) => pendingIds.has(id)));
   }
 
   private focusPanel(panel: ReviewPanel): void {

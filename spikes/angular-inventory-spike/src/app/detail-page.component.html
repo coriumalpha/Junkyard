@@ -155,7 +155,12 @@
         </mat-chip-set>
       </mat-card>
 
-      <mat-card class="info-card detail-wide-card description-card">
+      <mat-card class="info-card">
+        <p class="eyebrow">Ubicación</p>
+        <app-hierarchy-trail [nodes]="itemHierarchyNodes()" />
+      </mat-card>
+
+      <mat-card class="info-card item-side-wide description-card">
         <p class="eyebrow">Descripción</p>
         @if (item()!.notes) {
           <p class="notes">{{ item()!.notes }}</p>
@@ -204,10 +209,7 @@
                 <mat-label>Nuevo tag</mat-label>
                 <input matInput [ngModel]="newTagName()" (ngModelChange)="setNewTagName($event)" />
               </mat-form-field>
-              <label class="color-pick">
-                <span>Color</span>
-                <input type="color" [ngModel]="newTagColor()" (ngModelChange)="setNewTagColor($event)" />
-              </label>
+              <app-color-picker label="Color tag" [value]="newTagColor()" (valueChange)="setNewTagColor($event)" />
               <button mat-stroked-button type="button" (click)="quickCreateTag()" [disabled]="!newTagName().trim() || saving()">
                 <mat-icon>add</mat-icon>
                 Crear y asignar
@@ -271,11 +273,6 @@
           </div>
         </mat-card>
       }
-
-      <mat-card class="info-card">
-        <p class="eyebrow">Ubicación</p>
-        <app-hierarchy-trail [nodes]="itemHierarchyNodes()" />
-      </mat-card>
 
       <mat-card class="info-card action-log-card detail-wide-card">
         <div class="section-head compact">

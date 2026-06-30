@@ -404,8 +404,40 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (null, "El nombre del tag es obligatorio.");
         }
 
+        var duplicate = await db.Tags.AnyAsync(other => other.Id != id && other.Name == name, cancellationToken);
+        if (duplicate)
+        {
+            return (null, "Ya existe un tag con ese nombre.");
+        }
+
         tag.Name = name;
         tag.Color = NormalizeTagColor(input.Color);
+        tag.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return (new TagDto(tag.Id, tag.Name, tag.Color), null);
+    }
+
+    public async Task<(TagDto? Tag, string? Error)> RenameTagAsync(int id, TagRenameDto input, CancellationToken cancellationToken)
+    {
+        var tag = await db.Tags.FirstOrDefaultAsync(tag => tag.Id == id, cancellationToken);
+        if (tag is null)
+        {
+            return (null, null);
+        }
+
+        var name = (input.Name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return (null, "El nombre del tag es obligatorio.");
+        }
+
+        var duplicate = await db.Tags.AnyAsync(other => other.Id != id && other.Name == name, cancellationToken);
+        if (duplicate)
+        {
+            return (null, "Ya existe un tag con ese nombre.");
+        }
+
+        tag.Name = name;
         tag.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         return (new TagDto(tag.Id, tag.Name, tag.Color), null);
@@ -2179,5 +2211,7 @@ public record TagsResponseDto(List<TagDto> Tags);
 public record TagDto(int Id, string Name, string Color);
 
 public record TagUpdateDto(string? Name, string? Color);
+
+public record TagRenameDto(string? Name);
 
 public record ItemConditionDto(int Id, string Name, string Color);

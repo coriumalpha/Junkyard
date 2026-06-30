@@ -537,6 +537,10 @@ export class InventoryApiService {
     return this.http.put<InventoryTag>(`/api/tags/${id}`, input);
   }
 
+  renameTag(id: number, name: string): Observable<InventoryTag> {
+    return this.http.post<InventoryTag>(`/api/tags/${id}/rename`, { name });
+  }
+
   deleteTag(id: number): Observable<void> {
     return this.http.delete<void>(`/api/tags/${id}`);
   }

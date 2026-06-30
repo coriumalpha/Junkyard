@@ -237,6 +237,10 @@
   grid-column: 1 / -1;
 }
 
+.item-side-wide {
+  grid-column: 2 / -1;
+}
+
 .description-card {
   min-height: 120px;
 }
@@ -269,27 +273,9 @@
 
 .quick-tag {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 0.9fr) auto;
   gap: 12px;
   align-items: center;
-}
-
-.color-pick {
-  display: grid;
-  gap: 6px;
-  color: var(--app-muted);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.color-pick input {
-  width: 48px;
-  height: 44px;
-  padding: 3px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
 }
 
 .form-actions,
@@ -634,6 +620,10 @@
 @media (max-width: 980px) {
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .item-side-wide {
+    grid-column: 1 / -1;
   }
 
   .edit-grid {

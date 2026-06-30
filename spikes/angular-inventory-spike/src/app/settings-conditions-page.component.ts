@@ -10,12 +10,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
+import { ColorPickerComponent } from './color-picker.component';
 import { InventoryApiService, InventoryCondition } from './inventory-api.service';
 
 @Component({
   selector: 'app-settings-conditions-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, ColorPickerComponent],
   templateUrl: './settings-conditions-page.component.html',
   styleUrl: './settings-conditions-page.component.scss'
 })

@@ -12,10 +12,7 @@
       <mat-label>Nuevo estado</mat-label>
       <input matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" />
     </mat-form-field>
-    <label class="color-pick">
-      <span>Color</span>
-      <input type="color" [ngModel]="draftColor()" (ngModelChange)="draftColor.set($event)" />
-    </label>
+    <app-color-picker label="Color nuevo estado" [value]="draftColor()" (valueChange)="draftColor.set($event)" />
     <button mat-flat-button type="button" (click)="createCondition()" [disabled]="!draftName().trim() || saving()">
       <mat-icon>add</mat-icon>
       Crear
@@ -42,10 +39,7 @@
           <mat-label>Nombre</mat-label>
           <input matInput [ngModel]="condition.name" (blur)="updateCondition(condition, { name: ($any($event.target)).value })" />
         </mat-form-field>
-        <label class="color-pick">
-          <span>Color</span>
-          <input type="color" [ngModel]="condition.color" (ngModelChange)="updateCondition(condition, { color: $event })" />
-        </label>
+        <app-color-picker label="Color estado" [value]="condition.color" (valueChange)="updateCondition(condition, { color: $event })" />
         <button mat-icon-button type="button" (click)="deleteCondition(condition)" [disabled]="saving()" aria-label="Eliminar estado">
           <mat-icon>delete</mat-icon>
         </button>

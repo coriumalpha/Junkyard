@@ -45,7 +45,7 @@
 .condition-create-card,
 .condition-card {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) auto auto;
+  grid-template-columns: minmax(240px, 1fr) minmax(320px, 0.9fr) auto;
   gap: 12px;
   align-items: center;
   padding: 14px;
@@ -63,10 +63,11 @@
 }
 
 .condition-card {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
-    "swatch name delete"
-    "swatch color delete";
+    "swatch name"
+    "color color"
+    "delete delete";
   align-items: start;
 }
 
@@ -89,27 +90,13 @@
   justify-content: space-between;
 }
 
+.condition-card app-color-picker {
+  grid-area: color;
+}
+
 .condition-card button {
   grid-area: delete;
-  align-self: center;
-}
-
-.color-pick {
-  display: grid;
-  gap: 6px;
-  color: var(--app-muted);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.color-pick input {
-  width: 48px;
-  height: 44px;
-  padding: 3px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  justify-self: end;
 }
 
 .state-panel {

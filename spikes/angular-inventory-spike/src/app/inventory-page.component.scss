@@ -777,6 +777,20 @@
   white-space: nowrap;
 }
 
+.item-code {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid rgba(72, 255, 176, 0.28);
+  border-radius: 8px;
+  color: var(--app-accent);
+  background: rgba(72, 255, 176, 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
 .group-item-flags {
   display: flex;
   flex-wrap: wrap;
@@ -1051,11 +1065,11 @@
 .table-head,
 .table-row {
   display: grid;
-  grid-template-columns: 88px minmax(240px, 2fr) 150px minmax(240px, 1.5fr) 150px 120px;
+  grid-template-columns: 88px minmax(120px, 0.75fr) minmax(240px, 2fr) 150px minmax(240px, 1.5fr) 150px 120px;
   gap: 12px;
   align-items: center;
   padding: 14px 16px;
-  min-width: 880px;
+  min-width: 1020px;
 }
 
 .table-head {

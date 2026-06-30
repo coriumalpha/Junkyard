@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, EMPTY, finalize, tap } from 'rxjs';
+import { catchError, EMPTY, finalize, switchMap, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -10,12 +10,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
+import { ColorPickerComponent } from './color-picker.component';
 import { InventoryApiService, InventoryTag } from './inventory-api.service';
 
 @Component({
   selector: 'app-settings-tags-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, ColorPickerComponent],
   templateUrl: './settings-tags-page.component.html',
   styleUrl: './settings-tags-page.component.scss'
 })
@@ -26,6 +27,9 @@ export class SettingsTagsPageComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly draftName = signal('');
   protected readonly draftColor = signal('#48ffb0');
+  protected readonly editingTag = signal<InventoryTag | null>(null);
+  protected readonly editName = signal('');
+  protected readonly editColor = signal('#48ffb0');
 
   private readonly api = inject(InventoryApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -76,6 +80,49 @@ export class SettingsTagsPageComponent {
     this.saving.set(true);
     this.api.updateTag(next.id, { name: next.name, color: next.color }).pipe(
       tap((updated) => this.upsertTag(updated)),
+      catchError((error: unknown) => {
+        this.error.set(this.describeError(error, 'No se pudo guardar el tag.'));
+        this.reload();
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected startEdit(tag: InventoryTag): void {
+    this.editingTag.set(tag);
+    this.editName.set(tag.name);
+    this.editColor.set(tag.color);
+    this.error.set(null);
+  }
+
+  protected cancelEdit(): void {
+    this.editingTag.set(null);
+    this.editName.set('');
+    this.editColor.set('#48ffb0');
+  }
+
+  protected saveEdit(): void {
+    const tag = this.editingTag();
+    const name = this.editName().trim();
+    if (!tag || !name || this.saving()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.error.set(null);
+    this.api.renameTag(tag.id, name).pipe(
+      switchMap((renamed) => {
+        const color = this.editColor();
+        return color === renamed.color
+          ? [renamed]
+          : this.api.updateTag(renamed.id, { name: renamed.name, color });
+      }),
+      tap((updated) => {
+        this.upsertTag(updated);
+        this.cancelEdit();
+      }),
       catchError((error: unknown) => {
         this.error.set(this.describeError(error, 'No se pudo guardar el tag.'));
         this.reload();

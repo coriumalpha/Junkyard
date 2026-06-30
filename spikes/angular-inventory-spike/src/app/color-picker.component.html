@@ -1,0 +1,42 @@
+<div class="color-picker">
+  <div class="color-picker-head">
+    <span>{{ label }}</span>
+    <strong>{{ hex() }}</strong>
+    <i [style.background]="hex()" aria-hidden="true"></i>
+  </div>
+
+  <div
+    #plane
+    class="color-plane"
+    [style.background]="planeBackground()"
+    (pointerdown)="onPlanePointer($event)">
+    <span
+      class="plane-thumb"
+      [style.left.%]="saturation()"
+      [style.top.%]="100 - lightness()"></span>
+  </div>
+
+  <label class="hue-row">
+    <span>Tono</span>
+    <input type="range" min="0" max="360" [ngModel]="hue()" (ngModelChange)="onHueChange($event)" />
+  </label>
+
+  <div class="numeric-grid">
+    <label>
+      <span>Hex</span>
+      <input [ngModel]="hex()" (ngModelChange)="onHexChange($event)" spellcheck="false" />
+    </label>
+    <label>
+      <span>R</span>
+      <input type="number" min="0" max="255" [ngModel]="red()" (ngModelChange)="onRgbChange('red', $event)" />
+    </label>
+    <label>
+      <span>G</span>
+      <input type="number" min="0" max="255" [ngModel]="green()" (ngModelChange)="onRgbChange('green', $event)" />
+    </label>
+    <label>
+      <span>B</span>
+      <input type="number" min="0" max="255" [ngModel]="blue()" (ngModelChange)="onRgbChange('blue', $event)" />
+    </label>
+  </div>
+</div>

@@ -618,7 +618,7 @@ export class InventoryPageComponent {
 
         visuals.push({
           kind: 'item',
-          title: item.name,
+          title: `${item.code} · ${item.name}`,
           subtitle: item.boxCode || this.tagSummary(item),
           imageUrl: this.assetUrl(item.coverUrl),
           rotationDegrees: item.rotationDegrees,

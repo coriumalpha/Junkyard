@@ -12,7 +12,8 @@
 
 .settings-header,
 .tag-create-card,
-.tag-card,
+.tag-table-card,
+.tag-edit-card,
 .state-panel {
   border: 1px solid var(--app-border);
   background: var(--app-surface-raised);
@@ -43,9 +44,9 @@
 }
 
 .tag-create-card,
-.tag-card {
+.tag-edit-card {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) auto auto;
+  grid-template-columns: minmax(240px, 1fr) minmax(320px, 0.9fr) auto;
   gap: 12px;
   align-items: center;
   padding: 14px;
@@ -56,60 +57,78 @@
   margin-bottom: 14px;
 }
 
-.tag-grid {
+.tag-workspace {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.tag-card {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    "swatch name delete"
-    "swatch color delete";
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 14px;
   align-items: start;
 }
 
+.tag-table-card,
+.tag-edit-card {
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.tag-table-head,
+.tag-table-row {
+  display: grid;
+  grid-template-columns: 64px minmax(180px, 1fr) minmax(100px, 160px) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.tag-table-head {
+  padding: 0 10px 10px;
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.tag-table-row {
+  min-height: 66px;
+  padding: 10px;
+  border-top: 1px solid var(--app-border);
+}
+
+.tag-table-row.active {
+  background: rgba(72, 255, 176, 0.08);
+}
+
+.tag-table-row strong,
+.tag-table-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .tag-swatch {
-  grid-area: swatch;
   width: 42px;
   height: 42px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-.tag-card mat-form-field {
-  grid-area: name;
-}
-
-.tag-card .color-pick {
-  grid-area: color;
+.row-actions,
+.edit-actions,
+.edit-head {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.edit-head,
+.edit-actions {
   justify-content: space-between;
 }
 
-.tag-card button {
-  grid-area: delete;
-  align-self: center;
+.tag-edit-card {
+  grid-template-columns: 1fr;
+  position: sticky;
+  top: 14px;
 }
 
-.color-pick {
-  display: grid;
-  gap: 6px;
-  color: var(--app-muted);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.color-pick input {
-  width: 48px;
-  height: 44px;
-  padding: 3px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
+.tag-edit-card h2 {
+  margin: 0;
 }
 
 .state-panel {
@@ -126,17 +145,23 @@
 
 @media (max-width: 760px) {
   .tag-create-card,
-  .tag-card {
+  .tag-workspace,
+  .tag-table-head,
+  .tag-table-row {
     grid-template-columns: 1fr;
   }
 
-  .tag-grid {
-    grid-template-columns: 1fr;
+  .tag-table-head {
+    display: none;
+  }
+
+  .row-actions {
+    justify-content: flex-start;
   }
 }
 
 @media (min-width: 761px) and (max-width: 1120px) {
-  .tag-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .tag-workspace {
+    grid-template-columns: 1fr;
   }
 }

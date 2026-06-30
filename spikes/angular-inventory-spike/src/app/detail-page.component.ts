@@ -3,6 +3,7 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Title } from '@angular/platform-browser';
 import { catchError, EMPTY, finalize, map, switchMap, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -16,6 +17,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { EntityMiniCardComponent } from './entity-mini-card.component';
+import { ColorPickerComponent } from './color-picker.component';
 import { HierarchyTrailComponent, HierarchyTrailNode } from './hierarchy-trail.component';
 import { InventoryAction, InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryOptionsResponse, InventoryPhoto } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
@@ -42,6 +44,7 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
     MatMenuModule,
     MatProgressSpinnerModule,
     MatSlideToggleModule,
+    ColorPickerComponent,
     SearchableSelectComponent,
     EntityMiniCardComponent,
     HierarchyTrailComponent
@@ -174,6 +177,7 @@ export class DetailPageComponent {
 
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(InventoryApiService);
+  private readonly titleService = inject(Title);
   private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
@@ -207,7 +211,10 @@ export class DetailPageComponent {
           }
 
           return this.api.fetchItem(id).pipe(
-            tap((item) => this.item.set(item)),
+            tap((item) => {
+              this.item.set(item);
+              this.titleService.setTitle(`${item.code} · ${item.name} · Junkyard`);
+            }),
             catchError((error: unknown) => {
               this.error.set(error instanceof Error ? error.message : 'No se pudo cargar el detalle.');
               return EMPTY;
@@ -222,8 +229,11 @@ export class DetailPageComponent {
           return EMPTY;
         }
 
-        return this.api.fetchBox(value).pipe(
-          tap((box) => this.box.set(box)),
+          return this.api.fetchBox(value).pipe(
+            tap((box) => {
+              this.box.set(box);
+              this.titleService.setTitle(`${box.code} · ${box.name} · Junkyard`);
+            }),
           catchError((error: unknown) => {
             this.error.set(error instanceof Error ? error.message : 'No se pudo cargar el detalle.');
             return EMPTY;

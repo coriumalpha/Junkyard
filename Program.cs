@@ -184,6 +184,20 @@ app.MapPut("/api/tags/{id:int}", async (
 
     return tag is null ? Results.NotFound() : Results.Json(tag);
 });
+app.MapPost("/api/tags/{id:int}/rename", async (
+    int id,
+    TagRenameDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (tag, error) = await queryService.RenameTagAsync(id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return tag is null ? Results.NotFound() : Results.Json(tag);
+});
 app.MapDelete("/api/tags/{id:int}", async (
     int id,
     InventoryLiveQueryService queryService,
