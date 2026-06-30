@@ -9,6 +9,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
     public DbSet<Box> Boxes => Set<Box>();
     public DbSet<Item> Items => Set<Item>();
     public DbSet<Tag> Tags => Set<Tag>();
+    public DbSet<ItemCondition> ItemConditions => Set<ItemCondition>();
     public DbSet<ItemTag> ItemTags => Set<ItemTag>();
     public DbSet<InventoryAction> InventoryActions => Set<InventoryAction>();
     public DbSet<Photo> Photos => Set<Photo>();
@@ -53,6 +54,13 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
         });
 
         modelBuilder.Entity<Tag>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Color).HasMaxLength(16).IsRequired();
+            entity.HasIndex(x => x.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<ItemCondition>(entity =>
         {
             entity.Property(x => x.Name).HasMaxLength(80).IsRequired();
             entity.Property(x => x.Color).HasMaxLength(16).IsRequired();

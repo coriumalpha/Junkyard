@@ -85,17 +85,36 @@
           <mat-icon matSuffix>search</mat-icon>
         </mat-form-field>
 
-        <mat-form-field appearance="outline">
-          <mat-label>Contenedor</mat-label>
-          <input
-            matInput
-            [value]="state().box"
-            (input)="setBox(($any($event.target)).value)"
-            placeholder="CT-001"
-          />
-          <mat-icon matSuffix>inventory_2</mat-icon>
-        </mat-form-field>
+        <app-searchable-select
+          label="Contenedores"
+          [value]="state().boxIds"
+          [options]="boxOptions()"
+          [multiple]="true"
+          placeholder="Buscar por CT, nombre, ubicación..."
+          (valueChange)="setBoxIds($any($event))" />
       </div>
+
+      @if (selectedBoxOptions().length) {
+        <div class="selected-boxes primary-scope">
+          <div class="selected-boxes-head">
+            <span>{{ selectedBoxOptions().length }} contenedores en alcance</span>
+            <button mat-button type="button" (click)="clearBoxIds()">
+              <mat-icon>close</mat-icon>
+              Limpiar
+            </button>
+          </div>
+          <mat-chip-set>
+            @for (box of selectedBoxOptions(); track box.id) {
+              <mat-chip (removed)="removeBoxId(box.id)">
+                {{ box.code }} · {{ box.name }}
+                <button matChipRemove type="button" [attr.aria-label]="'Quitar ' + box.code">
+                  <mat-icon>cancel</mat-icon>
+                </button>
+              </mat-chip>
+            }
+          </mat-chip-set>
+        </div>
+      }
 
       <div class="mode-row">
         <mat-button-toggle-group [value]="state().layout" (change)="setLayout($event.value)" aria-label="Modo de vista">
@@ -148,37 +167,6 @@
             noneLabel="Todas"
             placeholder="Buscar ubicación..."
             (valueChange)="setLocationId($any($event))" />
-
-          <app-searchable-select
-            class="wide-control"
-            label="Contenedores múltiples"
-            [value]="state().boxIds"
-            [options]="boxOptions()"
-            [multiple]="true"
-            placeholder="Buscar contenedor..."
-            (valueChange)="setBoxIds($any($event))" />
-
-          @if (selectedBoxOptions().length) {
-            <div class="selected-boxes wide-control">
-              <div class="selected-boxes-head">
-                <span>{{ selectedBoxOptions().length }} contenedores en alcance</span>
-                <button mat-button type="button" (click)="clearBoxIds()">
-                  <mat-icon>close</mat-icon>
-                  Limpiar
-                </button>
-              </div>
-              <mat-chip-set>
-                @for (box of selectedBoxOptions(); track box.id) {
-                  <mat-chip (removed)="removeBoxId(box.id)">
-                    {{ box.code }} · {{ box.name }}
-                    <button matChipRemove type="button" [attr.aria-label]="'Quitar ' + box.code">
-                      <mat-icon>cancel</mat-icon>
-                    </button>
-                  </mat-chip>
-                }
-              </mat-chip-set>
-            </div>
-          }
 
           <mat-slide-toggle [checked]="state().includeChildren" (change)="setIncludeChildren($event.checked)">
             Incluir hijos
@@ -347,7 +335,7 @@
 
                     <div class="group-items-list">
                       @for (item of pagedGroupItems(group); track trackByItem($index, item)) {
-                        <article class="group-item-row">
+                        <article class="group-item-row clickable-row" [routerLink]="['/item', item.id]" tabindex="0">
                           @if (item.coverUrl) {
                             <img
                               class="group-item-thumb"
@@ -388,10 +376,6 @@
                             }
                           </div>
 
-                          <a mat-button [routerLink]="['/item', item.id]">
-                            <mat-icon>visibility</mat-icon>
-                            Ver
-                          </a>
                         </article>
                       } @empty {
                         <div class="group-empty">
@@ -435,6 +419,7 @@
           @case ('flat') {
             <div class="result-grid flat-grid">
               @for (item of items(); track trackByItem($index, item)) {
+                <a class="item-card-link" [routerLink]="['/item', item.id]">
                 <mat-card class="item-card">
                   <div class="item-card-top">
                     @if (item.coverUrl) {
@@ -472,13 +457,8 @@
                     }
                   </div>
 
-                  <mat-card-actions align="end">
-                    <a mat-button [routerLink]="['/item', item.id]">
-                      <mat-icon>visibility</mat-icon>
-                      Ver ítem
-                    </a>
-                  </mat-card-actions>
                 </mat-card>
+                </a>
               }
             </div>
           }
@@ -486,6 +466,7 @@
           @case ('gallery') {
             <div class="result-grid gallery-grid">
               @for (item of items(); track trackByItem($index, item)) {
+                <a class="item-card-link" [routerLink]="['/item', item.id]">
                 <mat-card class="gallery-card">
                   @if (item.coverUrl) {
                     <img
@@ -521,6 +502,7 @@
                     </div>
                   </div>
                 </mat-card>
+                </a>
               }
             </div>
           }

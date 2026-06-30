@@ -20,9 +20,9 @@ public static class SeedData
 
         var boxes = new[]
         {
-            new Box { Code = "C01", Name = "Vídeo Legacy", Description = "Cables y adaptadores de vídeo antiguos.", LocationId = taller.Id },
-            new Box { Code = "C02", Name = "USB y Alimentación", Description = "Cargadores, hubs y adaptadores USB.", LocationId = despacho.Id },
-            new Box { Code = "C03", Name = "Tornillería M3", Description = "Piezas pequeñas para impresión 3D y electrónica.", LocationId = taller.Id }
+            new Box { Code = "CT-000-001", Name = "Vídeo Legacy", Description = "Cables y adaptadores de vídeo antiguos.", LocationId = taller.Id },
+            new Box { Code = "CT-000-002", Name = "USB y Alimentación", Description = "Cargadores, hubs y adaptadores USB.", LocationId = despacho.Id },
+            new Box { Code = "CT-000-003", Name = "Tornillería M3", Description = "Piezas pequeñas para impresión 3D y electrónica.", LocationId = taller.Id }
         };
         db.Boxes.AddRange(boxes);
         db.SaveChanges();

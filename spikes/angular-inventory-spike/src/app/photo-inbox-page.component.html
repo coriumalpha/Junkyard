@@ -31,6 +31,27 @@
       <mat-icon>upload</mat-icon>
       <span>{{ uploading() ? 'Subiendo...' : 'Seleccionar fotos' }}</span>
     </label>
+    @if (uploading()) {
+      <div class="upload-progress">
+        <div class="upload-progress-head">
+          <span>
+            @if (uploadPhase() === 'processing') {
+              Procesando {{ uploadFileCount() }} fotos
+            } @else {
+              Subiendo {{ uploadFileCount() }} fotos
+            }
+          </span>
+          <strong>
+            @if (uploadPhase() === 'processing') {
+              Preparando bandeja
+            } @else {
+              {{ uploadProgress() }}%
+            }
+          </strong>
+        </div>
+        <mat-progress-bar [mode]="uploadPhase() === 'processing' ? 'indeterminate' : 'determinate'" [value]="uploadProgress()" />
+      </div>
+    }
   </mat-card>
 
   <section class="stats-grid" aria-label="Estado de bandeja">

@@ -44,8 +44,8 @@ public class CsvInventoryService(InventoryDbContext db)
     {
         var builder = new StringBuilder();
         builder.AppendLine(Header);
-        builder.AppendLine("Taller,C01,Vídeo Legacy,Cables VGA,Tecnología / cables,6,uds,true,2,Usado,Conservar,false,true,Cables largos y cortos");
-        builder.AppendLine("Despacho,C02,USB y Alimentación,Adaptadores USB-C,Tecnología / adaptadores,4,uds,false,,Bueno,Conservar,false,false,");
+        builder.AppendLine("Taller,CT-000-001,Vídeo Legacy,Cables VGA,Tecnología / cables,6,uds,true,2,Usado,Conservar,false,true,Cables largos y cortos");
+        builder.AppendLine("Despacho,CT-000-002,USB y Alimentación,Adaptadores USB-C,Tecnología / adaptadores,4,uds,false,,Bueno,Conservar,false,false,");
         return builder.ToString();
     }
 

@@ -3,14 +3,24 @@
     <div>
       <p class="eyebrow">Junkyard / Angular SPA</p>
       <h1>Ubicaciones</h1>
-      <p>Vista de consulta para entrar al inventario por ubicación efectiva.</p>
+      <p>Gestión de lugares físicos y entrada al inventario por ubicación efectiva.</p>
     </div>
-
-    <a mat-stroked-button [href]="legacyLocationsUrl" target="_blank" rel="noreferrer">
-      <mat-icon>open_in_new</mat-icon>
-      Editar en legacy
-    </a>
   </header>
+
+  <mat-card class="create-card">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Nueva ubicación</mat-label>
+      <input matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" placeholder="Taller, trastero, estantería A..." />
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Descripción</mat-label>
+      <input matInput [ngModel]="draftDescription()" (ngModelChange)="draftDescription.set($event)" />
+    </mat-form-field>
+    <button mat-flat-button type="button" (click)="createLocation()" [disabled]="!draftName().trim() || saving()">
+      <mat-icon>add_location</mat-icon>
+      Crear
+    </button>
+  </mat-card>
 
   @if (loading()) {
     <section class="state-panel">
@@ -23,18 +33,46 @@
       <span>{{ error() }}</span>
     </section>
   } @else {
+    @if (notice()) {
+    <section class="state-panel success">
+      <mat-icon>check_circle</mat-icon>
+      <span>{{ notice() }}</span>
+    </section>
+    }
+
     <section class="locations-grid">
       @for (card of cards(); track card.location.id) {
         <mat-card class="location-card">
-          <div class="location-card-head">
-            <span class="location-mark">
-              <mat-icon>place</mat-icon>
-            </span>
-            <div>
-              <h2>{{ card.location.name }}</h2>
-              <p>{{ card.boxes.length }} contenedores raíz o efectivos</p>
+          @if (editingId() === card.location.id) {
+            <div class="edit-panel">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Nombre</mat-label>
+                <input matInput [ngModel]="editName()" (ngModelChange)="editName.set($event)" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Descripción</mat-label>
+                <textarea matInput rows="3" [ngModel]="editDescription()" (ngModelChange)="editDescription.set($event)"></textarea>
+              </mat-form-field>
+              <div class="edit-actions">
+                <button mat-stroked-button type="button" (click)="cancelEdit()">Cancelar</button>
+                <button mat-flat-button type="button" (click)="saveEdit(card.location)" [disabled]="!editName().trim() || saving()">
+                  <mat-icon>save</mat-icon>
+                  Guardar
+                </button>
+              </div>
             </div>
-          </div>
+          } @else {
+            <div class="location-card-head">
+              <span class="location-mark">
+                <mat-icon>place</mat-icon>
+              </span>
+              <div>
+                <h2>{{ card.location.name }}</h2>
+                <p>{{ card.location.description || 'Sin descripción' }}</p>
+                <p>{{ card.boxes.length }} contenedores raíz o efectivos · {{ card.location.boxesCount }} cajas directas</p>
+              </div>
+            </div>
+          }
 
           <div class="box-preview-list">
             @for (box of card.boxes.slice(0, 4); track box.id) {
@@ -53,10 +91,18 @@
           </div>
 
           <mat-card-actions align="end">
+            <button mat-button type="button" (click)="startEdit(card.location)" [disabled]="saving()">
+              <mat-icon>edit</mat-icon>
+              Editar
+            </button>
             <a mat-button routerLink="/inventory" [queryParams]="{ locationId: card.location.id, layout: 'grouped', view: 'grouped' }">
               <mat-icon>inventory_2</mat-icon>
               Ver inventario
             </a>
+            <button mat-button type="button" class="danger-action" (click)="archiveLocation(card.location)" [disabled]="saving()">
+              <mat-icon>archive</mat-icon>
+              Archivar
+            </button>
           </mat-card-actions>
         </mat-card>
       } @empty {

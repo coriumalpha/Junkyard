@@ -16,6 +16,10 @@
           <mat-icon>open_in_new</mat-icon>
           Legacy
         </a>
+        <a mat-stroked-button [href]="itemPhotosDownloadUrl()" target="_blank" rel="noreferrer" [class.disabled-link]="!item()!.photos.length">
+          <mat-icon>download</mat-icon>
+          Fotos ZIP
+        </a>
       }
       @if (kind() === 'box' && box()) {
         <button mat-flat-button type="button" (click)="startBoxEdit()">
@@ -72,12 +76,19 @@
               <button mat-icon-button type="button" (click)="rotatePhoto(activePhoto()!, 90)" [disabled]="saving()" aria-label="Girar a la derecha">
                 <mat-icon>rotate_right</mat-icon>
               </button>
-              <button mat-icon-button type="button" (click)="returnPhotoToInbox(activePhoto()!)" [disabled]="saving()" aria-label="Devolver a revisión">
-                <mat-icon>move_to_inbox</mat-icon>
+              <button mat-icon-button type="button" [matMenuTriggerFor]="photoMoreMenu" [disabled]="saving()" aria-label="Más acciones de foto">
+                <mat-icon>more_vert</mat-icon>
               </button>
-              <button mat-icon-button type="button" (click)="archivePhoto(activePhoto()!)" [disabled]="saving()" aria-label="Archivar foto">
-                <mat-icon>archive</mat-icon>
-              </button>
+              <mat-menu #photoMoreMenu="matMenu">
+                <button mat-menu-item type="button" (click)="returnPhotoToInbox(activePhoto()!)">
+                  <mat-icon>move_to_inbox</mat-icon>
+                  <span>Devolver a bandeja</span>
+                </button>
+                <button mat-menu-item type="button" (click)="archivePhoto(activePhoto()!)">
+                  <mat-icon>archive</mat-icon>
+                  <span>Archivar foto</span>
+                </button>
+              </mat-menu>
             </div>
             <div class="main-photo"
                  (mousemove)="updateZoomOrigin($event)"
@@ -142,12 +153,14 @@
             <mat-chip>{{ flag }}</mat-chip>
           }
         </mat-chip-set>
+      </mat-card>
+
+      <mat-card class="info-card detail-wide-card description-card">
+        <p class="eyebrow">Descripción</p>
         @if (item()!.notes) {
-          <mat-divider />
-          <section class="description-block">
-            <p class="eyebrow">Descripción</p>
-            <p class="notes">{{ item()!.notes }}</p>
-          </section>
+          <p class="notes">{{ item()!.notes }}</p>
+        } @else {
+          <p class="empty-note">Sin descripción todavía.</p>
         }
       </mat-card>
 
@@ -224,10 +237,13 @@
               <input matInput type="number" [ngModel]="itemForm().minQuantity" (ngModelChange)="patchItemForm({ minQuantity: $event === '' ? null : +$event })" />
             </mat-form-field>
 
-            <mat-form-field appearance="outline">
-              <mat-label>Estado</mat-label>
-              <input matInput [ngModel]="itemForm().condition" (ngModelChange)="patchItemForm({ condition: $event })" />
-            </mat-form-field>
+            <app-searchable-select
+              label="Estado"
+              [value]="itemForm().condition"
+              [options]="conditionOptions()"
+              noneLabel="Sin estado"
+              placeholder="Buscar estado..."
+              (valueChange)="patchItemForm({ condition: $any($event) ?? '' })" />
 
             <mat-form-field appearance="outline">
               <mat-label>Retención</mat-label>
@@ -261,7 +277,7 @@
         <app-hierarchy-trail [nodes]="itemHierarchyNodes()" />
       </mat-card>
 
-      <mat-card class="info-card action-log-card">
+      <mat-card class="info-card action-log-card detail-wide-card">
         <div class="section-head compact">
           <div>
             <p class="eyebrow">Pendientes</p>
@@ -359,12 +375,19 @@
               <button mat-icon-button type="button" (click)="rotatePhoto(activePhoto()!, 90)" [disabled]="saving()" aria-label="Girar a la derecha">
                 <mat-icon>rotate_right</mat-icon>
               </button>
-              <button mat-icon-button type="button" (click)="returnPhotoToInbox(activePhoto()!)" [disabled]="saving()" aria-label="Devolver a revisión">
-                <mat-icon>move_to_inbox</mat-icon>
+              <button mat-icon-button type="button" [matMenuTriggerFor]="boxPhotoMoreMenu" [disabled]="saving()" aria-label="Más acciones de foto">
+                <mat-icon>more_vert</mat-icon>
               </button>
-              <button mat-icon-button type="button" (click)="archivePhoto(activePhoto()!)" [disabled]="saving()" aria-label="Archivar foto">
-                <mat-icon>archive</mat-icon>
-              </button>
+              <mat-menu #boxPhotoMoreMenu="matMenu">
+                <button mat-menu-item type="button" (click)="returnPhotoToInbox(activePhoto()!)">
+                  <mat-icon>move_to_inbox</mat-icon>
+                  <span>Devolver a bandeja</span>
+                </button>
+                <button mat-menu-item type="button" (click)="archivePhoto(activePhoto()!)">
+                  <mat-icon>archive</mat-icon>
+                  <span>Archivar foto</span>
+                </button>
+              </mat-menu>
             </div>
             <div class="main-photo"
                  (mousemove)="updateZoomOrigin($event)"
@@ -530,7 +553,7 @@
         }
       </mat-card>
 
-      <mat-card class="info-card action-log-card">
+      <mat-card class="info-card action-log-card detail-wide-card">
         <div class="section-head compact">
           <div>
             <p class="eyebrow">Pendientes</p>

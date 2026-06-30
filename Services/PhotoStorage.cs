@@ -58,7 +58,7 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
         };
     }
 
-    public async Task<PhotoInbox?> SaveInboxAsync(IFormFile? file, int? sourceBoxId, CancellationToken cancellationToken)
+    public async Task<PhotoInbox?> SaveInboxAsync(IFormFile? file, int? sourceBoxId, CancellationToken cancellationToken, bool processImmediately = true)
     {
         if (file is null || file.Length == 0)
         {
@@ -82,8 +82,11 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
             await file.CopyToAsync(stream, cancellationToken);
         }
 
-        await NormalizeImageAsync(fullPath, cancellationToken);
-        await EnsureDerivativesAsync($"inbox/{filename}", cancellationToken);
+        if (processImmediately)
+        {
+            await NormalizeImageAsync(fullPath, cancellationToken);
+            await EnsureDerivativesAsync($"inbox/{filename}", cancellationToken);
+        }
 
         return new PhotoInbox
         {
@@ -175,6 +178,8 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
 
         return await EnsureDerivativeAsync(filename, variant, maxSize, cancellationToken);
     }
+
+    public string ResolveOriginalPath(string filename) => FullPath(filename);
 
     public static async Task ResetRotationMetadataAsync(InventoryDbContext db, string filename, CancellationToken cancellationToken)
     {

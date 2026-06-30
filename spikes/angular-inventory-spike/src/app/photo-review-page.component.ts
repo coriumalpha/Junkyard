@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, HostListener, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -25,7 +25,7 @@ type ReviewPanel = 'none' | 'create' | 'assignItem' | 'assignBox';
 })
 export class PhotoReviewPageComponent {
   protected readonly review = signal<PhotoReviewResponse | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
   protected readonly items = signal<InventoryItem[]>([]);
   protected readonly selectedIds = signal<number[]>([]);
   protected readonly loading = signal(true);
@@ -46,7 +46,10 @@ export class PhotoReviewPageComponent {
     this.options().boxes.map((box) => ({
       value: box.id,
       label: `${box.code} · ${box.name}`,
-      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · ')
+      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · '),
+      imageUrl: box.coverUrl,
+      rotationDegrees: box.rotationDegrees,
+      placeholder: box.code
     })));
   protected readonly tagOptions = computed<SearchableSelectOption[]>(() =>
     this.options().tags.map((tag) => ({ value: tag.id, label: tag.name, hint: tag.color })));
@@ -54,13 +57,20 @@ export class PhotoReviewPageComponent {
     this.items().map((item) => ({
       value: item.id,
       label: `${item.code} · ${item.name}`,
-      hint: [item.category, item.boxCode].filter(Boolean).join(' · ')
+      hint: [item.category, item.boxCode].filter(Boolean).join(' · '),
+      imageUrl: item.coverUrl,
+      rotationDegrees: item.rotationDegrees,
+      placeholder: item.code
     })));
+  protected readonly actionSelectionSize = computed(() => this.selectedIds().length || (this.current() ? 1 : 0));
 
   private readonly api = inject(InventoryApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  @ViewChild('createNameInput') private readonly createNameInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('assignItemSelect') private readonly assignItemSelect?: SearchableSelectComponent;
+  @ViewChild('assignBoxSelect') private readonly assignBoxSelect?: SearchableSelectComponent;
 
   constructor() {
     const id = Number.parseInt(this.route.snapshot.queryParamMap.get('id') ?? '', 10);
@@ -105,6 +115,15 @@ export class PhotoReviewPageComponent {
     this.selectedIds.update((current) => current.includes(photo.id) ? current.filter((id) => id !== photo.id) : [...current, photo.id]);
   }
 
+  protected onFilmClick(photo: PhotoReviewPhoto, event: MouseEvent): void {
+    if (event.ctrlKey || event.metaKey || event.shiftKey) {
+      this.toggleSelected(photo);
+      return;
+    }
+
+    this.selectOnly(photo);
+  }
+
   protected selectOnly(photo: PhotoReviewPhoto): void {
     this.selectedIds.set([photo.id]);
     this.navigateTo(photo.id);
@@ -126,6 +145,7 @@ export class PhotoReviewPageComponent {
     }
 
     this.panel.set(panel);
+    this.focusPanel(panel);
   }
 
   protected closePanel(): void {
@@ -255,6 +275,12 @@ export class PhotoReviewPageComponent {
     } else if (key === 'b') {
       event.preventDefault();
       this.openPanel('assignBox');
+    } else if (event.key === ' ') {
+      event.preventDefault();
+      const current = this.current();
+      if (current) {
+        this.toggleSelected(current);
+      }
     } else if (event.key === 'Escape') {
       this.closePanel();
     }
@@ -310,5 +336,20 @@ export class PhotoReviewPageComponent {
   private applyReview(review: PhotoReviewResponse): void {
     this.review.set(review);
     this.selectedIds.set(review.current ? [review.current.id] : []);
+  }
+
+  private focusPanel(panel: ReviewPanel): void {
+    setTimeout(() => {
+      if (panel === 'create') {
+        this.createNameInput?.nativeElement.focus();
+        this.createNameInput?.nativeElement.select();
+      } else if (panel === 'assignItem') {
+        this.assignItemSelect?.focus();
+        this.assignItemSelect?.open();
+      } else if (panel === 'assignBox') {
+        this.assignBoxSelect?.focus();
+        this.assignBoxSelect?.open();
+      }
+    });
   }
 }

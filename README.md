@@ -19,7 +19,7 @@ Junkyard is built for people with homelabs, workshops, storage rooms, tools, cab
 ## What you can use it for
 
 - Keep a searchable inventory of boxes, drawers, shelves, bags, racks, cases and other physical containers.
-- Assign stable container codes such as `CT-000001` for labels, QR codes and manual lookup.
+- Assign stable container codes such as `CT-000-001` for labels, QR codes and manual lookup.
 - Browse containers as a physical hierarchy: root containers, nested containers, breadcrumbs and subtree views.
 - Upload many photos first, then review, rotate, assign or create items from them later.
 - Track useful item metadata: category, quantity, unit, condition, retention notes, consumable stock thresholds and flags.
@@ -48,7 +48,7 @@ Containers can be nested, moved and browsed as a tree, so your inventory can mir
 Every container can use a stable public code such as:
 
 ```text
-CT-000001
+CT-000-001
 ```
 
 These codes are intended for labels, QR codes, manual search and long-term physical identification. Names can change; physical labels should not have to.

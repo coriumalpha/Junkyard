@@ -281,7 +281,12 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 16px;
-  align-items: end;
+  align-items: start;
+}
+
+.filters-grid > mat-form-field,
+.filters-grid > app-searchable-select {
+  align-self: start;
 }
 
 .mode-row {
@@ -370,6 +375,10 @@
   background: rgba(255, 255, 255, 0.035);
 }
 
+.primary-scope {
+  margin-top: -4px;
+}
+
 .selected-boxes-head {
   display: flex;
   align-items: center;
@@ -383,13 +392,13 @@
   border-radius: 999px;
 }
 
-::ng-deep .mat-mdc-option .mdc-list-item__primary-text {
+::ng-deep app-inventory-page .mat-mdc-option .mdc-list-item__primary-text {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-::ng-deep .mat-mdc-option small {
+::ng-deep app-inventory-page .mat-mdc-option small {
   color: var(--app-muted);
   font-size: 0.72rem;
   overflow: hidden;
@@ -445,7 +454,7 @@
 }
 
 .flat-grid {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
 }
 
 .gallery-grid {
@@ -690,7 +699,7 @@
 
 .group-item-row {
   display: grid;
-  grid-template-columns: 56px minmax(220px, 1.4fr) minmax(160px, 0.9fr) minmax(180px, 1fr) auto;
+  grid-template-columns: 56px minmax(220px, 1.4fr) minmax(160px, 0.9fr) minmax(180px, 1fr);
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -698,6 +707,35 @@
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.065);
+}
+
+.clickable-row,
+.item-card-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.item-card-link {
+  display: block;
+  height: 100%;
+}
+
+.clickable-row:hover,
+.clickable-row:focus-visible,
+.item-card-link:hover .item-card,
+.item-card-link:focus-visible .item-card,
+.item-card-link:hover .gallery-card,
+.item-card-link:focus-visible .gallery-card {
+  border-color: rgba(138, 214, 255, 0.32);
+  background: rgba(138, 214, 255, 0.075);
+}
+
+.clickable-row:focus-visible,
+.item-card-link:focus-visible {
+  outline: 2px solid rgba(138, 214, 255, 0.7);
+  outline-offset: 3px;
+  border-radius: 18px;
 }
 
 .group-item-thumb {
@@ -876,6 +914,7 @@
 
 .item-card {
   background: rgba(10, 15, 28, 0.84);
+  height: 100%;
 }
 
 .item-card mat-card-actions {
@@ -884,14 +923,14 @@
 
 .item-card-top {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
+  grid-template-columns: 122px minmax(0, 1fr);
   gap: 14px;
-  padding: 16px 16px 0;
+  padding: 16px;
 }
 
 .thumb {
-  width: 104px;
-  height: 104px;
+  width: 122px;
+  height: 122px;
   border-radius: 20px;
   object-fit: cover;
   display: block;

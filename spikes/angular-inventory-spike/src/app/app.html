@@ -86,6 +86,14 @@
             <mat-icon matListItemIcon>sell</mat-icon>
             <span matListItemTitle>Tags</span>
           </a>
+          <a mat-list-item routerLink="/settings/conditions" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+            <mat-icon matListItemIcon>checklist</mat-icon>
+            <span matListItemTitle>Estados</span>
+          </a>
+          <a mat-list-item routerLink="/settings/data" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+            <mat-icon matListItemIcon fontSet="material-symbols-outlined">database</mat-icon>
+            <span matListItemTitle>Datos</span>
+          </a>
         }
       </div>
       <a mat-list-item [href]="legacyHomeUrl" target="_blank" rel="noreferrer">

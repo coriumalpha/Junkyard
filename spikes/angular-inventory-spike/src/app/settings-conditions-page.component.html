@@ -1,0 +1,62 @@
+<main class="settings-shell">
+  <header class="settings-header app-page-header">
+    <div>
+      <p class="eyebrow">Configuración</p>
+      <h1>Estados</h1>
+      <p>Lista maestra para el estado de conservación de los ítems.</p>
+    </div>
+  </header>
+
+  <mat-card class="condition-create-card">
+    <mat-form-field appearance="outline">
+      <mat-label>Nuevo estado</mat-label>
+      <input matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" />
+    </mat-form-field>
+    <label class="color-pick">
+      <span>Color</span>
+      <input type="color" [ngModel]="draftColor()" (ngModelChange)="draftColor.set($event)" />
+    </label>
+    <button mat-flat-button type="button" (click)="createCondition()" [disabled]="!draftName().trim() || saving()">
+      <mat-icon>add</mat-icon>
+      Crear
+    </button>
+  </mat-card>
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="44" />
+      <span>Cargando estados...</span>
+    </section>
+  } @else if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  }
+
+  <section class="condition-grid">
+    @for (condition of conditions(); track condition.id) {
+      <mat-card class="condition-card">
+        <span class="condition-swatch" [style.background]="condition.color"></span>
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre</mat-label>
+          <input matInput [ngModel]="condition.name" (blur)="updateCondition(condition, { name: ($any($event.target)).value })" />
+        </mat-form-field>
+        <label class="color-pick">
+          <span>Color</span>
+          <input type="color" [ngModel]="condition.color" (ngModelChange)="updateCondition(condition, { color: $event })" />
+        </label>
+        <button mat-icon-button type="button" (click)="deleteCondition(condition)" [disabled]="saving()" aria-label="Eliminar estado">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </mat-card>
+    } @empty {
+      @if (!loading()) {
+        <section class="state-panel empty">
+          <mat-icon>checklist</mat-icon>
+          <span>No hay estados todavía.</span>
+        </section>
+      }
+    }
+  </section>
+</main>

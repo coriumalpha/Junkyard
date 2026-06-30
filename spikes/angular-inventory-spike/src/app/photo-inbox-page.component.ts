@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HttpEventType } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, distinctUntilChanged, EMPTY, finalize, map, switchMap, tap } from 'rxjs';
@@ -9,6 +10,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { InventoryApiService, InventoryOptionsResponse, PhotoInboxItem, PhotoInboxResponse, PhotoInboxStatus } from './inventory-api.service';
@@ -40,6 +42,7 @@ const STATUS_OPTIONS: StatusOption[] = [
     MatChipsModule,
     MatFormFieldModule,
     MatIconModule,
+    MatProgressBarModule,
     SearchableSelectComponent,
     MatProgressSpinnerModule
   ],
@@ -53,13 +56,19 @@ export class PhotoInboxPageComponent {
   protected readonly actionMessage = signal<string | null>(null);
   protected readonly busyPhotoId = signal<number | null>(null);
   protected readonly uploading = signal(false);
+  protected readonly uploadPhase = signal<'idle' | 'uploading' | 'processing'>('idle');
+  protected readonly uploadProgress = signal(0);
+  protected readonly uploadFileCount = signal(0);
   protected readonly uploadSourceBoxId = signal<number | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
   protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
     this.options().boxes.map((box) => ({
       value: box.id,
       label: `${box.code} · ${box.name}`,
-      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · ')
+      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · '),
+      imageUrl: box.coverUrl,
+      rotationDegrees: box.rotationDegrees,
+      placeholder: box.code
     })));
   protected readonly statusOptions = STATUS_OPTIONS;
   private readonly currentStatus = signal<PhotoInboxStatus>('Pending');
@@ -195,21 +204,44 @@ export class PhotoInboxPageComponent {
     }
 
     this.uploading.set(true);
+    this.uploadPhase.set('uploading');
+    this.uploadProgress.set(0);
+    this.uploadFileCount.set(files.length);
     this.error.set(null);
     this.actionMessage.set(null);
     this.api.uploadInboxPhotos(files, this.uploadSourceBoxId()).pipe(
-      tap((response) => {
-        this.data.set(response.inbox);
-        this.actionMessage.set(`Importadas ${response.imported} fotos.${response.rejected.length ? ` Rechazadas: ${response.rejected.length}.` : ''}`);
-        if (input) {
-          input.value = '';
+      tap((event) => {
+        if (event.type === HttpEventType.UploadProgress) {
+          const total = event.total ?? files.reduce((sum, file) => sum + file.size, 0);
+          if (total > 0) {
+            const progress = Math.min(100, Math.round((event.loaded / total) * 100));
+            this.uploadProgress.set(progress);
+            if (progress >= 100) {
+              this.uploadPhase.set('processing');
+            }
+          }
+          return;
+        }
+
+        if (event.type === HttpEventType.Response && event.body) {
+          const response = event.body;
+          this.data.set(response.inbox);
+          this.actionMessage.set(`Importadas ${response.imported} fotos.${response.rejected.length ? ` Rechazadas: ${response.rejected.length}.` : ''}`);
+          if (input) {
+            input.value = '';
+          }
         }
       }),
       catchError((error: unknown) => {
         this.error.set(error instanceof Error ? error.message : 'No se pudieron subir las fotos.');
         return EMPTY;
       }),
-      finalize(() => this.uploading.set(false)),
+      finalize(() => {
+        this.uploading.set(false);
+        this.uploadPhase.set('idle');
+        this.uploadProgress.set(0);
+        this.uploadFileCount.set(0);
+      }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
   }

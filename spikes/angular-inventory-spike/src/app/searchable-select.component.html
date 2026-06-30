@@ -1,4 +1,4 @@
-<mat-form-field [appearance]="appearance">
+<mat-form-field [appearance]="appearance" subscriptSizing="dynamic">
   @if (label) {
     <mat-label>{{ label }}</mat-label>
   }
@@ -8,11 +8,16 @@
     [multiple]="multiple"
     [disabled]="disabled"
     (selectionChange)="updateValue($event.value)"
-    (openedChange)="clearSearch()"
+    (openedChange)="handleOpenedChange($event)"
   >
+    <mat-select-trigger>
+      <span class="select-trigger-text">{{ selectedSummary() }}</span>
+    </mat-select-trigger>
+
     <div class="select-search-row" (click)="stopPanelEvent($event)" (keydown)="stopPanelEvent($event)">
       <mat-icon>search</mat-icon>
       <input
+        #searchInput
         type="search"
         [ngModel]="query()"
         (ngModelChange)="query.set($event)"
@@ -22,15 +27,35 @@
     </div>
 
     @if (!multiple && noneLabel !== null) {
-      <mat-option [value]="null">{{ noneLabel }}</mat-option>
+      <mat-option [value]="null">
+        <span class="option-row none-option">
+          <span class="option-thumb icon-thumb">
+            <mat-icon>all_inclusive</mat-icon>
+          </span>
+          <span class="option-copy">
+            <span class="option-label">{{ noneLabel }}</span>
+          </span>
+        </span>
+      </mat-option>
     }
 
     @for (option of filteredOptions(); track option.value) {
       <mat-option [value]="option.value">
-        <span class="option-label">{{ option.label }}</span>
-        @if (option.hint) {
-          <small>{{ option.hint }}</small>
-        }
+        <span class="option-row">
+          <span class="option-thumb">
+            @if (assetUrl(option.imageUrl); as imageUrl) {
+              <img [src]="imageUrl" [style.transform]="'rotate(' + (option.rotationDegrees ?? 0) + 'deg)'" alt="" />
+            } @else {
+              <span>{{ optionPlaceholder(option) }}</span>
+            }
+          </span>
+          <span class="option-copy">
+            <span class="option-label">{{ option.label }}</span>
+            @if (option.hint) {
+              <small>{{ option.hint }}</small>
+            }
+          </span>
+        </span>
       </mat-option>
     } @empty {
       <mat-option disabled>Sin resultados</mat-option>

@@ -101,6 +101,13 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (null, "El contenedor seleccionado no existe.");
         }
 
+        var condition = (input.Condition ?? "").Trim();
+        if (!string.IsNullOrWhiteSpace(condition)
+            && !await db.ItemConditions.AnyAsync(itemCondition => itemCondition.Name == condition, cancellationToken))
+        {
+            return (null, "Selecciona un estado válido de la lista maestra.");
+        }
+
         item.BoxId = input.BoxId is > 0 ? input.BoxId : null;
         var normalizedCode = string.IsNullOrWhiteSpace(input.Code) ? item.Code : Item.NormalizePublicCode(input.Code);
         if (string.IsNullOrWhiteSpace(normalizedCode))
@@ -119,7 +126,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         item.Quantity = input.Quantity;
         item.Unit = string.IsNullOrWhiteSpace(input.Unit) ? null : input.Unit.Trim();
         item.MinQuantity = input.MinQuantity;
-        item.Condition = string.IsNullOrWhiteSpace(input.Condition) ? null : input.Condition.Trim();
+        item.Condition = string.IsNullOrWhiteSpace(condition) ? null : condition;
         item.Retention = string.IsNullOrWhiteSpace(input.Retention) ? null : input.Retention.Trim();
         item.Consumable = input.Consumable;
         item.Sentimental = input.Sentimental;
@@ -1074,6 +1081,10 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             .OrderBy(tag => tag.Name)
             .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color))
             .ToListAsync(cancellationToken);
+        var conditions = await db.ItemConditions.AsNoTracking()
+            .OrderBy(condition => condition.Name)
+            .Select(condition => new ItemConditionDto(condition.Id, condition.Name, condition.Color))
+            .ToListAsync(cancellationToken);
 
         var locations = await db.Locations.AsNoTracking()
             .OrderBy(location => location.Name)
@@ -1104,7 +1115,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 RotationFor(boxCoverStates, box.CoverPhoto)))
             .ToList();
 
-        return new InventoryOptionsDto(categories, tags, locations, boxes);
+        return new InventoryOptionsDto(categories, tags, conditions, locations, boxes);
     }
 
     public async Task<InventoryLiveResponseDto> GetLiveAsync(
@@ -2081,6 +2092,7 @@ public record InventoryCommentCreateDto(string? Text);
 public record InventoryOptionsDto(
     List<string> Categories,
     List<TagDto> Tags,
+    List<ItemConditionDto> Conditions,
     List<InventoryOptionDto> Locations,
     List<InventoryBoxOptionDto> Boxes);
 
@@ -2167,3 +2179,5 @@ public record TagsResponseDto(List<TagDto> Tags);
 public record TagDto(int Id, string Name, string Color);
 
 public record TagUpdateDto(string? Name, string? Color);
+
+public record ItemConditionDto(int Id, string Name, string Color);

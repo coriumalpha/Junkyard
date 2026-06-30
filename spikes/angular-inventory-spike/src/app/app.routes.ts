@@ -43,6 +43,14 @@ export const routes: Routes = [
     loadComponent: () => import('./settings-tags-page.component').then((m) => m.SettingsTagsPageComponent)
   },
   {
+    path: 'settings/conditions',
+    loadComponent: () => import('./settings-conditions-page.component').then((m) => m.SettingsConditionsPageComponent)
+  },
+  {
+    path: 'settings/data',
+    loadComponent: () => import('./settings-data-page.component').then((m) => m.SettingsDataPageComponent)
+  },
+  {
     path: '**',
     redirectTo: 'inventory'
   }

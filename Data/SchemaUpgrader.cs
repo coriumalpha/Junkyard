@@ -22,6 +22,7 @@ public static class SchemaUpgrader
         AddColumn(db, "Items", "Code", "TEXT NULL");
         EnsureNullableItemBoxId(db);
         EnsureTags(db);
+        EnsureItemConditions(db);
         EnsureInventoryActions(db);
         AddColumn(db, "InventoryActions", "Kind", "TEXT NOT NULL DEFAULT 'Task'");
         EnsurePhotoInbox(db);
@@ -32,6 +33,7 @@ public static class SchemaUpgrader
         db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Items_Code_Active" ON "Items" ("Code") WHERE "ArchivedAt" IS NULL AND "Code" IS NOT NULL AND trim("Code") <> '';""");
         NormalizeContainerTypes(db);
         BackfillCategoryTags(db);
+        BackfillItemConditions(db);
         BackfillTimestamps(db);
         BackfillBoxCoverPhotos(db);
         NormalizeChildBoxLocations(db);
@@ -115,6 +117,20 @@ public static class SchemaUpgrader
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_ItemTags_TagId" ON "ItemTags" ("TagId");""");
     }
 
+    private static void EnsureItemConditions(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "ItemConditions" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ItemConditions" PRIMARY KEY AUTOINCREMENT,
+                "Name" TEXT NOT NULL,
+                "Color" TEXT NOT NULL DEFAULT '#8ad6ff',
+                "CreatedAt" TEXT NOT NULL,
+                "UpdatedAt" TEXT NOT NULL
+            );
+            """);
+        db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemConditions_Name" ON "ItemConditions" ("Name");""");
+    }
+
     private static void BackfillCategoryTags(InventoryDbContext db)
     {
         db.Database.ExecuteSqlRaw("""
@@ -129,6 +145,25 @@ public static class SchemaUpgrader
             FROM "Items" i
             JOIN "Tags" t ON t."Name" = trim(i."Category")
             WHERE i."Category" IS NOT NULL AND trim(i."Category") <> '';
+            """);
+    }
+
+    private static void BackfillItemConditions(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            INSERT OR IGNORE INTO "ItemConditions" ("Name", "Color", "CreatedAt", "UpdatedAt")
+            SELECT DISTINCT trim("Condition"), '#8ad6ff', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            FROM "Items"
+            WHERE "Condition" IS NOT NULL AND trim("Condition") <> '';
+            """);
+        db.Database.ExecuteSqlRaw("""
+            INSERT OR IGNORE INTO "ItemConditions" ("Name", "Color", "CreatedAt", "UpdatedAt")
+            VALUES
+                ('Nuevo', '#48ffb0', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                ('Bueno', '#8ad6ff', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                ('Usado', '#ffc86b', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                ('Revisar', '#ffd39f', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                ('Para reparar', '#ff8f8f', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
             """);
     }
 

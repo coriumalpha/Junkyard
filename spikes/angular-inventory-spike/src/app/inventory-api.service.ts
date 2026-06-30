@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpEvent, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
@@ -43,6 +43,7 @@ export interface InventoryLiveResponse {
 export interface InventoryOptionsResponse {
   categories: string[];
   tags: InventoryTag[];
+  conditions: InventoryCondition[];
   locations: InventoryOption[];
   boxes: InventoryBoxOption[];
 }
@@ -57,6 +58,16 @@ export interface InventoryTag {
   color: string;
 }
 
+export interface ConditionsResponse {
+  conditions: InventoryCondition[];
+}
+
+export interface InventoryCondition {
+  id: number;
+  name: string;
+  color: string;
+}
+
 export interface TagUpdate {
   name: string;
   color: string;
@@ -65,6 +76,26 @@ export interface TagUpdate {
 export interface InventoryOption {
   id: number;
   name: string;
+}
+
+export interface InventoryLocation {
+  id: number;
+  name: string;
+  description: string | null;
+  boxesCount: number;
+}
+
+export interface LocationsResponse {
+  locations: InventoryLocation[];
+}
+
+export interface LocationUpdate {
+  name: string;
+  description: string;
+}
+
+export interface LocationArchiveResponse {
+  movedBoxes: number;
 }
 
 export interface InventoryBoxOption {
@@ -399,6 +430,33 @@ export interface PhotoReviewCreateItem {
   tagIds: number[];
 }
 
+export interface CsvInventoryRow {
+  location: string;
+  boxCode: string;
+  boxName: string;
+  itemName: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  consumable: boolean;
+  minQuantity: number | null;
+  condition: string;
+  retention: string;
+  sentimental: boolean;
+  obsolete: boolean;
+  notes: string;
+}
+
+export interface CsvPreviewResponse {
+  key: string;
+  rows: CsvInventoryRow[];
+  count: number;
+}
+
+export interface CsvImportResponse {
+  imported: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class InventoryApiService {
   private readonly http = inject(HttpClient);
@@ -451,6 +509,22 @@ export class InventoryApiService {
     return this.http.get<InventoryOptionsResponse>('/api/inventory/options');
   }
 
+  fetchLocations(): Observable<LocationsResponse> {
+    return this.http.get<LocationsResponse>('/api/locations');
+  }
+
+  createLocation(input: LocationUpdate): Observable<InventoryLocation> {
+    return this.http.post<InventoryLocation>('/api/locations', input);
+  }
+
+  updateLocation(id: number, input: LocationUpdate): Observable<InventoryLocation> {
+    return this.http.put<InventoryLocation>(`/api/locations/${id}`, input);
+  }
+
+  archiveLocation(id: number): Observable<LocationArchiveResponse> {
+    return this.http.delete<LocationArchiveResponse>(`/api/locations/${id}`);
+  }
+
   fetchTags(): Observable<TagsResponse> {
     return this.http.get<TagsResponse>('/api/tags');
   }
@@ -465,6 +539,22 @@ export class InventoryApiService {
 
   deleteTag(id: number): Observable<void> {
     return this.http.delete<void>(`/api/tags/${id}`);
+  }
+
+  fetchConditions(): Observable<ConditionsResponse> {
+    return this.http.get<ConditionsResponse>('/api/item-conditions');
+  }
+
+  createCondition(input: TagUpdate): Observable<InventoryCondition> {
+    return this.http.post<InventoryCondition>('/api/item-conditions', input);
+  }
+
+  updateCondition(id: number, input: TagUpdate): Observable<InventoryCondition> {
+    return this.http.put<InventoryCondition>(`/api/item-conditions/${id}`, input);
+  }
+
+  deleteCondition(id: number): Observable<void> {
+    return this.http.delete<void>(`/api/item-conditions/${id}`);
   }
 
   fetchDashboard(): Observable<DashboardResponse> {
@@ -527,6 +617,10 @@ export class InventoryApiService {
     return this.http.post<PhotoReturnToInboxResponse<InventoryItemDetail>>(`/api/items/${id}/photos/${photoId}/return-to-inbox`, {});
   }
 
+  itemPhotosDownloadUrl(id: number): string {
+    return `/api/items/${id}/photos/download`;
+  }
+
   fetchBox(code: string): Observable<InventoryBoxDetail> {
     return this.http.get<InventoryBoxDetail>(`/api/boxes/${encodeURIComponent(code)}`);
   }
@@ -564,7 +658,7 @@ export class InventoryApiService {
     return this.http.post<PhotoInboxItem>(`/api/photos/inbox/${id}/pending`, {});
   }
 
-  uploadInboxPhotos(files: File[], sourceBoxId: number | null): Observable<PhotoInboxUploadResponse> {
+  uploadInboxPhotos(files: File[], sourceBoxId: number | null): Observable<HttpEvent<PhotoInboxUploadResponse>> {
     const body = new FormData();
     for (const file of files) {
       body.append('files', file, file.name);
@@ -573,7 +667,10 @@ export class InventoryApiService {
       body.append('sourceBoxId', String(sourceBoxId));
     }
 
-    return this.http.post<PhotoInboxUploadResponse>('/api/photos/inbox/upload', body);
+    return this.http.post<PhotoInboxUploadResponse>('/api/photos/inbox/upload', body, {
+      observe: 'events',
+      reportProgress: true
+    });
   }
 
   uploadItemPhotos(id: number, files: File[], caption: string): Observable<InventoryItemDetail> {
@@ -631,5 +728,15 @@ export class InventoryApiService {
 
   undoReviewPhotos(ids: number[]): Observable<PhotoReviewResponse> {
     return this.http.post<PhotoReviewResponse>('/api/photos/review/undo', { ids });
+  }
+
+  previewCsvImport(file: File): Observable<CsvPreviewResponse> {
+    const body = new FormData();
+    body.append('file', file, file.name);
+    return this.http.post<CsvPreviewResponse>('/api/csv/preview', body);
+  }
+
+  confirmCsvImport(key: string): Observable<CsvImportResponse> {
+    return this.http.post<CsvImportResponse>('/api/csv/confirm', { key });
   }
 }

@@ -1,3 +1,5 @@
+using System.Text;
+using System.IO.Compression;
 using Inventario.Data;
 using Inventario.Models;
 using Inventario.Services;
@@ -117,6 +119,7 @@ app.MapGet("/api/inventory/live", async (
     var query = httpContext.Request.Query;
     var boxIds = query.TryGetValue("boxIds", out var rawBoxIds)
         ? rawBoxIds
+            .SelectMany(value => value?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [])
             .Select(value => int.TryParse(value, out var parsed) ? parsed : (int?)null)
             .Where(value => value.HasValue)
             .Select(value => value!.Value)
@@ -189,12 +192,193 @@ app.MapDelete("/api/tags/{id:int}", async (
     var error = await queryService.DeleteTagAsync(id, cancellationToken);
     return error is null ? Results.NoContent() : Results.BadRequest(new { error });
 });
+app.MapGet("/api/item-conditions", async (
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var conditions = await db.ItemConditions
+        .AsNoTracking()
+        .OrderBy(condition => condition.Name)
+        .Select(condition => new ItemConditionDto(condition.Id, condition.Name, condition.Color))
+        .ToListAsync(cancellationToken);
+
+    return Results.Json(new { conditions });
+});
+app.MapPost("/api/item-conditions", async (
+    ItemConditionUpdateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var name = (input.Name ?? "").Trim();
+    if (string.IsNullOrWhiteSpace(name) || name.Length > 80)
+    {
+        return Results.BadRequest(new { error = "El nombre del estado debe tener entre 1 y 80 caracteres." });
+    }
+
+    var existing = await db.ItemConditions.FirstOrDefaultAsync(condition => condition.Name == name, cancellationToken);
+    if (existing is not null)
+    {
+        return Results.Json(new ItemConditionDto(existing.Id, existing.Name, existing.Color));
+    }
+
+    var condition = new ItemCondition { Name = name, Color = NormalizeSwatch(input.Color, "#8ad6ff") };
+    db.ItemConditions.Add(condition);
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(new ItemConditionDto(condition.Id, condition.Name, condition.Color));
+});
+app.MapPut("/api/item-conditions/{id:int}", async (
+    int id,
+    ItemConditionUpdateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var condition = await db.ItemConditions.FirstOrDefaultAsync(condition => condition.Id == id, cancellationToken);
+    if (condition is null)
+    {
+        return Results.NotFound();
+    }
+
+    var name = (input.Name ?? "").Trim();
+    if (string.IsNullOrWhiteSpace(name) || name.Length > 80)
+    {
+        return Results.BadRequest(new { error = "El nombre del estado debe tener entre 1 y 80 caracteres." });
+    }
+
+    condition.Name = name;
+    condition.Color = NormalizeSwatch(input.Color, condition.Color);
+    condition.UpdatedAt = DateTime.UtcNow;
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(new ItemConditionDto(condition.Id, condition.Name, condition.Color));
+});
+app.MapDelete("/api/item-conditions/{id:int}", async (
+    int id,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var condition = await db.ItemConditions.FirstOrDefaultAsync(condition => condition.Id == id, cancellationToken);
+    if (condition is null)
+    {
+        return Results.NotFound();
+    }
+
+    var used = await db.Items.AnyAsync(item => item.Condition == condition.Name, cancellationToken);
+    if (used)
+    {
+        return Results.BadRequest(new { error = "No se puede eliminar un estado con ítems asignados." });
+    }
+
+    db.ItemConditions.Remove(condition);
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.NoContent();
+});
 app.MapGet("/api/inventory/options", async (
     InventoryLiveQueryService queryService,
     CancellationToken cancellationToken) =>
 {
     var response = await queryService.GetOptionsAsync(cancellationToken);
     return Results.Json(response);
+});
+app.MapGet("/api/locations", async (
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var locations = await db.Locations
+        .AsNoTracking()
+        .Include(location => location.Boxes)
+        .OrderBy(location => location.Name)
+        .Select(location => new LocationDto(
+            location.Id,
+            location.Name,
+            location.Description,
+            location.Boxes.Count))
+        .ToListAsync(cancellationToken);
+
+    return Results.Json(new { locations });
+});
+app.MapPost("/api/locations", async (
+    LocationUpdateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var name = input.Name.Trim();
+    if (string.IsNullOrWhiteSpace(name) || name.Length > 120)
+    {
+        return Results.BadRequest(new { error = "El nombre debe tener entre 1 y 120 caracteres." });
+    }
+
+    var location = new Location
+    {
+        Name = name,
+        Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim()
+    };
+    db.Locations.Add(location);
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(new LocationDto(location.Id, location.Name, location.Description, 0));
+});
+app.MapPut("/api/locations/{id:int}", async (
+    int id,
+    LocationUpdateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var name = input.Name.Trim();
+    if (string.IsNullOrWhiteSpace(name) || name.Length > 120)
+    {
+        return Results.BadRequest(new { error = "El nombre debe tener entre 1 y 120 caracteres." });
+    }
+
+    var location = await db.Locations
+        .Include(candidate => candidate.Boxes)
+        .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+    if (location is null)
+    {
+        return Results.NotFound();
+    }
+
+    location.Name = name;
+    location.Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim();
+    location.UpdatedAt = DateTime.UtcNow;
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(new LocationDto(location.Id, location.Name, location.Description, location.Boxes.Count));
+});
+app.MapDelete("/api/locations/{id:int}", async (
+    int id,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var location = await db.Locations
+        .Include(candidate => candidate.Boxes)
+        .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+    if (location is null)
+    {
+        return Results.NotFound();
+    }
+
+    var movedBoxes = location.Boxes.Count;
+    if (movedBoxes > 0)
+    {
+        var unassigned = await db.Locations
+            .FirstOrDefaultAsync(candidate => candidate.Name == "Ubicación no asignada", cancellationToken);
+        if (unassigned is null)
+        {
+            unassigned = new Location
+            {
+                Name = "Ubicación no asignada",
+                Description = "Destino automático al archivar o eliminar ubicaciones."
+            };
+            db.Locations.Add(unassigned);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        foreach (var box in location.Boxes)
+        {
+            box.LocationId = unassigned.Id;
+        }
+    }
+
+    db.Locations.Remove(location);
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(new { movedBoxes });
 });
 app.MapGet("/api/items/{id:int}", async (
     int id,
@@ -331,6 +515,53 @@ app.MapPost("/api/items/{id:int}/photos/upload", async (
 
     await db.SaveChangesAsync(cancellationToken);
     return Results.Json(await queryService.GetItemDetailAsync(id, cancellationToken));
+});
+app.MapGet("/api/items/{id:int}/photos/download", async (
+    int id,
+    InventoryDbContext db,
+    PhotoStorage storage,
+    CancellationToken cancellationToken) =>
+{
+    var item = await db.Items.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+    if (item is null)
+    {
+        return Results.NotFound();
+    }
+
+    var photos = await db.Photos.AsNoTracking()
+        .Where(photo => photo.EntityType == PhotoEntityType.Item
+            && photo.EntityId == id
+            && photo.Status == PhotoStatus.Active)
+        .OrderBy(photo => photo.Id)
+        .ToListAsync(cancellationToken);
+    if (photos.Count == 0)
+    {
+        return Results.NotFound(new { error = "Este ítem no tiene fotos descargables." });
+    }
+
+    var stream = new MemoryStream();
+    using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+    {
+        var index = 1;
+        foreach (var photo in photos)
+        {
+            var path = storage.ResolveOriginalPath(photo.Filename);
+            if (!File.Exists(path))
+            {
+                continue;
+            }
+
+            var entryName = $"{item.Code}-{index:00}{Path.GetExtension(path).ToLowerInvariant()}";
+            var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
+            await using var entryStream = entry.Open();
+            await using var fileStream = File.OpenRead(path);
+            await fileStream.CopyToAsync(entryStream, cancellationToken);
+            index++;
+        }
+    }
+
+    stream.Position = 0;
+    return Results.File(stream, "application/zip", $"{item.Code}-fotos.zip");
 });
 app.MapGet("/api/boxes/{code}", async (
     string code,
@@ -509,6 +740,11 @@ app.MapPost("/api/photos/inbox/upload", async (
     InventoryLiveQueryService queryService,
     CancellationToken cancellationToken) =>
 {
+    if (!request.HasFormContentType)
+    {
+        return Results.BadRequest(new { error = "La subida debe enviarse como multipart/form-data." });
+    }
+
     var form = await request.ReadFormAsync(cancellationToken);
     var sourceBoxId = int.TryParse(form["sourceBoxId"], out var parsedBoxId) ? parsedBoxId : (int?)null;
     var imported = 0;
@@ -517,7 +753,7 @@ app.MapPost("/api/photos/inbox/upload", async (
     {
         try
         {
-            var inbox = await storage.SaveInboxAsync(file, sourceBoxId, cancellationToken);
+            var inbox = await storage.SaveInboxAsync(file, sourceBoxId, cancellationToken, processImmediately: false);
             if (inbox is not null)
             {
                 db.PhotoInboxes.Add(inbox);
@@ -638,9 +874,84 @@ app.MapPost("/api/actions/{id:int}/reopen", async (
     var response = await queryService.UpdateActionStatusAsync(id, InventoryActionStatus.Open, cancellationToken);
     return response is null ? Results.NotFound() : Results.Json(response);
 });
+app.MapGet("/api/csv/export", async (
+    CsvInventoryService csv,
+    CancellationToken cancellationToken) =>
+{
+    var content = await csv.ExportAsync(cancellationToken);
+    return Results.File(
+        Encoding.UTF8.GetBytes(content),
+        "text/csv",
+        $"inventario-{DateTime.UtcNow:yyyyMMdd-HHmm}.csv");
+});
+app.MapGet("/api/csv/template", () =>
+    Results.File(
+        Encoding.UTF8.GetBytes(CsvInventoryService.Template()),
+        "text/csv",
+        "inventario-plantilla.csv"));
+app.MapPost("/api/csv/preview", async (
+    IFormFile? file,
+    IWebHostEnvironment env,
+    IConfiguration config,
+    CsvInventoryService csv,
+    CancellationToken cancellationToken) =>
+{
+    if (file is null || file.Length == 0)
+    {
+        return Results.BadRequest(new { error = "Sube un CSV para previsualizar." });
+    }
+
+    try
+    {
+        using var reader = new StreamReader(file.OpenReadStream(), Encoding.UTF8);
+        var content = await reader.ReadToEndAsync(cancellationToken);
+        var rows = csv.Parse(content);
+        var root = DataPaths.ImportRoot(env, config);
+        Directory.CreateDirectory(root);
+        var key = $"pending-{Guid.NewGuid():N}.csv";
+        await File.WriteAllTextAsync(Path.Combine(root, key), content, cancellationToken);
+        return Results.Json(new { key, rows, count = rows.Count });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).DisableAntiforgery();
+app.MapPost("/api/csv/confirm", async (
+    CsvImportConfirmDto input,
+    IWebHostEnvironment env,
+    IConfiguration config,
+    CsvInventoryService csv,
+    CancellationToken cancellationToken) =>
+{
+    var path = Path.Combine(DataPaths.ImportRoot(env, config), Path.GetFileName(input.Key));
+    if (!File.Exists(path))
+    {
+        return Results.BadRequest(new { error = "No encuentro la previsualizacion pendiente. Vuelve a subir el CSV." });
+    }
+
+    try
+    {
+        var content = await File.ReadAllTextAsync(path, cancellationToken);
+        var rows = csv.Parse(content);
+        await csv.ImportAsync(rows, cancellationToken);
+        File.Delete(path);
+        return Results.Json(new { imported = rows.Count });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
 app.MapRazorPages();
 
 app.Run();
+
+static string NormalizeSwatch(string? value, string fallback)
+{
+    var color = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+    return color.StartsWith('#') && color.Length is 4 or 7 ? color : fallback;
+}
 
 static async Task NormalizePhotoRotationsAsync(IServiceProvider services)
 {
@@ -705,3 +1016,8 @@ static async Task GeneratePhotoDerivativesAsync(IServiceProvider services)
 
 public record PhotoRotateDto(int Delta);
 public record PhotoReturnToInboxDto<TDetail>(TDetail Detail, int? InboxId);
+public record CsvImportConfirmDto(string Key);
+public record LocationDto(int Id, string Name, string? Description, int BoxesCount);
+public record LocationUpdateDto(string Name, string? Description);
+public record ItemConditionDto(int Id, string Name, string Color);
+public record ItemConditionUpdateDto(string? Name, string? Color);

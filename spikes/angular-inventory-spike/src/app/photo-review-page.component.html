@@ -11,6 +11,7 @@
       <span>B caja</span>
       <span>N nuevo</span>
       <span>D descartar</span>
+      <span>Espacio seleccionar</span>
       <span>S saltar</span>
     </div>
   </header>
@@ -46,51 +47,68 @@
     <section class="review-grid">
       <mat-card class="review-photo-card">
         <div class="review-photo-frame">
-          <img [src]="assetUrl(current()!.previewUrl)!" [style.transform]="'rotate(' + current()!.rotationDegrees + 'deg)'" [alt]="current()!.originalFilename" />
+          <div class="review-photo-zoom">
+            <img [src]="assetUrl(current()!.previewUrl)!" [style.transform]="'rotate(' + current()!.rotationDegrees + 'deg)'" [alt]="current()!.originalFilename" />
+          </div>
         </div>
         <div class="photo-caption">
-          <strong>{{ current()!.originalFilename }}</strong>
-          <small>{{ current()!.importedAt | date:'short' }}</small>
-          @if (current()!.sourceBox) {
-            <span>{{ current()!.sourceBox!.code }} · {{ current()!.sourceBox!.name }}</span>
-          }
+          <div>
+            <strong>{{ current()!.originalFilename }}</strong>
+            <small>{{ current()!.importedAt | date:'short' }}</small>
+            @if (current()!.sourceBox) {
+              <span>{{ current()!.sourceBox!.code }} · {{ current()!.sourceBox!.name }}</span>
+            }
+          </div>
+          <button mat-stroked-button type="button" (click)="toggleSelected(current()!)" [class.selected-action]="isSelected(current()!)">
+            <span class="keycap">Espacio</span>
+            {{ isSelected(current()!) ? 'Seleccionada' : 'Seleccionar' }}
+          </button>
         </div>
       </mat-card>
 
       <aside class="review-actions">
         <mat-card class="action-card">
+          <p class="selection-summary">
+            {{ actionSelectionSize() }} {{ actionSelectionSize() === 1 ? 'foto en la acción' : 'fotos en la acción' }}.
+          </p>
           <button mat-flat-button type="button" (click)="openPanel('create')" [disabled]="busy()">
             <mat-icon>add_box</mat-icon>
+            <span class="keycap">N</span>
             Crear ítem
           </button>
           <button mat-stroked-button type="button" (click)="openPanel('assignItem')" [disabled]="busy()">
             <mat-icon>category</mat-icon>
+            <span class="keycap">A</span>
             Asociar a ítem
           </button>
           <button mat-stroked-button type="button" (click)="openPanel('assignBox')" [disabled]="busy()">
             <mat-icon>inventory_2</mat-icon>
+            <span class="keycap">B</span>
             Asociar a caja
           </button>
           <div class="split-actions">
             <button mat-stroked-button type="button" (click)="rotate(-90)" [disabled]="busy()">
               <mat-icon>rotate_left</mat-icon>
-              Q
+              <span class="keycap">Q</span>
             </button>
             <button mat-stroked-button type="button" (click)="rotate(90)" [disabled]="busy()">
               <mat-icon>rotate_right</mat-icon>
-              E
+              <span class="keycap">E</span>
             </button>
           </div>
           <button mat-stroked-button type="button" (click)="discard()" [disabled]="busy()">
             <mat-icon>delete</mat-icon>
+            <span class="keycap">D</span>
             Descartar
           </button>
           <div class="split-actions">
             <button mat-button type="button" (click)="skip(-1)" [disabled]="!review()?.previousId">
               <mat-icon>arrow_back</mat-icon>
+              <span class="keycap">←</span>
             </button>
             <button mat-button type="button" (click)="skip(1)" [disabled]="!review()?.nextId">
               <mat-icon>arrow_forward</mat-icon>
+              <span class="keycap">S/→</span>
             </button>
           </div>
         </mat-card>
@@ -98,6 +116,7 @@
         @if (panel() === 'assignBox') {
           <mat-card class="action-card">
             <app-searchable-select
+              #assignBoxSelect
               label="Contenedor"
               [value]="assignBoxId()"
               [options]="boxOptions()"
@@ -110,6 +129,7 @@
         @if (panel() === 'assignItem') {
           <mat-card class="action-card">
             <app-searchable-select
+              #assignItemSelect
               label="Ítem"
               [value]="assignItemId()"
               [options]="itemOptions()"
@@ -123,7 +143,7 @@
           <mat-card class="action-card">
             <mat-form-field appearance="outline">
               <mat-label>Nombre</mat-label>
-              <input matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" />
+              <input #createNameInput matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" />
             </mat-form-field>
             <app-searchable-select
               label="Tags"
@@ -161,9 +181,11 @@
 
     <section class="filmstrip" aria-label="Fotos pendientes cercanas">
       @for (photo of review()!.pending; track photo.id) {
-        <button type="button" class="film" [class.current]="photo.id === current()!.id" [class.selected]="isSelected(photo)" (click)="selectOnly(photo)">
+        <button type="button" class="film" [class.current]="photo.id === current()!.id" [class.selected]="isSelected(photo)" (click)="onFilmClick(photo, $event)">
           <img [src]="assetUrl(photo.thumbUrl)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.originalFilename" />
-          <span></span>
+          <span class="film-check" (click)="toggleSelected(photo); $event.stopPropagation()">
+            <mat-icon>{{ isSelected(photo) ? 'check' : 'add' }}</mat-icon>
+          </span>
         </button>
       }
     </section>

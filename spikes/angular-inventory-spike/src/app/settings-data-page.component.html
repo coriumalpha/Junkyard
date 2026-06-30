@@ -1,0 +1,120 @@
+<main class="settings-shell">
+  <header class="settings-header app-page-header">
+    <div>
+      <p class="eyebrow">Configuración</p>
+      <h1>Datos</h1>
+      <p>Importación y exportación CSV del inventario operativo.</p>
+    </div>
+  </header>
+
+  <section class="data-grid">
+    <mat-card class="data-card">
+      <div class="card-head">
+        <mat-icon>download</mat-icon>
+        <div>
+          <p class="eyebrow">Salida</p>
+          <h2>Exportar inventario</h2>
+        </div>
+      </div>
+      <p>Descarga un CSV con los ítems actuales, caja, ubicación, cantidad, flags y notas.</p>
+      <div class="button-row">
+        <a mat-flat-button href="/api/csv/export">
+          <mat-icon>download</mat-icon>
+          Exportar CSV
+        </a>
+        <a mat-stroked-button href="/api/csv/template">
+          <mat-icon>description</mat-icon>
+          Plantilla
+        </a>
+      </div>
+    </mat-card>
+
+    <mat-card class="data-card">
+      <div class="card-head">
+        <mat-icon>upload_file</mat-icon>
+        <div>
+          <p class="eyebrow">Entrada</p>
+          <h2>Importar CSV</h2>
+        </div>
+      </div>
+      <p>Previsualiza antes de escribir. La confirmación crea ubicaciones/cajas faltantes y actualiza ítems coincidentes por caja y nombre.</p>
+      <div class="import-row">
+        <label class="file-button">
+          <input type="file" accept=".csv,text/csv" (change)="chooseFile($event)" [disabled]="busy()" />
+          <mat-icon>attach_file</mat-icon>
+          <span>{{ selectedFile()?.name ?? 'Elegir CSV' }}</span>
+        </label>
+        <button mat-flat-button type="button" (click)="preview()" [disabled]="!selectedFile() || busy()">
+          <mat-icon>visibility</mat-icon>
+          Previsualizar
+        </button>
+      </div>
+    </mat-card>
+  </section>
+
+  @if (busy()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="42" />
+      <span>Procesando CSV...</span>
+    </section>
+  } @else if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  } @else if (notice()) {
+    <section class="state-panel success">
+      <mat-icon>check_circle</mat-icon>
+      <span>{{ notice() }}</span>
+    </section>
+  }
+
+  @if (previewRows().length) {
+    <mat-card class="preview-card">
+      <div class="preview-head">
+        <div>
+          <p class="eyebrow">Previsualización</p>
+          <h2>{{ previewRows().length }} filas detectadas</h2>
+        </div>
+        <button mat-flat-button type="button" (click)="confirm()" [disabled]="!pendingKey() || busy()">
+          <mat-icon>publish</mat-icon>
+          Confirmar importación
+        </button>
+      </div>
+      <mat-divider />
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Ubicación</th>
+              <th>Caja</th>
+              <th>Ítem</th>
+              <th>Categoría</th>
+              <th>Cantidad</th>
+              <th>Flags</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of visibleRows(); track row.boxCode + row.itemName + $index) {
+              <tr>
+                <td>{{ row.location }}</td>
+                <td><strong>{{ row.boxCode }}</strong><span>{{ row.boxName }}</span></td>
+                <td>{{ row.itemName }}</td>
+                <td>{{ row.category }}</td>
+                <td>{{ row.quantity }} {{ row.unit }}</td>
+                <td>
+                  <span class="flag" [class.on]="row.consumable">Consumible</span>
+                  <span class="flag" [class.on]="row.sentimental">Sentimental</span>
+                  <span class="flag" [class.on]="row.obsolete">Obsoleto</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (remainingRows()) {
+        <p class="preview-note">Mostrando 25 filas; quedan {{ remainingRows() }} más en la importación pendiente.</p>
+      }
+    </mat-card>
+  }
+</main>

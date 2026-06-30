@@ -42,7 +42,7 @@ export class ActionsPageComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly busyId = signal<number | null>(null);
   protected readonly data = signal<InventoryActionsResponse | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
   protected readonly items = signal<InventoryItem[]>([]);
   protected readonly newTitle = signal('');
   protected readonly newDescription = signal('');
@@ -56,13 +56,19 @@ export class ActionsPageComponent {
     this.options().boxes.map((box) => ({
       value: box.id,
       label: `${box.code} · ${box.name}`,
-      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · ')
+      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · '),
+      imageUrl: box.coverUrl,
+      rotationDegrees: box.rotationDegrees,
+      placeholder: box.code
     })));
   protected readonly itemOptions = computed<SearchableSelectOption[]>(() =>
     this.items().map((item) => ({
       value: item.id,
       label: `${item.code} · ${item.name}`,
-      hint: [item.category, item.boxCode].filter(Boolean).join(' · ')
+      hint: [item.category, item.boxCode].filter(Boolean).join(' · '),
+      imageUrl: item.coverUrl,
+      rotationDegrees: item.rotationDegrees,
+      placeholder: item.code
     })));
   protected readonly legacyActionsUrl = legacyUrl('/Pendientes');
 

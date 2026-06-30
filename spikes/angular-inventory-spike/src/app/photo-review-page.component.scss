@@ -81,11 +81,26 @@
   display: grid;
   place-items: center;
   min-height: min(72vh, 760px);
+  overflow: hidden;
   background:
     linear-gradient(45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25%),
     linear-gradient(-45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25%),
     rgba(255, 255, 255, 0.025);
   background-size: 24px 24px;
+  cursor: zoom-in;
+}
+
+.review-photo-zoom {
+  display: grid;
+  place-items: center;
+  max-width: 100%;
+  max-height: min(72vh, 760px);
+  transform-origin: center;
+  transition: transform 160ms ease;
+}
+
+.review-photo-frame:hover .review-photo-zoom {
+  transform: scale(1.75);
 }
 
 .review-photo-frame img {
@@ -95,9 +110,16 @@
 }
 
 .photo-caption {
-  display: grid;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 4px;
   padding: 14px 16px;
+}
+
+.photo-caption > div {
+  display: grid;
+  gap: 4px;
 }
 
 .review-actions {
@@ -116,6 +138,37 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.selection-summary {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.keycap {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  min-height: 20px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--app-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.photo-caption .keycap {
+  color: var(--app-text);
+}
+
+.selected-action .keycap {
+  border-color: rgba(72, 255, 176, 0.45);
+  background: rgba(72, 255, 176, 0.16);
 }
 
 .filmstrip {
@@ -143,14 +196,29 @@
   box-shadow: 0 0 0 2px rgba(72, 255, 176, 0.14);
 }
 
-.film.selected span {
+.film-check {
   position: absolute;
   right: 6px;
   bottom: 6px;
-  width: 13px;
-  height: 13px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
+  background: rgba(10, 14, 20, 0.78);
+  color: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.28);
+}
+
+.film-check mat-icon {
+  width: 17px;
+  height: 17px;
+  font-size: 17px;
+}
+
+.film.selected .film-check {
   background: #48ffb0;
+  color: #06100c;
   box-shadow: 0 0 12px rgba(72, 255, 176, 0.45);
 }
 

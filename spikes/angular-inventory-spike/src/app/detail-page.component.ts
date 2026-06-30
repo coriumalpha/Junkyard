@@ -11,6 +11,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
@@ -38,6 +39,7 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatMenuModule,
     MatProgressSpinnerModule,
     MatSlideToggleModule,
     SearchableSelectComponent,
@@ -58,7 +60,7 @@ export class DetailPageComponent {
   protected readonly saving = signal(false);
   protected readonly saveMessage = signal<string | null>(null);
   protected readonly formError = signal<string | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
   protected readonly itemForm = signal<InventoryItemUpdate>(this.emptyItemForm());
   protected readonly boxForm = signal<InventoryBoxUpdate>(this.emptyBoxForm());
   protected readonly newTagName = signal('');
@@ -99,13 +101,18 @@ export class DetailPageComponent {
   protected readonly linkedComments = computed(() => this.item()?.comments ?? this.box()?.comments ?? []);
   protected readonly tagOptions = computed<SearchableSelectOption[]>(() =>
     this.options().tags.map((tag) => ({ value: tag.id, label: tag.name, hint: tag.color })));
+  protected readonly conditionOptions = computed<SearchableSelectOption[]>(() =>
+    this.options().conditions.map((condition) => ({ value: condition.name, label: condition.name, hint: condition.color })));
   protected readonly locationOptions = computed<SearchableSelectOption[]>(() =>
     this.options().locations.map((location) => ({ value: location.id, label: location.name })));
   protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
     this.options().boxes.map((box) => ({
       value: box.id,
       label: `${box.code} · ${box.name}`,
-      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · ')
+      hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · '),
+      imageUrl: box.coverUrl,
+      rotationDegrees: box.rotationDegrees,
+      placeholder: box.code
     })));
   protected readonly parentBoxOptions = computed<SearchableSelectOption[]>(() => {
     const currentBoxId = this.box()?.id;
@@ -547,6 +554,11 @@ export class DetailPageComponent {
 
   protected itemLegacyUrl(): string {
     return this.legacyUrl(this.item()?.legacyUrl);
+  }
+
+  protected itemPhotosDownloadUrl(): string {
+    const item = this.item();
+    return item ? this.api.itemPhotosDownloadUrl(item.id) : '#';
   }
 
   protected photoTrack(_index: number, photo: InventoryPhoto): number {

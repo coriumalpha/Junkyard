@@ -112,7 +112,7 @@ const LAYOUT_TO_VIEW: Record<InventoryLayoutMode, InventoryViewMode> = {
 export class InventoryPageComponent {
   protected readonly state = signal<InventoryQueryState>({ ...DEFAULT_STATE });
   protected readonly data = signal<InventoryLiveResponse | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly expandedGroups = signal<Record<string, boolean>>({});
@@ -130,7 +130,14 @@ export class InventoryPageComponent {
   protected readonly locationOptions = computed<SearchableSelectOption[]>(() =>
     this.options().locations.map((location) => ({ value: location.id, label: location.name })));
   protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
-    this.options().boxes.map((box) => ({ value: box.id, label: this.boxOptionLabel(box), hint: this.boxOptionHint(box) })));
+    this.options().boxes.map((box) => ({
+      value: box.id,
+      label: this.boxOptionLabel(box),
+      hint: this.boxOptionHint(box),
+      imageUrl: box.coverUrl,
+      rotationDegrees: box.rotationDegrees,
+      placeholder: box.code
+    })));
   protected readonly layoutOptions = LAYOUT_OPTIONS;
   protected readonly groupPageSize = 12;
 
