@@ -19,7 +19,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { EntityMiniCardComponent } from './entity-mini-card.component';
 import { ColorPickerComponent } from './color-picker.component';
 import { HierarchyTrailComponent, HierarchyTrailNode } from './hierarchy-trail.component';
-import { InventoryCodePipe } from './inventory-code.pipe';
+import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { InventoryAction, InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryOptionsResponse, InventoryPhoto } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
@@ -121,11 +121,11 @@ export class DetailPageComponent {
   protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
     this.options().boxes.map((box) => ({
       value: box.id,
-      label: `${box.code} · ${box.name}`,
+      label: `${formatInventoryCode(box.code)} · ${box.name}`,
       hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · '),
       imageUrl: box.coverUrl,
       rotationDegrees: box.rotationDegrees,
-      placeholder: box.code
+      placeholder: formatInventoryCode(box.code)
     })));
   protected readonly parentBoxOptions = computed<SearchableSelectOption[]>(() => {
     const currentBoxId = this.box()?.id;
@@ -178,11 +178,11 @@ export class DetailPageComponent {
   protected readonly subtitle = computed(() => {
     const item = this.item();
     if (item) {
-      return item.box ? `${item.box.code} · ${item.box.path}` : 'Ítem sin caja';
+      return item.box ? `${formatInventoryCode(item.box.code)} · ${item.box.path}` : 'Ítem sin caja';
     }
 
     const box = this.box();
-    return box ? `${box.code} · ${box.path}` : '';
+    return box ? `${formatInventoryCode(box.code)} · ${box.path}` : '';
   });
 
   private readonly route = inject(ActivatedRoute);
@@ -223,7 +223,7 @@ export class DetailPageComponent {
           return this.api.fetchItem(id).pipe(
             tap((item) => {
               this.item.set(item);
-              this.titleService.setTitle(`${item.code} · ${item.name} · Junkyard`);
+              this.titleService.setTitle(`${formatInventoryCode(item.code)} · ${item.name} · Junkyard`);
             }),
             catchError((error: unknown) => {
               this.error.set(error instanceof Error ? error.message : 'No se pudo cargar el detalle.');
@@ -242,7 +242,7 @@ export class DetailPageComponent {
           return this.api.fetchBox(value).pipe(
             tap((box) => {
               this.box.set(box);
-              this.titleService.setTitle(`${box.code} · ${box.name} · Junkyard`);
+              this.titleService.setTitle(`${formatInventoryCode(box.code)} · ${box.name} · Junkyard`);
             }),
           catchError((error: unknown) => {
             this.error.set(error instanceof Error ? error.message : 'No se pudo cargar el detalle.');

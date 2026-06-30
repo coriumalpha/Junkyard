@@ -9,14 +9,29 @@
 }
 
 .tag-picker-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   color: var(--app-muted);
   font-size: 0.84rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.tag-picker-head span {
+  min-width: 0;
+}
+
+.tag-picker-head small {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--app-text);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .selected-tags,
@@ -41,7 +56,8 @@
 }
 
 .tag-option {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -61,10 +77,38 @@
   background: color-mix(in srgb, var(--tag-color) 18%, rgba(255, 255, 255, 0.045));
 }
 
-.tag-option span {
+.tag-option.active {
+  border-color: color-mix(in srgb, var(--tag-color) 72%, white 16%);
+  background: color-mix(in srgb, var(--tag-color) 24%, rgba(255, 255, 255, 0.06));
+}
+
+.tag-swatch {
   width: 12px;
   height: 12px;
   border-radius: 999px;
   background: var(--tag-color);
   flex: 0 0 auto;
+}
+
+.tag-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tag-option mat-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  color: var(--app-accent);
+}
+
+@media (max-width: 560px) {
+  .tag-picker-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .tag-picker-head button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
 }

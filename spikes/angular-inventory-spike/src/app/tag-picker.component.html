@@ -1,6 +1,7 @@
 <div class="tag-picker" [class.compact]="compact">
   <div class="tag-picker-head">
     <span>{{ label }}</span>
+    <small>{{ value.length }} seleccionadas</small>
     @if (value.length) {
       <button mat-button type="button" (click)="clear()">
         <mat-icon>backspace</mat-icon>
@@ -12,6 +13,11 @@
   <mat-form-field appearance="outline" subscriptSizing="dynamic">
     <mat-label>Buscar tag</mat-label>
     <input matInput [value]="query()" (input)="query.set($any($event.target).value)" placeholder="Nombre, tema, familia..." />
+    @if (query()) {
+      <button mat-icon-button matSuffix type="button" (click)="query.set('')" aria-label="Limpiar búsqueda de tags">
+        <mat-icon>close</mat-icon>
+      </button>
+    }
   </mat-form-field>
 
   @if (selected().length) {
@@ -29,9 +35,18 @@
 
   <div class="tag-grid">
     @for (tag of filtered(); track tag.id) {
-      <button type="button" class="tag-option" [style.--tag-color]="tag.color" (click)="toggle(tag.id)">
-        <span></span>
-        {{ tag.name }}
+      <button
+        type="button"
+        class="tag-option"
+        [class.active]="isSelected(tag.id)"
+        [style.--tag-color]="tag.color"
+        (click)="toggle(tag.id)"
+      >
+        <span class="tag-swatch"></span>
+        <span class="tag-name">{{ tag.name }}</span>
+        @if (isSelected(tag.id)) {
+          <mat-icon>check</mat-icon>
+        }
       </button>
     } @empty {
       <p>Sin tags disponibles.</p>

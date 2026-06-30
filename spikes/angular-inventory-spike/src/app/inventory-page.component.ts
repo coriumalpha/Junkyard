@@ -17,7 +17,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatToolbarModule } from '@angular/material/toolbar';
 
 import { InventoryApiService, InventoryBoxOption, InventoryBoxUpdate, InventoryBulkUpdate, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
-import { InventoryCodePipe } from './inventory-code.pipe';
+import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
@@ -204,7 +204,7 @@ export class InventoryPageComponent {
       hint: this.boxOptionHint(box),
       imageUrl: box.coverUrl,
       rotationDegrees: box.rotationDegrees,
-      placeholder: box.code
+      placeholder: formatInventoryCode(box.code)
     })));
   protected readonly layoutOptions = LAYOUT_OPTIONS;
   protected readonly containerTypeOptions = CONTAINER_TYPE_OPTIONS;
@@ -396,7 +396,7 @@ export class InventoryPageComponent {
           this.options.set(options);
           this.createBoxForm.set(this.emptyBoxForm());
           this.showCreateBoxForm.set(false);
-          this.createBoxMessage.set(`Contenedor ${box.code} creado.`);
+          this.createBoxMessage.set(`Contenedor ${formatInventoryCode(box.code)} creado.`);
           this.router.navigate(['/boxes', box.code]).catch(() => undefined);
         })
       )),
@@ -627,7 +627,7 @@ export class InventoryPageComponent {
   }
 
   protected boxOptionLabel(box: InventoryBoxOption): string {
-    return `${box.code} · ${box.name}`;
+    return `${formatInventoryCode(box.code)} · ${box.name}`;
   }
 
   protected boxOptionHint(box: InventoryBoxOption): string {
@@ -839,7 +839,7 @@ export class InventoryPageComponent {
 
       visuals.push({
         kind: 'group',
-        title: group.code,
+        title: formatInventoryCode(group.code),
         subtitle: group.name,
         imageUrl: this.assetUrl(group.coverUrl),
         rotationDegrees: group.rotationDegrees,
@@ -859,8 +859,8 @@ export class InventoryPageComponent {
 
         visuals.push({
           kind: 'item',
-          title: `${item.code} · ${item.name}`,
-          subtitle: item.boxCode || this.tagSummary(item),
+          title: `${formatInventoryCode(item.code)} · ${item.name}`,
+          subtitle: formatInventoryCode(item.boxCode) || this.tagSummary(item),
           imageUrl: this.assetUrl(item.coverUrl),
           rotationDegrees: item.rotationDegrees,
           fallback: item.generatedLabel || item.name.slice(0, 1)

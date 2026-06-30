@@ -14,7 +14,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { InventoryApiService, InventoryOptionsResponse, PhotoInboxItem, PhotoInboxResponse, PhotoInboxStatus } from './inventory-api.service';
-import { InventoryCodePipe } from './inventory-code.pipe';
+import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
@@ -66,11 +66,11 @@ export class PhotoInboxPageComponent {
   protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
     this.options().boxes.map((box) => ({
       value: box.id,
-      label: `${box.code} · ${box.name}`,
+      label: `${formatInventoryCode(box.code)} · ${box.name}`,
       hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · '),
       imageUrl: box.coverUrl,
       rotationDegrees: box.rotationDegrees,
-      placeholder: box.code
+      placeholder: formatInventoryCode(box.code)
     })));
   protected readonly statusOptions = STATUS_OPTIONS;
   private readonly currentStatus = signal<PhotoInboxStatus>('Pending');

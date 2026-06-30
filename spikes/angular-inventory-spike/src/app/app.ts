@@ -1,5 +1,5 @@
 import { BreakpointObserver } from '@angular/cdk/layout';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -51,6 +51,7 @@ export class App {
   private readonly router = inject(Router);
   private readonly api = inject(InventoryApiService);
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
+  @ViewChild('quickSearchInput') private readonly quickSearchInput?: ElementRef<HTMLInputElement>;
 
   constructor() {
     this.currentUrl.set(this.router.url);
@@ -110,6 +111,16 @@ export class App {
     this.quickItems.set([]);
     this.quickBoxes.set([]);
     this.quickLoading.set(false);
+  }
+
+  protected openQuickSearch(): void {
+    if (!this.handset()) {
+      this.drawerCollapsed.set(false);
+    } else {
+      this.drawerOpen.set(true);
+    }
+
+    setTimeout(() => this.quickSearchInput?.nativeElement.focus(), 0);
   }
 
   protected openQuickItem(item: InventoryItem): void {

@@ -30,6 +30,7 @@
           <mat-label>Búsqueda rápida</mat-label>
           <mat-icon matPrefix>search</mat-icon>
           <input
+            #quickSearchInput
             matInput
             [ngModel]="quickSearch()"
             (ngModelChange)="updateQuickSearch($event)"
@@ -69,6 +70,10 @@
           </div>
         }
       </section>
+    } @else {
+      <button mat-icon-button type="button" class="quick-search-collapsed" (click)="openQuickSearch()" aria-label="Búsqueda rápida">
+        <mat-icon>search</mat-icon>
+      </button>
     }
 
     <mat-nav-list class="drawer-nav">

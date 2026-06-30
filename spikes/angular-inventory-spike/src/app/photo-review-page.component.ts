@@ -12,7 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { InventoryApiService, InventoryItem, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse } from './inventory-api.service';
-import { InventoryCodePipe } from './inventory-code.pipe';
+import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
 
@@ -47,22 +47,22 @@ export class PhotoReviewPageComponent {
   protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
     this.options().boxes.map((box) => ({
       value: box.id,
-      label: `${box.code} · ${box.name}`,
+      label: `${formatInventoryCode(box.code)} · ${box.name}`,
       hint: [box.containerTypeLabel, box.locationName, box.path].filter(Boolean).join(' · '),
       imageUrl: box.coverUrl,
       rotationDegrees: box.rotationDegrees,
-      placeholder: box.code
+      placeholder: formatInventoryCode(box.code)
     })));
   protected readonly tagOptions = computed<SearchableSelectOption[]>(() =>
     this.options().tags.map((tag) => ({ value: tag.id, label: tag.name, hint: tag.color })));
   protected readonly itemOptions = computed<SearchableSelectOption[]>(() =>
     this.items().map((item) => ({
       value: item.id,
-      label: `${item.code} · ${item.name}`,
-      hint: [item.category, item.boxCode].filter(Boolean).join(' · '),
+      label: `${formatInventoryCode(item.code)} · ${item.name}`,
+      hint: [item.category, formatInventoryCode(item.boxCode)].filter(Boolean).join(' · '),
       imageUrl: item.coverUrl,
       rotationDegrees: item.rotationDegrees,
-      placeholder: item.code
+      placeholder: formatInventoryCode(item.code)
     })));
   protected readonly actionSelectionSize = computed(() => this.selectedIds().length || (this.current() ? 1 : 0));
 

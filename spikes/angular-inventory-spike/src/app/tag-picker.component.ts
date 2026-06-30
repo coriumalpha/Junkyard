@@ -28,9 +28,8 @@ export class TagPickerComponent {
     return this.tags.filter((tag) => ids.has(tag.id));
   });
   protected readonly filtered = computed(() => {
-    const selectedIds = new Set(this.value);
     const terms = this.normalize(this.query()).split(' ').filter(Boolean);
-    const candidates = this.tags.filter((tag) => !selectedIds.has(tag.id));
+    const candidates = this.tags;
     if (!terms.length) {
       return candidates.slice(0, this.compact ? 10 : 18);
     }
@@ -52,6 +51,10 @@ export class TagPickerComponent {
 
   protected clear(): void {
     this.valueChange.emit([]);
+  }
+
+  protected isSelected(id: number): boolean {
+    return this.value.includes(id);
   }
 
   private normalize(value: string): string {
