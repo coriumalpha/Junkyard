@@ -700,6 +700,74 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         return (await GetBoxDetailAsync(box.Code, cancellationToken), null);
     }
 
+    public async Task<(InventoryBoxDetailDto? Box, string? Error)> CreateBoxAsync(
+        InventoryBoxUpdateDto input,
+        CancellationToken cancellationToken)
+    {
+        var normalizedCode = Box.NormalizePublicCode(input.Code);
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            normalizedCode = await BoxCodeService.GetNextCtCodeAsync(db, cancellationToken);
+        }
+
+        var name = (input.Name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return (null, "El nombre es obligatorio.");
+        }
+
+        if (await BoxCodeService.IsDuplicateAsync(db, normalizedCode, null, cancellationToken))
+        {
+            return (null, "Ese CT ya existe.");
+        }
+
+        var parentBoxId = input.ParentBoxId is > 0 ? input.ParentBoxId : null;
+        var parentValidation = await BoxHierarchyService.ValidateParentAssignmentAsync(db, 0, parentBoxId, cancellationToken);
+        if (!parentValidation.IsValid)
+        {
+            return (null, parentValidation.ErrorMessage);
+        }
+
+        var locationId = input.LocationId;
+        if (parentBoxId is int parentId)
+        {
+            var location = await BoxHierarchyService.ResolveLocationAsync(db, parentId, cancellationToken);
+            if (location?.LocationId is int inheritedLocationId)
+            {
+                locationId = inheritedLocationId;
+            }
+        }
+        else if (locationId <= 0 || !await db.Locations.AnyAsync(location => location.Id == locationId, cancellationToken))
+        {
+            return (null, "La ubicación es obligatoria para contenedores raíz.");
+        }
+
+        var box = new Box
+        {
+            Code = normalizedCode,
+            Name = name,
+            ContainerType = Box.NormalizeContainerType(input.ContainerType),
+            Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim(),
+            LocationId = locationId,
+            ParentBoxId = parentBoxId,
+            Status = Enum.TryParse<BoxStatus>(input.Status, true, out var status) ? status : BoxStatus.Active,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        db.Boxes.Add(box);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return (null, "Ese CT ya existe.");
+        }
+
+        return (await GetBoxDetailAsync(box.Code, cancellationToken), null);
+    }
+
     public async Task<PhotoInboxResponseDto> GetPhotoInboxAsync(string? status, CancellationToken cancellationToken)
     {
         var currentStatus = string.IsNullOrWhiteSpace(status) ? "Pending" : status.Trim();

@@ -16,7 +16,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatToolbarModule } from '@angular/material/toolbar';
 
-import { InventoryApiService, InventoryBoxOption, InventoryBulkUpdate, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
+import { InventoryApiService, InventoryBoxOption, InventoryBoxUpdate, InventoryBulkUpdate, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
@@ -95,6 +95,23 @@ const LAYOUT_TO_VIEW: Record<InventoryLayoutMode, InventoryViewMode> = {
   containers: 'grouped'
 };
 
+const CONTAINER_TYPE_OPTIONS: SearchableSelectOption[] = [
+  { value: 'box', label: 'Caja' },
+  { value: 'subbox', label: 'Subcaja' },
+  { value: 'shelf', label: 'Balda' },
+  { value: 'drawer', label: 'Cajón' },
+  { value: 'rack', label: 'Estantería' },
+  { value: 'bag', label: 'Bolsa' },
+  { value: 'case', label: 'Maletín' },
+  { value: 'binder', label: 'Archivador' },
+  { value: 'lot', label: 'Lote temporal' },
+  { value: 'zone', label: 'Zona física' },
+  { value: 'other', label: 'Otro soporte' }
+];
+
+const BOX_STATUS_OPTIONS: SearchableSelectOption[] = ['Active', 'Quarantine', 'Archived']
+  .map((status) => ({ value: status, label: status }));
+
 @Component({
   selector: 'app-inventory-page',
   standalone: true,
@@ -132,6 +149,11 @@ export class InventoryPageComponent {
   protected readonly bulkBoxId = signal<number | null>(null);
   protected readonly bulkBusy = signal(false);
   protected readonly bulkMessage = signal<string | null>(null);
+  protected readonly showCreateBoxForm = signal(false);
+  protected readonly createBoxForm = signal<InventoryBoxUpdate>(this.emptyBoxForm());
+  protected readonly createBoxBusy = signal(false);
+  protected readonly createBoxMessage = signal<string | null>(null);
+  protected readonly createBoxError = signal<string | null>(null);
   protected readonly groups = computed(() => this.data()?.groups ?? []);
   protected readonly groupTree = computed(() => this.buildGroupTree(this.groups()));
   protected readonly items = computed(() => this.data()?.items ?? []);
@@ -181,6 +203,8 @@ export class InventoryPageComponent {
       placeholder: box.code
     })));
   protected readonly layoutOptions = LAYOUT_OPTIONS;
+  protected readonly containerTypeOptions = CONTAINER_TYPE_OPTIONS;
+  protected readonly boxStatusOptions = BOX_STATUS_OPTIONS;
   protected readonly groupPageSize = 12;
 
   private readonly route = inject(ActivatedRoute);
@@ -214,11 +238,7 @@ export class InventoryPageComponent {
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
 
-    this.api.fetchOptions().pipe(
-      tap((options) => this.options.set(options)),
-      catchError(() => EMPTY),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe();
+    this.refreshOptions();
 
   }
 
@@ -344,6 +364,45 @@ export class InventoryPageComponent {
     }
 
     this.runBulk({ removeTagId: tagId }, 'Tag retirado de la selección.');
+  }
+
+  protected toggleCreateBoxForm(): void {
+    this.showCreateBoxForm.update((visible) => !visible);
+    this.createBoxError.set(null);
+    this.createBoxMessage.set(null);
+  }
+
+  protected patchCreateBoxForm(patch: Partial<InventoryBoxUpdate>): void {
+    this.createBoxForm.update((current) => ({ ...current, ...patch }));
+    this.createBoxError.set(null);
+    this.createBoxMessage.set(null);
+  }
+
+  protected createBox(): void {
+    if (this.createBoxBusy()) {
+      return;
+    }
+
+    this.createBoxBusy.set(true);
+    this.createBoxError.set(null);
+    this.createBoxMessage.set(null);
+    this.api.createBox(this.createBoxForm()).pipe(
+      switchMap((box) => this.api.fetchOptions().pipe(
+        tap((options) => {
+          this.options.set(options);
+          this.createBoxForm.set(this.emptyBoxForm());
+          this.showCreateBoxForm.set(false);
+          this.createBoxMessage.set(`Contenedor ${box.code} creado.`);
+          this.router.navigate(['/boxes', box.code]).catch(() => undefined);
+        })
+      )),
+      catchError((error: unknown) => {
+        this.createBoxError.set(this.describeError(error));
+        return EMPTY;
+      }),
+      finalize(() => this.createBoxBusy.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
   }
 
   protected backendUrl(path: string | null | undefined): string {
@@ -581,6 +640,22 @@ export class InventoryPageComponent {
     return `layout-${this.state().layout}`;
   }
 
+  protected readInputValue(event: Event): string {
+    return (event.target as HTMLInputElement | HTMLTextAreaElement | null)?.value ?? '';
+  }
+
+  protected readLocationId(value: number | string | null | (number | string | null)[]): number {
+    return typeof value === 'number' && value > 0 ? value : 0;
+  }
+
+  protected readNullableBoxId(value: number | string | null | (number | string | null)[]): number | null {
+    return typeof value === 'number' && value > 0 ? value : null;
+  }
+
+  protected readSelectText(value: number | string | null | (number | string | null)[], fallback: string): string {
+    return typeof value === 'string' && value.trim() ? value : fallback;
+  }
+
   private runBulk(action: Omit<InventoryBulkUpdate, 'itemIds'>, success: string): void {
     const itemIds = this.selectedItemIds();
     if (!itemIds.length || this.bulkBusy()) {
@@ -723,6 +798,26 @@ export class InventoryPageComponent {
 
   private deriveBackendView(layout: InventoryLayoutMode): InventoryViewMode {
     return LAYOUT_TO_VIEW[layout];
+  }
+
+  private refreshOptions(): void {
+    this.api.fetchOptions().pipe(
+      tap((options) => this.options.set(options)),
+      catchError(() => EMPTY),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  private emptyBoxForm(): InventoryBoxUpdate {
+    return {
+      code: '',
+      name: '',
+      containerType: 'box',
+      description: '',
+      locationId: 0,
+      parentBoxId: null,
+      status: 'Active'
+    };
   }
 
   private buildFocusVisuals(): FocusVisual[] {

@@ -598,6 +598,19 @@ app.MapGet("/api/boxes/{code}", async (
     var response = await queryService.GetBoxDetailAsync(code, cancellationToken);
     return response is null ? Results.NotFound() : Results.Json(response);
 });
+app.MapPost("/api/boxes", async (
+    InventoryBoxUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (box, error) = await queryService.CreateBoxAsync(input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return Results.Json(box);
+});
 app.MapPut("/api/boxes/{id:int}", async (
     int id,
     InventoryBoxUpdateDto input,

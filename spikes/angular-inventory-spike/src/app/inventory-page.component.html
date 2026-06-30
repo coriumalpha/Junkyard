@@ -656,6 +656,105 @@
           }
 
           @case ('containers') {
+            <mat-card class="filters-card">
+              <div class="filters-head">
+                <div>
+                  <p class="eyebrow">Contenedores</p>
+                  <h2>Gestión de cajas</h2>
+                  <p>Crear soportes físicos aunque todavía no tengan ítems.</p>
+                </div>
+                <button mat-flat-button type="button" (click)="toggleCreateBoxForm()">
+                  <mat-icon>{{ showCreateBoxForm() ? 'close' : 'add_box' }}</mat-icon>
+                  {{ showCreateBoxForm() ? 'Cerrar' : 'Nuevo contenedor' }}
+                </button>
+              </div>
+
+              @if (createBoxMessage()) {
+                <p>{{ createBoxMessage() }}</p>
+              }
+
+              @if (showCreateBoxForm()) {
+                @if (createBoxError()) {
+                  <p>{{ createBoxError() }}</p>
+                }
+
+                <div class="filters-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>CT público</mat-label>
+                    <input
+                      matInput
+                      [value]="createBoxForm().code"
+                      placeholder="Auto si se deja vacío"
+                      (input)="patchCreateBoxForm({ code: readInputValue($event) })"
+                    />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Nombre</mat-label>
+                    <input
+                      matInput
+                      [value]="createBoxForm().name"
+                      (input)="patchCreateBoxForm({ name: readInputValue($event) })"
+                    />
+                  </mat-form-field>
+
+                  <app-searchable-select
+                    label="Tipo"
+                    placeholder="Buscar tipo..."
+                    [options]="containerTypeOptions"
+                    [value]="createBoxForm().containerType"
+                    (valueChange)="patchCreateBoxForm({ containerType: readSelectText($event, 'box') })"
+                  />
+
+                  <app-searchable-select
+                    label="Ubicación raíz"
+                    placeholder="Buscar ubicación..."
+                    [options]="locationOptions()"
+                    [value]="createBoxForm().locationId || null"
+                    [disabled]="createBoxForm().parentBoxId !== null"
+                    (valueChange)="patchCreateBoxForm({ locationId: readLocationId($event) })"
+                  />
+
+                  <app-searchable-select
+                    label="Dentro de"
+                    noneLabel="Primer nivel"
+                    placeholder="Buscar contenedor..."
+                    [options]="boxOptions()"
+                    [value]="createBoxForm().parentBoxId"
+                    (valueChange)="patchCreateBoxForm({ parentBoxId: readNullableBoxId($event) })"
+                  />
+
+                  <app-searchable-select
+                    label="Estado"
+                    placeholder="Buscar estado..."
+                    [options]="boxStatusOptions"
+                    [value]="createBoxForm().status"
+                    (valueChange)="patchCreateBoxForm({ status: readSelectText($event, 'Active') })"
+                  />
+
+                  <mat-form-field appearance="outline" class="wide-control">
+                    <mat-label>Descripción</mat-label>
+                    <textarea
+                      matInput
+                      rows="2"
+                      [value]="createBoxForm().description"
+                      (input)="patchCreateBoxForm({ description: readInputValue($event) })"
+                    ></textarea>
+                  </mat-form-field>
+
+                  <div class="mode-row wide-control">
+                    <button mat-stroked-button type="button" (click)="toggleCreateBoxForm()">
+                      Cancelar
+                    </button>
+                    <button mat-flat-button type="button" [disabled]="createBoxBusy()" (click)="createBox()">
+                      <mat-icon>save</mat-icon>
+                      Crear
+                    </button>
+                  </div>
+                </div>
+              }
+            </mat-card>
+
             <div class="container-grid">
               @for (box of filteredContainers(); track box.id) {
                 <a class="container-card-link" [routerLink]="['/boxes', box.code]">

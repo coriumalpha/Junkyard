@@ -644,6 +644,10 @@ export class InventoryApiService {
     return this.http.get<InventoryBoxDetail>(`/api/boxes/${encodeURIComponent(code)}`);
   }
 
+  createBox(input: InventoryBoxUpdate): Observable<InventoryBoxDetail> {
+    return this.http.post<InventoryBoxDetail>('/api/boxes', input);
+  }
+
   updateBox(id: number, input: InventoryBoxUpdate): Observable<InventoryBoxDetail> {
     return this.http.put<InventoryBoxDetail>(`/api/boxes/${id}`, input);
   }
