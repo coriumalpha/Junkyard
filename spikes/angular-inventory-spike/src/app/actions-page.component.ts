@@ -50,6 +50,10 @@ export class ActionsPageComponent {
   protected readonly linkMode = signal<LinkMode>('none');
   protected readonly linkedBoxId = signal<number | null>(null);
   protected readonly linkedItemId = signal<number | null>(null);
+  protected readonly editingId = signal<number | null>(null);
+  protected readonly editTitle = signal('');
+  protected readonly editDescription = signal('');
+  protected readonly editPriority = signal(3);
   protected readonly openActions = computed(() => this.data()?.actions.filter((action) => action.status === 'Open') ?? []);
   protected readonly completedActions = computed(() => this.data()?.actions.filter((action) => action.status === 'Completed') ?? []);
   protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
@@ -180,6 +184,47 @@ export class ActionsPageComponent {
       tap((updated) => this.replaceAction(updated)),
       catchError((error: unknown) => {
         this.error.set(error instanceof Error ? error.message : 'No se pudo reabrir la acción.');
+        return EMPTY;
+      }),
+      finalize(() => this.busyId.set(null)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected startEdit(action: InventoryAction): void {
+    this.editingId.set(action.id);
+    this.editTitle.set(action.title);
+    this.editDescription.set(action.description ?? '');
+    this.editPriority.set(action.priority);
+  }
+
+  protected cancelEdit(): void {
+    this.editingId.set(null);
+    this.editTitle.set('');
+    this.editDescription.set('');
+    this.editPriority.set(3);
+  }
+
+  protected saveEdit(action: InventoryAction): void {
+    const title = this.editTitle().trim();
+    if (!title || this.busyId()) {
+      this.error.set('El título de la tarea es obligatorio.');
+      return;
+    }
+
+    this.busyId.set(action.id);
+    this.api.updateAction(action.id, {
+      title,
+      description: this.editDescription().trim(),
+      priority: this.editPriority()
+    }).pipe(
+      tap((updated) => {
+        this.replaceAction(updated);
+        this.cancelEdit();
+        this.error.set(null);
+      }),
+      catchError((error: unknown) => {
+        this.error.set(error instanceof Error ? error.message : 'No se pudo actualizar la tarea.');
         return EMPTY;
       }),
       finalize(() => this.busyId.set(null)),

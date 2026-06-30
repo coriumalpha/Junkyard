@@ -17,8 +17,10 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatToolbarModule } from '@angular/material/toolbar';
 
 import { InventoryApiService, InventoryBoxOption, InventoryBoxUpdate, InventoryBulkUpdate, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
+import { InventoryCodePipe } from './inventory-code.pipe';
 import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
+import { TagPickerComponent } from './tag-picker.component';
 
 interface FocusVisual {
   kind: 'group' | 'item' | 'summary';
@@ -128,6 +130,8 @@ const BOX_STATUS_OPTIONS: SearchableSelectOption[] = ['Active', 'Quarantine', 'A
     MatInputModule,
     MatProgressSpinnerModule,
     SearchableSelectComponent,
+    TagPickerComponent,
+    InventoryCodePipe,
     MatSlideToggleModule,
     MatToolbarModule,
     RouterLink

@@ -340,6 +340,13 @@ export interface InventoryCommentCreate {
   text: string;
 }
 
+export interface InventoryActionUpdate {
+  title?: string;
+  description?: string;
+  text?: string;
+  priority?: number;
+}
+
 export interface InventoryBoxUpdate {
   code: string;
   name: string;
@@ -582,6 +589,14 @@ export class InventoryApiService {
 
   createAction(input: InventoryActionCreate): Observable<InventoryAction> {
     return this.http.post<InventoryAction>('/api/actions', input);
+  }
+
+  updateAction(id: number, input: InventoryActionUpdate): Observable<InventoryAction> {
+    return this.http.put<InventoryAction>(`/api/actions/${id}`, input);
+  }
+
+  updateComment(id: number, input: InventoryActionUpdate): Observable<InventoryAction> {
+    return this.http.put<InventoryAction>(`/api/comments/${id}`, input);
   }
 
   completeAction(id: number): Observable<InventoryAction> {

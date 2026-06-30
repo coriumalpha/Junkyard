@@ -569,6 +569,24 @@
   font-weight: 800;
 }
 
+.linked-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.linked-edit .wide {
+  grid-column: 1 / -1;
+}
+
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .linked-row p,
 .comment-row p,
 .empty-note {

@@ -10,6 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
 
 import { DashboardResponse, InventoryApiService } from './inventory-api.service';
+import { InventoryCodePipe } from './inventory-code.pipe';
 import { legacyUrl } from './legacy-url';
 
 @Component({
@@ -22,7 +23,8 @@ import { legacyUrl } from './legacy-url';
     MatCardModule,
     MatChipsModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    InventoryCodePipe
   ],
   templateUrl: './dashboard-page.component.html',
   styleUrl: './dashboard-page.component.scss'

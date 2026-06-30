@@ -93,7 +93,7 @@
             <div class="photo-topline">
               <span [class]="statusClass(photo)">{{ photo.status }}</span>
               @if (photo.sourceBox) {
-                <a class="box-chip" [routerLink]="['/boxes', photo.sourceBox.code]">{{ photo.sourceBox.code }}</a>
+                <a class="box-chip" [routerLink]="['/boxes', photo.sourceBox.code]">{{ photo.sourceBox.code | inventoryCode }}</a>
               }
             </div>
             <strong>{{ photo.originalFilename }}</strong>

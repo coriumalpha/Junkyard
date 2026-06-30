@@ -898,6 +898,34 @@ app.MapPost("/api/actions", async (
 
     return Results.Json(action);
 });
+app.MapPut("/api/actions/{id:int}", async (
+    int id,
+    InventoryActionUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (action, error) = await queryService.UpdateLinkedRowAsync(id, InventoryActionKind.Task, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return action is null ? Results.NotFound() : Results.Json(action);
+});
+app.MapPut("/api/comments/{id:int}", async (
+    int id,
+    InventoryActionUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (comment, error) = await queryService.UpdateLinkedRowAsync(id, InventoryActionKind.Comment, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return comment is null ? Results.NotFound() : Results.Json(comment);
+});
 app.MapPost("/api/actions/{id:int}/complete", async (
     int id,
     InventoryLiveQueryService queryService,

@@ -14,6 +14,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { InventoryApiService, InventoryOptionsResponse, PhotoInboxItem, PhotoInboxResponse, PhotoInboxStatus } from './inventory-api.service';
+import { InventoryCodePipe } from './inventory-code.pipe';
 import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
@@ -43,6 +44,7 @@ const STATUS_OPTIONS: StatusOption[] = [
     MatFormFieldModule,
     MatIconModule,
     MatProgressBarModule,
+    InventoryCodePipe,
     SearchableSelectComponent,
     MatProgressSpinnerModule
   ],

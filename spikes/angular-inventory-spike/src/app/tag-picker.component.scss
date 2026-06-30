@@ -1,0 +1,70 @@
+:host {
+  display: block;
+}
+
+.tag-picker {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tag-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--app-muted);
+  font-size: 0.84rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.selected-tags,
+.tag-grid {
+  min-width: 0;
+}
+
+.selected-tags mat-chip {
+  --mdc-chip-elevated-container-color: color-mix(in srgb, var(--tag-color) 28%, rgba(255, 255, 255, 0.08));
+}
+
+.tag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.compact .tag-grid {
+  max-height: 150px;
+}
+
+.tag-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--app-text);
+  cursor: pointer;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.tag-option:hover {
+  border-color: color-mix(in srgb, var(--tag-color) 70%, white 12%);
+  background: color-mix(in srgb, var(--tag-color) 18%, rgba(255, 255, 255, 0.045));
+}
+
+.tag-option span {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--tag-color);
+  flex: 0 0 auto;
+}

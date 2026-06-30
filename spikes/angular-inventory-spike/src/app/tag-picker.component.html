@@ -1,0 +1,40 @@
+<div class="tag-picker" [class.compact]="compact">
+  <div class="tag-picker-head">
+    <span>{{ label }}</span>
+    @if (value.length) {
+      <button mat-button type="button" (click)="clear()">
+        <mat-icon>backspace</mat-icon>
+        Limpiar
+      </button>
+    }
+  </div>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Buscar tag</mat-label>
+    <input matInput [value]="query()" (input)="query.set($any($event.target).value)" placeholder="Nombre, tema, familia..." />
+  </mat-form-field>
+
+  @if (selected().length) {
+    <mat-chip-set class="selected-tags" aria-label="Tags seleccionadas">
+      @for (tag of selected(); track tag.id) {
+        <mat-chip [style.--tag-color]="tag.color" (removed)="toggle(tag.id)">
+          {{ tag.name }}
+          <button matChipRemove type="button" [attr.aria-label]="'Quitar ' + tag.name">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip>
+      }
+    </mat-chip-set>
+  }
+
+  <div class="tag-grid">
+    @for (tag of filtered(); track tag.id) {
+      <button type="button" class="tag-option" [style.--tag-color]="tag.color" (click)="toggle(tag.id)">
+        <span></span>
+        {{ tag.name }}
+      </button>
+    } @empty {
+      <p>Sin tags disponibles.</p>
+    }
+  </div>
+</div>

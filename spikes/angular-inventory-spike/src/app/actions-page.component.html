@@ -90,30 +90,55 @@
           @for (action of openActions(); track action.id) {
             <article class="action-row">
               <div class="priority">P{{ action.priority }}</div>
-              <div class="action-copy">
-                <strong>{{ action.title }}</strong>
-                <span>{{ action.linkedLabel }}</span>
-                @if (action.description) {
-                  <p>{{ action.description }}</p>
-                }
-              </div>
-              <div class="action-buttons">
-                @if (action.spaUrl) {
-                  <a mat-button [routerLink]="action.spaUrl">
-                    <mat-icon>open_in_new</mat-icon>
-                    Abrir
-                  </a>
-                } @else if (action.legacyUrl) {
-                  <a mat-button [href]="legacyUrl(action.legacyUrl)" target="_blank" rel="noreferrer">
-                    <mat-icon>open_in_new</mat-icon>
-                    Abrir
-                  </a>
-                }
-                <button mat-flat-button type="button" (click)="complete(action)" [disabled]="busyId() === action.id">
-                  <mat-icon>check</mat-icon>
-                  Completar
-                </button>
-              </div>
+              @if (editingId() === action.id) {
+                <div class="action-edit">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Título</mat-label>
+                    <input matInput [ngModel]="editTitle()" (ngModelChange)="editTitle.set($event)" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="priority-field">
+                    <mat-label>Prioridad</mat-label>
+                    <input matInput type="number" min="1" max="5" [ngModel]="editPriority()" (ngModelChange)="editPriority.set(+$event)" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="wide">
+                    <mat-label>Detalle</mat-label>
+                    <textarea matInput rows="2" [ngModel]="editDescription()" (ngModelChange)="editDescription.set($event)"></textarea>
+                  </mat-form-field>
+                  <div class="action-buttons wide">
+                    <button mat-button type="button" (click)="cancelEdit()">Cancelar</button>
+                    <button mat-flat-button type="button" (click)="saveEdit(action)" [disabled]="busyId() === action.id">Guardar</button>
+                  </div>
+                </div>
+              } @else {
+                <div class="action-copy">
+                  <strong>{{ action.title }}</strong>
+                  <span>{{ action.linkedLabel }}</span>
+                  @if (action.description) {
+                    <p>{{ action.description }}</p>
+                  }
+                </div>
+                <div class="action-buttons">
+                  @if (action.spaUrl) {
+                    <a mat-button [routerLink]="action.spaUrl">
+                      <mat-icon>open_in_new</mat-icon>
+                      Abrir
+                    </a>
+                  } @else if (action.legacyUrl) {
+                    <a mat-button [href]="legacyUrl(action.legacyUrl)" target="_blank" rel="noreferrer">
+                      <mat-icon>open_in_new</mat-icon>
+                      Abrir
+                    </a>
+                  }
+                  <button mat-button type="button" (click)="startEdit(action)" [disabled]="busyId() === action.id">
+                    <mat-icon>edit</mat-icon>
+                    Editar
+                  </button>
+                  <button mat-flat-button type="button" (click)="complete(action)" [disabled]="busyId() === action.id">
+                    <mat-icon>check</mat-icon>
+                    Completar
+                  </button>
+                </div>
+              }
             </article>
           } @empty {
             <div class="empty">No hay acciones abiertas.</div>

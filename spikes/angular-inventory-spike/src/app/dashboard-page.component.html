@@ -53,11 +53,11 @@
               @if (box.coverUrl) {
                 <img [src]="assetUrl(box.coverUrl)!" [style.transform]="'rotate(' + box.rotationDegrees + 'deg)'" [alt]="box.name" />
               } @else {
-                <div class="placeholder">{{ box.code }}</div>
+                <div class="placeholder">{{ box.code | inventoryCode }}</div>
               }
               <div>
                 <mat-chip-set>
-                  <mat-chip>{{ box.code }}</mat-chip>
+                  <mat-chip>{{ box.code | inventoryCode }}</mat-chip>
                   <mat-chip>{{ box.containerTypeLabel }}</mat-chip>
                 </mat-chip-set>
                 <strong>{{ box.name }}</strong>

@@ -56,7 +56,7 @@
             <strong>{{ current()!.originalFilename }}</strong>
             <small>{{ current()!.importedAt | date:'short' }}</small>
             @if (current()!.sourceBox) {
-              <span>{{ current()!.sourceBox!.code }} · {{ current()!.sourceBox!.name }}</span>
+              <span>{{ current()!.sourceBox!.code | inventoryCode }} · {{ current()!.sourceBox!.name }}</span>
             }
           </div>
           <button mat-stroked-button type="button" (click)="toggleSelected(current()!)" [class.selected-action]="isSelected(current()!)">
@@ -145,12 +145,11 @@
               <mat-label>Nombre</mat-label>
               <input #createNameInput matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" />
             </mat-form-field>
-            <app-searchable-select
+            <app-tag-picker
               label="Tags"
               [value]="draftTagIds()"
-              [options]="tagOptions()"
-              [multiple]="true"
-              placeholder="Buscar tag..."
+              [tags]="options().tags"
+              [compact]="true"
               (valueChange)="draftTagIds.set($any($event))" />
             <app-searchable-select
               label="Contenedor"

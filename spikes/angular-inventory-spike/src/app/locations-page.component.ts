@@ -13,6 +13,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { EntityMiniCardComponent } from './entity-mini-card.component';
+import { InventoryCodePipe } from './inventory-code.pipe';
 import { InventoryApiService, InventoryBoxOption, InventoryLocation, InventoryOptionsResponse } from './inventory-api.service';
 
 interface LocationCard {
@@ -33,6 +34,7 @@ interface LocationCard {
     MatIconModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    InventoryCodePipe,
     RouterLink,
     EntityMiniCardComponent
   ],

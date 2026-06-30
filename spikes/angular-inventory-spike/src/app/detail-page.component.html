@@ -133,7 +133,7 @@
         <p class="eyebrow">Ítem</p>
         <h2>{{ item()!.name }}</h2>
         <div class="meta-grid">
-          <span>IT</span><strong>{{ item()!.code }}</strong>
+          <span>IT</span><strong>{{ item()!.code | inventoryCode }}</strong>
           <span>Tags</span>
           <strong class="tag-chip-row">
             @for (tag of item()!.tags; track tag.id) {
@@ -196,12 +196,10 @@
               <input matInput [ngModel]="itemForm().name" (ngModelChange)="patchItemForm({ name: $event })" />
             </mat-form-field>
 
-            <app-searchable-select
+            <app-tag-picker
               label="Tags"
               [value]="itemForm().tagIds"
-              [options]="tagOptions()"
-              [multiple]="true"
-              placeholder="Buscar tag..."
+              [tags]="options().tags"
               (valueChange)="patchItemForm({ tagIds: $any($event) })" />
 
             <div class="quick-tag wide">
@@ -303,16 +301,43 @@
           @for (action of linkedActions(); track action.id) {
             <article class="linked-row">
               <span class="priority">P{{ action.priority }}</span>
-              <div>
-                <strong>{{ action.title }}</strong>
-                @if (action.description) {
-                  <p>{{ action.description }}</p>
-                }
-              </div>
-              <button mat-button type="button" (click)="completeLinkedAction(action)" [disabled]="saving()">
-                <mat-icon>check</mat-icon>
-                Completar
-              </button>
+              @if (editingActionId() === action.id) {
+                <div class="linked-edit">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Título</mat-label>
+                    <input matInput [ngModel]="editingActionTitle()" (ngModelChange)="editingActionTitle.set($event)" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="priority-field">
+                    <mat-label>Prioridad</mat-label>
+                    <input matInput type="number" min="1" max="5" [ngModel]="editingActionPriority()" (ngModelChange)="editingActionPriority.set(+$event)" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="wide">
+                    <mat-label>Detalle</mat-label>
+                    <textarea matInput rows="2" [ngModel]="editingActionDescription()" (ngModelChange)="editingActionDescription.set($event)"></textarea>
+                  </mat-form-field>
+                  <div class="row-actions">
+                    <button mat-button type="button" (click)="cancelActionEdit()">Cancelar</button>
+                    <button mat-flat-button type="button" (click)="saveActionEdit(action)" [disabled]="saving()">Guardar</button>
+                  </div>
+                </div>
+              } @else {
+                <div>
+                  <strong>{{ action.title }}</strong>
+                  @if (action.description) {
+                    <p>{{ action.description }}</p>
+                  }
+                </div>
+                <div class="row-actions">
+                  <button mat-button type="button" (click)="startActionEdit(action)" [disabled]="saving()">
+                    <mat-icon>edit</mat-icon>
+                    Editar
+                  </button>
+                  <button mat-button type="button" (click)="completeLinkedAction(action)" [disabled]="saving()">
+                    <mat-icon>check</mat-icon>
+                    Completar
+                  </button>
+                </div>
+              }
             </article>
           } @empty {
             <p class="empty-note">Sin tareas abiertas vinculadas.</p>
@@ -332,9 +357,24 @@
         <div class="comment-list">
           @for (comment of linkedComments(); track comment.id) {
             <article class="comment-row">
-              <strong>{{ comment.title }}</strong>
-              <p>{{ comment.description }}</p>
-              <small>{{ comment.createdAt | date:'short' }}</small>
+              @if (editingCommentId() === comment.id) {
+                <mat-form-field appearance="outline">
+                  <mat-label>Comentario</mat-label>
+                  <textarea matInput rows="3" [ngModel]="editingCommentText()" (ngModelChange)="editingCommentText.set($event)"></textarea>
+                </mat-form-field>
+                <div class="row-actions">
+                  <button mat-button type="button" (click)="cancelCommentEdit()">Cancelar</button>
+                  <button mat-flat-button type="button" (click)="saveCommentEdit(comment)" [disabled]="saving()">Guardar</button>
+                </div>
+              } @else {
+                <strong>{{ comment.title }}</strong>
+                <p>{{ comment.description }}</p>
+                <small>{{ comment.createdAt | date:'short' }}</small>
+                <button mat-button type="button" (click)="startCommentEdit(comment)" [disabled]="saving()">
+                  <mat-icon>edit</mat-icon>
+                  Editar
+                </button>
+              }
             </article>
           } @empty {
             <p class="empty-note">Sin comentarios todavía.</p>
@@ -410,7 +450,7 @@
             </label>
           </div>
         } @else {
-          <div class="hero-placeholder">{{ box()!.code }}</div>
+          <div class="hero-placeholder">{{ box()!.code | inventoryCode }}</div>
           <div class="gallery-upload">
             <mat-form-field appearance="outline">
               <mat-label>Caption</mat-label>
@@ -500,7 +540,7 @@
 
       <mat-card class="info-card container-summary-card">
         <p class="eyebrow">Contenedor</p>
-        <h2>{{ box()!.code }} · {{ box()!.name }}</h2>
+        <h2>{{ box()!.code | inventoryCode }} · {{ box()!.name }}</h2>
         <div class="container-stat-grid">
           <span>
             <small>Tipo</small>
@@ -542,7 +582,7 @@
           @for (child of box()!.children; track child.id) {
               <app-entity-mini-card
                 [title]="child.name"
-                [subtitle]="child.code"
+                [subtitle]="child.code | inventoryCode"
                 [placeholder]="child.code.slice(-2)"
                 [routerLink]="['/boxes', child.code]" />
           }
@@ -579,16 +619,43 @@
           @for (action of linkedActions(); track action.id) {
             <article class="linked-row">
               <span class="priority">P{{ action.priority }}</span>
-              <div>
-                <strong>{{ action.title }}</strong>
-                @if (action.description) {
-                  <p>{{ action.description }}</p>
-                }
-              </div>
-              <button mat-button type="button" (click)="completeLinkedAction(action)" [disabled]="saving()">
-                <mat-icon>check</mat-icon>
-                Completar
-              </button>
+              @if (editingActionId() === action.id) {
+                <div class="linked-edit">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Título</mat-label>
+                    <input matInput [ngModel]="editingActionTitle()" (ngModelChange)="editingActionTitle.set($event)" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="priority-field">
+                    <mat-label>Prioridad</mat-label>
+                    <input matInput type="number" min="1" max="5" [ngModel]="editingActionPriority()" (ngModelChange)="editingActionPriority.set(+$event)" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="wide">
+                    <mat-label>Detalle</mat-label>
+                    <textarea matInput rows="2" [ngModel]="editingActionDescription()" (ngModelChange)="editingActionDescription.set($event)"></textarea>
+                  </mat-form-field>
+                  <div class="row-actions">
+                    <button mat-button type="button" (click)="cancelActionEdit()">Cancelar</button>
+                    <button mat-flat-button type="button" (click)="saveActionEdit(action)" [disabled]="saving()">Guardar</button>
+                  </div>
+                </div>
+              } @else {
+                <div>
+                  <strong>{{ action.title }}</strong>
+                  @if (action.description) {
+                    <p>{{ action.description }}</p>
+                  }
+                </div>
+                <div class="row-actions">
+                  <button mat-button type="button" (click)="startActionEdit(action)" [disabled]="saving()">
+                    <mat-icon>edit</mat-icon>
+                    Editar
+                  </button>
+                  <button mat-button type="button" (click)="completeLinkedAction(action)" [disabled]="saving()">
+                    <mat-icon>check</mat-icon>
+                    Completar
+                  </button>
+                </div>
+              }
             </article>
           } @empty {
             <p class="empty-note">Sin tareas abiertas vinculadas.</p>
@@ -608,9 +675,24 @@
         <div class="comment-list">
           @for (comment of linkedComments(); track comment.id) {
             <article class="comment-row">
-              <strong>{{ comment.title }}</strong>
-              <p>{{ comment.description }}</p>
-              <small>{{ comment.createdAt | date:'short' }}</small>
+              @if (editingCommentId() === comment.id) {
+                <mat-form-field appearance="outline">
+                  <mat-label>Comentario</mat-label>
+                  <textarea matInput rows="3" [ngModel]="editingCommentText()" (ngModelChange)="editingCommentText.set($event)"></textarea>
+                </mat-form-field>
+                <div class="row-actions">
+                  <button mat-button type="button" (click)="cancelCommentEdit()">Cancelar</button>
+                  <button mat-flat-button type="button" (click)="saveCommentEdit(comment)" [disabled]="saving()">Guardar</button>
+                </div>
+              } @else {
+                <strong>{{ comment.title }}</strong>
+                <p>{{ comment.description }}</p>
+                <small>{{ comment.createdAt | date:'short' }}</small>
+                <button mat-button type="button" (click)="startCommentEdit(comment)" [disabled]="saving()">
+                  <mat-icon>edit</mat-icon>
+                  Editar
+                </button>
+              }
             </article>
           } @empty {
             <p class="empty-note">Sin comentarios todavía.</p>
@@ -647,7 +729,7 @@
           </div>
           @for (item of sortedBoxItems(); track item.id) {
             <a class="items-table-row" [routerLink]="['/item', item.id]" role="row">
-              <span>{{ item.code }}</span>
+              <span>{{ item.code | inventoryCode }}</span>
               <strong>{{ item.name }}</strong>
               <span>{{ tagSummary(item) }}</span>
               <span>{{ item.quantityLabel }}</span>
@@ -661,7 +743,7 @@
           @for (item of sortedBoxItems(); track item.id) {
             <app-entity-mini-card
               [title]="item.name"
-              [subtitle]="item.code + ' · ' + tagSummary(item) + ' · ' + item.quantityLabel"
+              [subtitle]="(item.code | inventoryCode) + ' · ' + tagSummary(item) + ' · ' + item.quantityLabel"
               [imageUrl]="assetUrl(item.coverUrl)"
               [rotationDegrees]="item.rotationDegrees"
               [placeholder]="firstLetter(item.name)"

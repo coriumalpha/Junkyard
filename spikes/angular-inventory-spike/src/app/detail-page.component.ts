@@ -19,9 +19,11 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { EntityMiniCardComponent } from './entity-mini-card.component';
 import { ColorPickerComponent } from './color-picker.component';
 import { HierarchyTrailComponent, HierarchyTrailNode } from './hierarchy-trail.component';
+import { InventoryCodePipe } from './inventory-code.pipe';
 import { InventoryAction, InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryOptionsResponse, InventoryPhoto } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
+import { TagPickerComponent } from './tag-picker.component';
 
 type DetailKind = 'item' | 'box';
 type BoxItemsView = 'list' | 'gallery' | 'table';
@@ -45,6 +47,8 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
     MatProgressSpinnerModule,
     MatSlideToggleModule,
     ColorPickerComponent,
+    InventoryCodePipe,
+    TagPickerComponent,
     SearchableSelectComponent,
     EntityMiniCardComponent,
     HierarchyTrailComponent
@@ -78,6 +82,12 @@ export class DetailPageComponent {
   protected readonly newActionDescription = signal('');
   protected readonly newActionPriority = signal(3);
   protected readonly newCommentText = signal('');
+  protected readonly editingActionId = signal<number | null>(null);
+  protected readonly editingActionTitle = signal('');
+  protected readonly editingActionDescription = signal('');
+  protected readonly editingActionPriority = signal(3);
+  protected readonly editingCommentId = signal<number | null>(null);
+  protected readonly editingCommentText = signal('');
   protected readonly zooming = signal(false);
   protected readonly zoomOriginX = signal('50%');
   protected readonly zoomOriginY = signal('50%');
@@ -525,6 +535,84 @@ export class DetailPageComponent {
     ).subscribe();
   }
 
+  protected startActionEdit(action: InventoryAction): void {
+    this.editingActionId.set(action.id);
+    this.editingActionTitle.set(action.title);
+    this.editingActionDescription.set(action.description ?? '');
+    this.editingActionPriority.set(action.priority);
+    this.formError.set(null);
+  }
+
+  protected cancelActionEdit(): void {
+    this.editingActionId.set(null);
+    this.editingActionTitle.set('');
+    this.editingActionDescription.set('');
+    this.editingActionPriority.set(3);
+  }
+
+  protected saveActionEdit(action: InventoryAction): void {
+    const title = this.editingActionTitle().trim();
+    if (!title || this.saving()) {
+      this.formError.set('El título de la tarea es obligatorio.');
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    this.api.updateAction(action.id, {
+      title,
+      description: this.editingActionDescription().trim(),
+      priority: this.editingActionPriority()
+    }).pipe(
+      tap((updated) => {
+        this.replaceLinkedAction(updated);
+        this.cancelActionEdit();
+        this.saveMessage.set('Tarea actualizada.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo actualizar la tarea.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected startCommentEdit(comment: InventoryAction): void {
+    this.editingCommentId.set(comment.id);
+    this.editingCommentText.set(comment.description ?? '');
+    this.formError.set(null);
+  }
+
+  protected cancelCommentEdit(): void {
+    this.editingCommentId.set(null);
+    this.editingCommentText.set('');
+  }
+
+  protected saveCommentEdit(comment: InventoryAction): void {
+    const text = this.editingCommentText().trim();
+    if (!text || this.saving()) {
+      this.formError.set('El comentario no puede quedar vacío.');
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    this.api.updateComment(comment.id, { text }).pipe(
+      tap((updated) => {
+        this.replaceLinkedComment(updated);
+        this.cancelCommentEdit();
+        this.saveMessage.set('Comentario actualizado.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo actualizar el comentario.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
   protected legacyUrl(path: string | null | undefined): string {
     return legacyUrl(path);
   }
@@ -860,6 +948,18 @@ export class DetailPageComponent {
         : actions.filter((candidate) => candidate.id !== action.id);
     this.item.update((item) => item ? { ...item, actions: replace(item.actions) } : item);
     this.box.update((box) => box ? { ...box, actions: replace(box.actions) } : box);
+  }
+
+  private replaceLinkedAction(action: InventoryAction): void {
+    const replace = (actions: InventoryAction[]) => actions.map((candidate) => candidate.id === action.id ? action : candidate);
+    this.item.update((item) => item ? { ...item, actions: replace(item.actions) } : item);
+    this.box.update((box) => box ? { ...box, actions: replace(box.actions) } : box);
+  }
+
+  private replaceLinkedComment(comment: InventoryAction): void {
+    const replace = (comments: InventoryAction[]) => comments.map((candidate) => candidate.id === comment.id ? comment : candidate);
+    this.item.update((item) => item ? { ...item, comments: replace(item.comments) } : item);
+    this.box.update((box) => box ? { ...box, comments: replace(box.comments) } : box);
   }
 
   protected activePhotoTransform(photo: InventoryPhoto): string {

@@ -24,6 +24,53 @@
       </button>
     </div>
 
+    @if (!drawerCollapsed() || handset()) {
+      <section class="quick-search">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Búsqueda rápida</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input
+            matInput
+            [ngModel]="quickSearch()"
+            (ngModelChange)="updateQuickSearch($event)"
+            placeholder="IT, CT, nombre, tag..."
+          />
+          @if (quickSearch()) {
+            <button mat-icon-button matSuffix type="button" (click)="clearQuickSearch()" aria-label="Limpiar búsqueda">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+        </mat-form-field>
+
+        @if (quickLoading()) {
+          <div class="quick-state">
+            <mat-progress-spinner mode="indeterminate" diameter="20" />
+            <span>Buscando...</span>
+          </div>
+        } @else if (quickSearch().trim().length >= 2) {
+          <div class="quick-results">
+            @for (item of quickItems(); track item.id) {
+              <button type="button" class="quick-result" (click)="openQuickItem(item)">
+                <span class="quick-kind">IT</span>
+                <strong>{{ item.code | inventoryCode }}</strong>
+                <span>{{ item.name }}</span>
+              </button>
+            }
+            @for (box of quickBoxes(); track box.boxId) {
+              <button type="button" class="quick-result" (click)="openQuickBox(box)">
+                <span class="quick-kind">CT</span>
+                <strong>{{ box.code | inventoryCode }}</strong>
+                <span>{{ box.name }}</span>
+              </button>
+            }
+            @if (!quickItems().length && !quickBoxes().length) {
+              <div class="quick-empty">Sin resultados</div>
+            }
+          </div>
+        }
+      </section>
+    }
+
     <mat-nav-list class="drawer-nav">
       <a mat-list-item routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
         <mat-icon matListItemIcon>dashboard</mat-icon>

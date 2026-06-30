@@ -78,7 +78,7 @@
             @for (box of card.boxes.slice(0, 4); track box.id) {
               <app-entity-mini-card
                 [title]="box.name"
-                [subtitle]="box.code + ' · ' + box.containerTypeLabel"
+                [subtitle]="(box.code | inventoryCode) + ' · ' + box.containerTypeLabel"
                 [meta]="box.path"
                 [imageUrl]="assetUrl(box.coverUrl)"
                 [rotationDegrees]="box.rotationDegrees"

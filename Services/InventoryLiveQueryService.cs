@@ -1265,6 +1265,50 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         return (await ToActionDtoAsync(comment, cancellationToken), null);
     }
 
+    public async Task<(InventoryActionDto? Row, string? Error)> UpdateLinkedRowAsync(
+        int id,
+        InventoryActionKind expectedKind,
+        InventoryActionUpdateDto input,
+        CancellationToken cancellationToken)
+    {
+        var row = await db.InventoryActions.FirstOrDefaultAsync(action => action.Id == id && action.Kind == expectedKind, cancellationToken);
+        if (row is null)
+        {
+            return (null, null);
+        }
+
+        if (expectedKind == InventoryActionKind.Task)
+        {
+            var title = (input.Title ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return (null, "El título es obligatorio.");
+            }
+
+            row.Title = title;
+            row.Priority = Math.Clamp(input.Priority ?? row.Priority, 1, 5);
+        }
+
+        if (expectedKind == InventoryActionKind.Comment)
+        {
+            row.Title = "Comentario";
+        }
+
+        var description = expectedKind == InventoryActionKind.Comment
+            ? (input.Text ?? input.Description ?? "").Trim()
+            : (input.Description ?? "").Trim();
+        if (expectedKind == InventoryActionKind.Comment && string.IsNullOrWhiteSpace(description))
+        {
+            return (null, "El comentario es obligatorio.");
+        }
+
+        row.Description = string.IsNullOrWhiteSpace(description) ? null : description;
+        row.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return (await ToActionDtoAsync(row, cancellationToken), null);
+    }
+
     public async Task<InventoryOptionsDto> GetOptionsAsync(CancellationToken cancellationToken)
     {
         var categories = await db.Items.AsNoTracking()
@@ -2292,6 +2336,12 @@ public record InventoryActionCreateDto(
     int Priority);
 
 public record InventoryCommentCreateDto(string? Text);
+
+public record InventoryActionUpdateDto(
+    string? Title,
+    string? Description,
+    string? Text,
+    int? Priority);
 
 public record InventoryOptionsDto(
     List<string> Categories,

@@ -12,14 +12,16 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { InventoryApiService, InventoryItem, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse } from './inventory-api.service';
+import { InventoryCodePipe } from './inventory-code.pipe';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
+import { TagPickerComponent } from './tag-picker.component';
 
 type ReviewPanel = 'none' | 'create' | 'assignItem' | 'assignBox';
 
 @Component({
   selector: 'app-photo-review-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, SearchableSelectComponent],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
   templateUrl: './photo-review-page.component.html',
   styleUrl: './photo-review-page.component.scss'
 })

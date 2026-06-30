@@ -110,7 +110,7 @@
           <mat-chip-set>
             @for (box of selectedBoxOptions(); track box.id) {
               <mat-chip (removed)="removeBoxId(box.id)">
-                {{ box.code }} · {{ box.name }}
+                {{ box.code | inventoryCode }} · {{ box.name }}
                 <button matChipRemove type="button" [attr.aria-label]="'Quitar ' + box.code">
                   <mat-icon>cancel</mat-icon>
                 </button>
@@ -138,12 +138,11 @@
         </mat-expansion-panel-header>
 
         <div class="advanced-grid">
-          <app-searchable-select
+          <app-tag-picker
             label="Tags"
             [value]="state().tagIds"
-            [options]="tagOptions()"
-            [multiple]="true"
-            placeholder="Buscar tag..."
+            [tags]="options().tags"
+            [compact]="true"
             (valueChange)="setTagIds($any($event))" />
 
           @if (state().tagIds.length) {
@@ -254,7 +253,7 @@
           <div class="scope-header">
             <div>
               <p class="eyebrow">Ámbito activo</p>
-              <h2>{{ data()?.selectedBox?.name || data()?.boxCode || 'Inventario general' }}</h2>
+              <h2>{{ data()?.selectedBox?.name || (data()?.boxCode | inventoryCode) || 'Inventario general' }}</h2>
               <p class="scope-path">
                 {{ data()?.selectedBox?.path || (data()?.selectedBoxes?.[0]?.path ?? 'Sin caja seleccionada') }}
               </p>
@@ -270,7 +269,7 @@
               @for (box of data()?.selectedBoxes ?? []; track box.id) {
                 <mat-chip>
                   <mat-icon>inventory_2</mat-icon>
-                  {{ box.code }} · {{ box.name }}
+                  {{ box.code | inventoryCode }} · {{ box.name }}
                 </mat-chip>
               }
             </mat-chip-set>
@@ -309,7 +308,7 @@
                           }
 
                           <div class="group-copy">
-                            <span class="eyebrow">{{ group.code }}</span>
+                            <span class="eyebrow">{{ group.code | inventoryCode }}</span>
                             <strong>{{ group.name }}</strong>
                             <span class="group-path">{{ group.path }}</span>
                           </div>
@@ -410,7 +409,7 @@
                           }
 
                           <div class="group-item-main">
-                            <span class="item-code">{{ item.code }}</span>
+                            <span class="item-code">{{ item.code | inventoryCode }}</span>
                             <strong>{{ item.name }}</strong>
                             <span>{{ tagSummary(item) }}</span>
                           </div>
@@ -503,7 +502,7 @@
                     }
 
                     <div class="item-copy">
-                      <p class="eyebrow">{{ item.code }} · {{ tagSummary(item) }}</p>
+                      <p class="eyebrow">{{ item.code | inventoryCode }} · {{ tagSummary(item) }}</p>
                       <h3>{{ item.name }}</h3>
                       <p>{{ item.quantityLabel }}</p>
                       <p class="item-path">{{ item.boxPath || 'Sin caja' }}</p>
@@ -560,7 +559,7 @@
 
                   <div class="gallery-copy">
                     <div>
-                      <p class="eyebrow">{{ item.code }} · {{ item.boxCode || 'Sin caja' }}</p>
+                      <p class="eyebrow">{{ item.code | inventoryCode }} · {{ item.boxCode ? (item.boxCode | inventoryCode) : 'Sin caja' }}</p>
                       <h3>{{ item.name }}</h3>
                     </div>
                     <p class="gallery-meta">{{ item.quantityLabel }}</p>
@@ -621,7 +620,7 @@
                   </div>
 
                   <div class="table-main">
-                    <span class="item-code">{{ item.code }}</span>
+                    <span class="item-code">{{ item.code | inventoryCode }}</span>
                   </div>
 
                   <div class="table-main">
@@ -772,7 +771,7 @@
                       </div>
                     }
                     <div class="container-copy">
-                      <p class="eyebrow">{{ box.code }}</p>
+                      <p class="eyebrow">{{ box.code | inventoryCode }}</p>
                       <h3>{{ box.name }}</h3>
                       <p>{{ box.containerTypeLabel }}</p>
                       <p>{{ box.locationName || 'Sin ubicación' }}</p>

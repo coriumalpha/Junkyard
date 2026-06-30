@@ -175,6 +175,18 @@
   flex: 1;
 }
 
+.action-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.action-edit .wide {
+  grid-column: 1 / -1;
+}
+
 .action-copy strong {
   overflow-wrap: anywhere;
 }
