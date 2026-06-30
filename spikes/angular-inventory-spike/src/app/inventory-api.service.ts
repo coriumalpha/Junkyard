@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 export type InventoryViewMode = 'grouped' | 'flat';
-export type InventoryLayoutMode = 'grouped' | 'flat' | 'gallery' | 'table';
+export type InventoryLayoutMode = 'grouped' | 'flat' | 'gallery' | 'table' | 'containers';
 
 export interface InventoryQueryState {
   q: string;
@@ -277,6 +277,17 @@ export interface InventoryItemUpdate {
   obsolete: boolean;
   notes: string;
   boxId: number | null;
+}
+
+export interface InventoryBulkUpdate {
+  itemIds: number[];
+  moveToBoxId?: number | null;
+  addTagId?: number | null;
+  removeTagId?: number | null;
+}
+
+export interface InventoryBulkUpdateResponse {
+  updatedCount: number;
 }
 
 export interface InventoryItemBox {
@@ -603,6 +614,10 @@ export class InventoryApiService {
 
   updateItem(id: number, input: InventoryItemUpdate): Observable<InventoryItemDetail> {
     return this.http.put<InventoryItemDetail>(`/api/items/${id}`, input);
+  }
+
+  bulkUpdateItems(input: InventoryBulkUpdate): Observable<InventoryBulkUpdateResponse> {
+    return this.http.post<InventoryBulkUpdateResponse>('/api/items/bulk', input);
   }
 
   setItemCoverPhoto(id: number, photoId: number): Observable<InventoryItemDetail> {

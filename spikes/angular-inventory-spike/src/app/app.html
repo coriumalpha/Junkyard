@@ -39,6 +39,13 @@
           <span matListItemLine>Filtros y resultados</span>
         }
       </a>
+      <a mat-list-item routerLink="/inventory" [queryParams]="{ layout: 'containers', view: 'grouped' }" [class.active]="isContainersSection()" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>inventory</mat-icon>
+        <span matListItemTitle>Contenedores</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Cajas y ubicaciones</span>
+        }
+      </a>
       <a mat-list-item routerLink="/inventory" [queryParams]="{ onlyConsumable: 'true', layout: 'flat', view: 'flat' }" [class.active]="isConsumablesSection()" (click)="closeDrawer()">
         <mat-icon matListItemIcon>shopping_basket</mat-icon>
         <span matListItemTitle>Consumibles</span>

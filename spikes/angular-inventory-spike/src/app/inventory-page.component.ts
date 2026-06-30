@@ -6,6 +6,7 @@ import { catchError, distinctUntilChanged, EMPTY, finalize, map, switchMap, tap 
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -15,7 +16,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatToolbarModule } from '@angular/material/toolbar';
 
-import { InventoryApiService, InventoryBoxOption, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
+import { InventoryApiService, InventoryBoxOption, InventoryBulkUpdate, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
@@ -77,6 +78,12 @@ const LAYOUT_OPTIONS: LayoutOption[] = [
     label: 'Tabla',
     icon: 'table_rows',
     description: 'Base preparada para tabla futura'
+  },
+  {
+    value: 'containers',
+    label: 'Contenedores',
+    icon: 'inventory',
+    description: 'Gestión visual de cajas'
   }
 ];
 
@@ -84,7 +91,8 @@ const LAYOUT_TO_VIEW: Record<InventoryLayoutMode, InventoryViewMode> = {
   grouped: 'grouped',
   flat: 'flat',
   gallery: 'flat',
-  table: 'flat'
+  table: 'flat',
+  containers: 'grouped'
 };
 
 @Component({
@@ -95,6 +103,7 @@ const LAYOUT_TO_VIEW: Record<InventoryLayoutMode, InventoryViewMode> = {
     MatButtonModule,
     MatButtonToggleModule,
     MatCardModule,
+    MatCheckboxModule,
     MatChipsModule,
     MatExpansionModule,
     MatFormFieldModule,
@@ -117,9 +126,42 @@ export class InventoryPageComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly expandedGroups = signal<Record<string, boolean>>({});
   protected readonly groupPages = signal<Record<string, number>>({});
+  protected readonly editMode = signal(false);
+  protected readonly selectedItemIds = signal<number[]>([]);
+  protected readonly bulkTagId = signal<number | null>(null);
+  protected readonly bulkBoxId = signal<number | null>(null);
+  protected readonly bulkBusy = signal(false);
+  protected readonly bulkMessage = signal<string | null>(null);
   protected readonly groups = computed(() => this.data()?.groups ?? []);
   protected readonly groupTree = computed(() => this.buildGroupTree(this.groups()));
   protected readonly items = computed(() => this.data()?.items ?? []);
+  protected readonly visibleItems = computed(() => this.state().layout === 'grouped'
+    ? this.groups().flatMap((group) => group.items)
+    : this.items());
+  protected readonly selectedItemsCount = computed(() => this.selectedItemIds().length);
+  protected readonly shouldAutoExpandGroups = computed(() => {
+    const state = this.state();
+    return state.layout === 'grouped'
+      && Boolean(state.q.trim() || state.category.trim() || state.tagIds.length || state.boxIds.length || state.locationId !== null || state.onlyConsumable || state.onlyOrphans);
+  });
+  protected readonly filteredContainers = computed(() => {
+    const state = this.state();
+    const query = state.q.trim().toLocaleLowerCase();
+    const selectedLocationName = state.locationId === null ? null : this.locationLabel(state.locationId);
+    return this.options().boxes.filter((box) => {
+      if (selectedLocationName !== null && box.locationName !== selectedLocationName) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return [box.code, box.name, box.path, box.locationName, box.containerTypeLabel]
+        .filter(Boolean)
+        .some((value) => value!.toLocaleLowerCase().includes(query));
+    });
+  });
   protected readonly focusVisuals = computed(() => this.buildFocusVisuals());
   protected readonly selectedBoxOptions = computed(() => {
     const selected = new Set(this.state().boxIds);
@@ -156,7 +198,11 @@ export class InventoryPageComponent {
         this.loading.set(true);
         this.error.set(null);
         return this.api.fetchInventory(state).pipe(
-          tap((response) => this.data.set(response)),
+          tap((response) => {
+            this.data.set(response);
+            const visibleIds = new Set(response.items.map((item) => item.id));
+            this.selectedItemIds.update((current) => current.filter((id) => visibleIds.has(id)));
+          }),
           catchError((error: unknown) => {
             this.error.set(this.describeError(error));
             this.data.set(null);
@@ -232,6 +278,72 @@ export class InventoryPageComponent {
       onlyOrphans: value,
       onlyConsumable: value ? false : this.state().onlyConsumable
     });
+  }
+
+  protected toggleEditMode(): void {
+    this.editMode.update((value) => !value);
+    this.bulkMessage.set(null);
+    if (!this.editMode()) {
+      this.clearSelection();
+    }
+  }
+
+  protected isItemSelected(item: InventoryItem): boolean {
+    return this.selectedItemIds().includes(item.id);
+  }
+
+  protected toggleItemSelection(item: InventoryItem, event?: unknown): void {
+    const maybeEvent = event as { stopPropagation?: () => void; preventDefault?: () => void } | undefined;
+    if (typeof maybeEvent?.stopPropagation === 'function') {
+      maybeEvent.stopPropagation();
+    }
+
+    if (typeof maybeEvent?.preventDefault === 'function') {
+      maybeEvent.preventDefault();
+    }
+
+    this.selectedItemIds.update((current) =>
+      current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id]);
+  }
+
+  protected selectAllVisible(): void {
+    this.selectedItemIds.set(Array.from(new Set(this.visibleItems().map((item) => item.id))));
+  }
+
+  protected clearSelection(): void {
+    this.selectedItemIds.set([]);
+    this.bulkTagId.set(null);
+    this.bulkBoxId.set(null);
+  }
+
+  protected bulkMoveToBox(): void {
+    const boxId = this.bulkBoxId();
+    if (!boxId) {
+      this.bulkMessage.set('Selecciona un contenedor destino.');
+      return;
+    }
+
+    this.runBulk({ moveToBoxId: boxId }, 'Ítems movidos.');
+  }
+
+  protected bulkAddTag(): void {
+    const tagId = this.bulkTagId();
+    if (!tagId) {
+      this.bulkMessage.set('Selecciona un tag.');
+      return;
+    }
+
+    this.runBulk({ addTagId: tagId }, 'Tag añadido a la selección.');
+  }
+
+  protected bulkRemoveTag(): void {
+    const tagId = this.bulkTagId();
+    if (!tagId) {
+      this.bulkMessage.set('Selecciona un tag.');
+      return;
+    }
+
+    this.runBulk({ removeTagId: tagId }, 'Tag retirado de la selección.');
   }
 
   protected backendUrl(path: string | null | undefined): string {
@@ -391,6 +503,10 @@ export class InventoryPageComponent {
   }
 
   protected isGroupExpanded(group: InventoryGroup): boolean {
+    if (this.shouldAutoExpandGroups()) {
+      return true;
+    }
+
     return this.expandedGroups()[this.groupKey(group)] ?? false;
   }
 
@@ -463,6 +579,32 @@ export class InventoryPageComponent {
 
   protected layoutGridClass(): string {
     return `layout-${this.state().layout}`;
+  }
+
+  private runBulk(action: Omit<InventoryBulkUpdate, 'itemIds'>, success: string): void {
+    const itemIds = this.selectedItemIds();
+    if (!itemIds.length || this.bulkBusy()) {
+      this.bulkMessage.set('Selecciona al menos un ítem.');
+      return;
+    }
+
+    this.bulkBusy.set(true);
+    this.bulkMessage.set(null);
+    this.api.bulkUpdateItems({ itemIds, ...action }).pipe(
+      switchMap((response) => this.api.fetchInventory(this.state()).pipe(
+        tap((data) => {
+          this.data.set(data);
+          this.bulkMessage.set(`${success} ${response.updatedCount} actualizados.`);
+          this.clearSelection();
+        })
+      )),
+      catchError((error: unknown) => {
+        this.bulkMessage.set(this.describeError(error));
+        return EMPTY;
+      }),
+      finalize(() => this.bulkBusy.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
   }
 
   private navigate(patch: Partial<InventoryQueryState>): void {
@@ -576,7 +718,7 @@ export class InventoryPageComponent {
   }
 
   private isLayoutMode(value: string | null): value is InventoryLayoutMode {
-    return value === 'grouped' || value === 'flat' || value === 'gallery' || value === 'table';
+    return value === 'grouped' || value === 'flat' || value === 'gallery' || value === 'table' || value === 'containers';
   }
 
   private deriveBackendView(layout: InventoryLayoutMode): InventoryViewMode {

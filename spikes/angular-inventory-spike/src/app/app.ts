@@ -81,7 +81,11 @@ export class App {
       return true;
     }
 
-    return path.startsWith('/inventory') && !this.hasQueryFlag('onlyConsumable') && !this.hasQueryFlag('onlyOrphans');
+    return path.startsWith('/inventory') && !this.hasQueryFlag('onlyConsumable') && !this.hasQueryFlag('onlyOrphans') && !this.hasQueryValue('layout', 'containers');
+  }
+
+  protected isContainersSection(): boolean {
+    return this.currentUrl().split('?')[0].startsWith('/inventory') && this.hasQueryValue('layout', 'containers');
   }
 
   protected isConsumablesSection(): boolean {
@@ -99,5 +103,10 @@ export class App {
   private hasQueryFlag(name: string): boolean {
     const query = this.currentUrl().split('?')[1] ?? '';
     return new URLSearchParams(query).get(name)?.toLowerCase() === 'true';
+  }
+
+  private hasQueryValue(name: string, value: string): boolean {
+    const query = this.currentUrl().split('?')[1] ?? '';
+    return new URLSearchParams(query).get(name)?.toLowerCase() === value.toLowerCase();
   }
 }

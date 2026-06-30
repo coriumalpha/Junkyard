@@ -143,6 +143,102 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         return (await GetItemDetailAsync(id, cancellationToken), null);
     }
 
+    public async Task<(InventoryBulkUpdateResponseDto? Response, string? Error)> BulkUpdateItemsAsync(
+        InventoryBulkUpdateDto input,
+        CancellationToken cancellationToken)
+    {
+        var itemIds = input.ItemIds?.Where(id => id > 0).Distinct().ToList() ?? [];
+        if (itemIds.Count == 0)
+        {
+            return (null, "Selecciona al menos un ítem.");
+        }
+
+        var hasMove = input.MoveToBoxId.HasValue;
+        var hasAddTag = input.AddTagId.HasValue;
+        var hasRemoveTag = input.RemoveTagId.HasValue;
+        if ((hasMove ? 1 : 0) + (hasAddTag ? 1 : 0) + (hasRemoveTag ? 1 : 0) != 1)
+        {
+            return (null, "Selecciona una única acción bulk.");
+        }
+
+        if (input.MoveToBoxId is int moveToBoxId
+            && moveToBoxId > 0
+            && !await db.Boxes.AnyAsync(box => box.Id == moveToBoxId, cancellationToken))
+        {
+            return (null, "El contenedor seleccionado no existe.");
+        }
+
+        Tag? addTag = null;
+        if (input.AddTagId is int addTagId)
+        {
+            addTag = await db.Tags.FirstOrDefaultAsync(tag => tag.Id == addTagId, cancellationToken);
+            if (addTag is null)
+            {
+                return (null, "El tag a añadir no existe.");
+            }
+        }
+
+        Tag? removeTag = null;
+        if (input.RemoveTagId is int removeTagId)
+        {
+            removeTag = await db.Tags.FirstOrDefaultAsync(tag => tag.Id == removeTagId, cancellationToken);
+            if (removeTag is null)
+            {
+                return (null, "El tag a retirar no existe.");
+            }
+        }
+
+        var fallbackTag = removeTag is null ? null : await GetOrCreateDefaultTagAsync(cancellationToken);
+        var items = await db.Items
+            .Include(item => item.ItemTags)
+            .ThenInclude(itemTag => itemTag.Tag)
+            .Where(item => itemIds.Contains(item.Id))
+            .ToListAsync(cancellationToken);
+
+        if (items.Count == 0)
+        {
+            return (null, "No se encontró ningún ítem seleccionado.");
+        }
+
+        foreach (var item in items)
+        {
+            if (hasMove)
+            {
+                item.BoxId = input.MoveToBoxId is > 0 ? input.MoveToBoxId : null;
+            }
+
+            if (addTag is not null && item.ItemTags.All(itemTag => itemTag.TagId != addTag.Id))
+            {
+                item.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = addTag.Id, Tag = addTag });
+            }
+
+            if (removeTag is not null)
+            {
+                var existing = item.ItemTags.Where(itemTag => itemTag.TagId == removeTag.Id).ToList();
+                foreach (var itemTag in existing)
+                {
+                    item.ItemTags.Remove(itemTag);
+                }
+
+                if (item.ItemTags.Count == 0 && fallbackTag is not null)
+                {
+                    item.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = fallbackTag.Id, Tag = fallbackTag });
+                }
+            }
+
+            var primaryTag = item.ItemTags
+                .Select(itemTag => itemTag.Tag)
+                .Where(tag => tag is not null)
+                .OrderBy(tag => tag!.Name)
+                .FirstOrDefault();
+            item.Category = primaryTag?.Name ?? fallbackTag?.Name ?? item.Category;
+            item.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return (new InventoryBulkUpdateResponseDto(items.Count), null);
+    }
+
     public async Task<(InventoryItemDetailDto? Item, string? Error)> SetItemCoverPhotoAsync(
         int id,
         int photoId,
@@ -1952,6 +2048,14 @@ public record InventoryItemUpdateDto(
     bool Obsolete,
     string? Notes,
     int? BoxId);
+
+public record InventoryBulkUpdateDto(
+    List<int>? ItemIds,
+    int? MoveToBoxId,
+    int? AddTagId,
+    int? RemoveTagId);
+
+public record InventoryBulkUpdateResponseDto(int UpdatedCount);
 
 public record InventoryItemBoxDto(
     int Id,

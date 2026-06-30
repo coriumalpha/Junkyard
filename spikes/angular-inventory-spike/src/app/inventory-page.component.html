@@ -14,6 +14,10 @@
       </div>
 
       <div class="workspace-actions">
+        <button mat-flat-button type="button" (click)="toggleEditMode()" [class.active-action]="editMode()">
+          <mat-icon>{{ editMode() ? 'close' : 'edit' }}</mat-icon>
+          {{ editMode() ? 'Cerrar edición' : 'Editar' }}
+        </button>
         <a mat-stroked-button class="ghost-link" [href]="currentScopeBackendUrl()" target="_blank" rel="noreferrer">
           <mat-icon>open_in_new</mat-icon>
           Abrir Razor
@@ -183,6 +187,54 @@
       </mat-expansion-panel>
     </mat-card>
 
+    @if (editMode()) {
+      <mat-card class="bulk-card">
+        <div class="bulk-summary">
+          <p class="eyebrow">Edición bulk</p>
+          <strong>{{ selectedItemsCount() }} seleccionados</strong>
+          @if (bulkMessage()) {
+            <span>{{ bulkMessage() }}</span>
+          }
+        </div>
+        <div class="bulk-actions">
+          <button mat-stroked-button type="button" (click)="selectAllVisible()" [disabled]="!visibleItems().length || bulkBusy()">
+            <mat-icon>select_all</mat-icon>
+            Seleccionar visibles
+          </button>
+          <button mat-stroked-button type="button" (click)="clearSelection()" [disabled]="!selectedItemsCount() || bulkBusy()">
+            <mat-icon>close</mat-icon>
+            Limpiar
+          </button>
+          <app-searchable-select
+            label="Tag"
+            [value]="bulkTagId()"
+            [options]="tagOptions()"
+            noneLabel="Sin tag"
+            placeholder="Buscar tag..."
+            (valueChange)="bulkTagId.set($any($event))" />
+          <button mat-stroked-button type="button" (click)="bulkAddTag()" [disabled]="!selectedItemsCount() || !bulkTagId() || bulkBusy()">
+            <mat-icon>add</mat-icon>
+            Añadir tag
+          </button>
+          <button mat-stroked-button type="button" (click)="bulkRemoveTag()" [disabled]="!selectedItemsCount() || !bulkTagId() || bulkBusy()">
+            <mat-icon>remove</mat-icon>
+            Retirar tag
+          </button>
+          <app-searchable-select
+            label="Mover a"
+            [value]="bulkBoxId()"
+            [options]="boxOptions()"
+            noneLabel="Sin caja"
+            placeholder="Buscar contenedor..."
+            (valueChange)="bulkBoxId.set($any($event))" />
+          <button mat-flat-button type="button" (click)="bulkMoveToBox()" [disabled]="!selectedItemsCount() || !bulkBoxId() || bulkBusy()">
+            <mat-icon>drive_file_move</mat-icon>
+            Mover
+          </button>
+        </div>
+      </mat-card>
+    }
+
     @if (loading()) {
       <section class="state-panel">
         <mat-progress-spinner mode="indeterminate" diameter="52" />
@@ -226,7 +278,7 @@
         </mat-card>
       }
 
-      <section class="results-section" id="results" [ngClass]="layoutGridClass()">
+      <section class="results-section" id="results" [ngClass]="layoutGridClass()" [class.edit-mode]="editMode()">
         @switch (state().layout) {
           @case ('grouped') {
             <div class="grouped-list">
@@ -336,6 +388,14 @@
                     <div class="group-items-list">
                       @for (item of pagedGroupItems(group); track trackByItem($index, item)) {
                         <article class="group-item-row clickable-row" [routerLink]="['/item', item.id]" tabindex="0">
+                          @if (editMode()) {
+                            <mat-checkbox
+                              class="selection-check"
+                              [checked]="isItemSelected(item)"
+                              (click)="$event.stopPropagation()"
+                              (change)="toggleItemSelection(item, $event)"
+                              aria-label="Seleccionar ítem" />
+                          }
                           @if (item.coverUrl) {
                             <img
                               class="group-item-thumb"
@@ -422,6 +482,14 @@
               @for (item of items(); track trackByItem($index, item)) {
                 <a class="item-card-link" [routerLink]="['/item', item.id]">
                 <mat-card class="item-card">
+                  @if (editMode()) {
+                    <mat-checkbox
+                      class="selection-check floating"
+                      [checked]="isItemSelected(item)"
+                      (click)="$event.stopPropagation()"
+                      (change)="toggleItemSelection(item, $event)"
+                      aria-label="Seleccionar ítem" />
+                  }
                   <div class="item-card-top">
                     @if (item.coverUrl) {
                       <img
@@ -469,6 +537,14 @@
               @for (item of items(); track trackByItem($index, item)) {
                 <a class="item-card-link" [routerLink]="['/item', item.id]">
                 <mat-card class="gallery-card">
+                  @if (editMode()) {
+                    <mat-checkbox
+                      class="selection-check floating"
+                      [checked]="isItemSelected(item)"
+                      (click)="$event.stopPropagation()"
+                      (change)="toggleItemSelection(item, $event)"
+                      aria-label="Seleccionar ítem" />
+                  }
                   @if (item.coverUrl) {
                     <img
                       class="gallery-cover"
@@ -511,6 +587,9 @@
           @case ('table') {
             <div class="table-shell">
               <div class="table-head">
+                @if (editMode()) {
+                  <span></span>
+                }
                 <span>Foto</span>
                 <span>IT</span>
                 <span>Ítem</span>
@@ -522,6 +601,13 @@
 
               @for (item of items(); track trackByItem($index, item)) {
                 <article class="table-row">
+                  @if (editMode()) {
+                    <mat-checkbox
+                      class="selection-check"
+                      [checked]="isItemSelected(item)"
+                      (change)="toggleItemSelection(item, $event)"
+                      aria-label="Seleccionar ítem" />
+                  }
                   <div class="table-photo">
                     @if (item.coverUrl) {
                       <img
@@ -568,10 +654,48 @@
               }
             </div>
           }
+
+          @case ('containers') {
+            <div class="container-grid">
+              @for (box of filteredContainers(); track box.id) {
+                <a class="container-card-link" [routerLink]="['/boxes', box.code]">
+                  <mat-card class="container-card">
+                    @if (box.coverUrl) {
+                      <img
+                        class="container-cover"
+                        [src]="assetUrl(box.coverUrl)!"
+                        [style.transform]="'rotate(' + box.rotationDegrees + 'deg)'"
+                        [alt]="box.name"
+                      />
+                    } @else {
+                      <div class="container-cover placeholder">
+                        <span>{{ box.code.slice(0, 2) }}</span>
+                      </div>
+                    }
+                    <div class="container-copy">
+                      <p class="eyebrow">{{ box.code }}</p>
+                      <h3>{{ box.name }}</h3>
+                      <p>{{ box.containerTypeLabel }}</p>
+                      <p>{{ box.locationName || 'Sin ubicación' }}</p>
+                      <small>{{ box.path }}</small>
+                    </div>
+                  </mat-card>
+                </a>
+              } @empty {
+                <mat-card class="state-panel empty">
+                  <mat-icon>inventory_2</mat-icon>
+                  <div>
+                    <h2>Sin contenedores</h2>
+                    <p>No hay contenedores que coincidan con este filtro.</p>
+                  </div>
+                </mat-card>
+              }
+            </div>
+          }
         }
       </section>
 
-      @if (!(groups().length || items().length)) {
+      @if (state().layout !== 'containers' && !(groups().length || items().length)) {
         <mat-card class="state-panel empty" id="photos">
           <mat-icon>inventory_2</mat-icon>
           <div>

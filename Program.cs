@@ -416,6 +416,19 @@ app.MapPut("/api/items/{id:int}", async (
 
     return item is null ? Results.NotFound() : Results.Json(item);
 });
+app.MapPost("/api/items/bulk", async (
+    InventoryBulkUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (response, error) = await queryService.BulkUpdateItemsAsync(input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return Results.Json(response);
+});
 app.MapPost("/api/items/{id:int}/actions", async (
     int id,
     InventoryActionCreateDto input,
