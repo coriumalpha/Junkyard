@@ -140,10 +140,14 @@
         }
 
         @if (panel() === 'create') {
-          <mat-card class="action-card">
+          <mat-card class="action-card create-item-card" (keydown.control.enter)="createItem(); $event.preventDefault()" (keydown.escape)="closePanel()">
+            <div class="panel-title-row">
+              <strong>Nuevo ítem</strong>
+              <span>Ctrl+Enter crea · Esc cierra</span>
+            </div>
             <mat-form-field appearance="outline">
               <mat-label>Nombre</mat-label>
-              <input #createNameInput matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" />
+              <input #createNameInput matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" autocomplete="off" />
             </mat-form-field>
             <app-tag-picker
               label="Tags"

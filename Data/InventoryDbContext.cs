@@ -8,6 +8,8 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Box> Boxes => Set<Box>();
     public DbSet<Item> Items => Set<Item>();
+    public DbSet<ItemClass> ItemClasses => Set<ItemClass>();
+    public DbSet<ItemSubtype> ItemSubtypes => Set<ItemSubtype>();
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<ItemCondition> ItemConditions => Set<ItemCondition>();
     public DbSet<ItemTag> ItemTags => Set<ItemTag>();
@@ -46,11 +48,40 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.Property(x => x.MinQuantity).HasPrecision(18, 3);
             entity.HasQueryFilter(x => x.ArchivedAt == null);
             entity.HasOne(x => x.Box).WithMany(x => x.Items).HasForeignKey(x => x.BoxId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.ItemClass).WithMany(x => x.Items).HasForeignKey(x => x.ItemClassId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.ItemSubtype).WithMany(x => x.Items).HasForeignKey(x => x.ItemSubtypeId).OnDelete(DeleteBehavior.SetNull);
             entity.HasIndex(x => x.Code)
                 .IsUnique()
                 .HasFilter("\"ArchivedAt\" IS NULL");
             entity.HasIndex(x => x.Name);
             entity.HasIndex(x => x.Category);
+            entity.HasIndex(x => x.ItemClassId);
+            entity.HasIndex(x => x.ItemSubtypeId);
+        });
+
+        modelBuilder.Entity<ItemClass>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.InventoryMode).HasConversion<string>().HasMaxLength(24);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.Color).HasMaxLength(16);
+            entity.Property(x => x.Icon).HasMaxLength(48);
+            entity.Property(x => x.IsActive).HasDefaultValue(true);
+            entity.HasIndex(x => x.Name).IsUnique();
+            entity.HasIndex(x => new { x.IsActive, x.SortOrder, x.Name });
+        });
+
+        modelBuilder.Entity<ItemSubtype>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Unit).HasMaxLength(32);
+            entity.Property(x => x.MinStock).HasPrecision(18, 3);
+            entity.Property(x => x.TargetStock).HasPrecision(18, 3);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.IsActive).HasDefaultValue(true);
+            entity.HasOne(x => x.ItemClass).WithMany(x => x.Subtypes).HasForeignKey(x => x.ItemClassId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.ItemClassId, x.Name }).IsUnique();
+            entity.HasIndex(x => new { x.ItemClassId, x.IsActive, x.SortOrder, x.Name });
         });
 
         modelBuilder.Entity<Tag>(entity =>

@@ -1,7 +1,7 @@
 <main class="detail-shell">
   <header class="detail-header">
     <div>
-      <p class="eyebrow">Inventario / Angular SPA</p>
+      <p class="eyebrow">Detalle</p>
       <h1>{{ title() }}</h1>
       <p>{{ subtitle() }}</p>
     </div>
@@ -173,7 +173,7 @@
         <mat-card class="edit-card">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Edición Angular</p>
+              <p class="eyebrow">Edición</p>
               <h2>Ficha editable</h2>
             </div>
             <button mat-icon-button type="button" (click)="cancelItemEdit()" aria-label="Cerrar edición">
@@ -202,16 +202,12 @@
               [tags]="options().tags"
               (valueChange)="patchItemForm({ tagIds: $any($event) })" />
 
-            <div class="quick-tag wide">
-              <mat-form-field appearance="outline">
-                <mat-label>Nuevo tag</mat-label>
-                <input matInput [ngModel]="newTagName()" (ngModelChange)="setNewTagName($event)" />
-              </mat-form-field>
-              <app-color-picker label="Color tag" [value]="newTagColor()" (valueChange)="setNewTagColor($event)" />
-              <button mat-stroked-button type="button" (click)="quickCreateTag()" [disabled]="!newTagName().trim() || saving()">
+            <div class="inline-create-action">
+              <button mat-stroked-button type="button" (click)="openTagCreate()" [disabled]="saving()">
                 <mat-icon>add</mat-icon>
-                Crear y asignar
+                Crear tag
               </button>
+              <span>La tag nueva quedará seleccionada en esta ficha.</span>
             </div>
 
             <app-searchable-select
@@ -269,6 +265,37 @@
               {{ saving() ? 'Guardando...' : 'Guardar' }}
             </button>
           </div>
+
+          @if (tagCreateOpen()) {
+            <div class="tag-dialog-backdrop" (click)="closeTagCreate()">
+              <section class="tag-dialog" role="dialog" aria-modal="true" aria-labelledby="tag-dialog-title" (click)="$event.stopPropagation()">
+                <div class="section-head compact">
+                  <div>
+                    <p class="eyebrow">Tags</p>
+                    <h2 id="tag-dialog-title">Crear tag</h2>
+                  </div>
+                  <button mat-icon-button type="button" (click)="closeTagCreate()" [disabled]="saving()" aria-label="Cerrar creación de tag">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Nombre</mat-label>
+                  <input matInput [ngModel]="newTagName()" (ngModelChange)="setNewTagName($event)" />
+                </mat-form-field>
+
+                <app-color-picker label="Color" [value]="newTagColor()" (valueChange)="setNewTagColor($event)" />
+
+                <div class="dialog-actions">
+                  <button mat-stroked-button type="button" (click)="closeTagCreate()" [disabled]="saving()">Cancelar</button>
+                  <button mat-flat-button type="button" (click)="quickCreateTag()" [disabled]="!newTagName().trim() || saving()">
+                    <mat-icon>add</mat-icon>
+                    Crear y asignar
+                  </button>
+                </div>
+              </section>
+            </div>
+          }
         </mat-card>
       }
 
@@ -469,7 +496,7 @@
         <mat-card class="edit-card">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Edición Angular</p>
+              <p class="eyebrow">Edición</p>
               <h2>Contenedor editable</h2>
             </div>
             <button mat-icon-button type="button" (click)="cancelBoxEdit()" aria-label="Cerrar edición">

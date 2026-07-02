@@ -1,12 +1,11 @@
 :host {
   display: block;
   min-height: 100vh;
-  background: linear-gradient(180deg, rgba(6, 10, 20, 0.98), rgba(10, 16, 30, 1));
   color: var(--app-text);
 }
 
 .photo-inbox-shell {
-  width: min(1540px, calc(100% - 32px));
+  width: min(var(--app-page-max), calc(100% - (var(--app-page-gutter) * 2)));
   margin: 0 auto;
   padding: 20px 0 34px;
 }
@@ -156,7 +155,9 @@
 
 .photo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(230px, 320px));
+  justify-content: start;
+  align-items: start;
   gap: 12px;
 }
 
@@ -244,13 +245,18 @@
   color: #c8f8d2;
 }
 
+.photo-pager {
+  display: block;
+  margin-bottom: 12px;
+}
+
 @media (max-width: 720px) {
   .photo-inbox-shell {
-    width: min(100% - 20px, 1540px);
+    width: min(var(--app-page-max), calc(100% - 20px));
   }
 
   .photo-grid {
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   }
 
   .upload-card {

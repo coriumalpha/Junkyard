@@ -16,12 +16,19 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { InventoryApiService, InventoryOptionsResponse, PhotoInboxItem, PhotoInboxResponse, PhotoInboxStatus } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { legacyUrl } from './legacy-url';
+import { AppPaginatorComponent } from './app-paginator.component';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
 interface StatusOption {
   value: PhotoInboxStatus;
   label: string;
   icon: string;
+}
+
+interface PhotoInboxQuery {
+  status: PhotoInboxStatus;
+  page: number;
+  showAll: boolean;
 }
 
 const STATUS_OPTIONS: StatusOption[] = [
@@ -44,6 +51,7 @@ const STATUS_OPTIONS: StatusOption[] = [
     MatFormFieldModule,
     MatIconModule,
     MatProgressBarModule,
+    AppPaginatorComponent,
     InventoryCodePipe,
     SearchableSelectComponent,
     MatProgressSpinnerModule
@@ -62,7 +70,7 @@ export class PhotoInboxPageComponent {
   protected readonly uploadProgress = signal(0);
   protected readonly uploadFileCount = signal(0);
   protected readonly uploadSourceBoxId = signal<number | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], itemClasses: [], itemSubtypes: [], locations: [], boxes: [] });
   protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
     this.options().boxes.map((box) => ({
       value: box.id,
@@ -73,7 +81,10 @@ export class PhotoInboxPageComponent {
       placeholder: formatInventoryCode(box.code)
     })));
   protected readonly statusOptions = STATUS_OPTIONS;
+  protected readonly pageSize = 96;
   private readonly currentStatus = signal<PhotoInboxStatus>('Pending');
+  private readonly currentPage = signal(1);
+  private readonly showAll = signal(false);
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -82,14 +93,20 @@ export class PhotoInboxPageComponent {
 
   constructor() {
     this.route.queryParamMap.pipe(
-      map((params) => this.parseStatus(params.get('status'))),
-      distinctUntilChanged(),
-      tap((status) => {
-        this.currentStatus.set(status);
+      map((params): PhotoInboxQuery => ({
+        status: this.parseStatus(params.get('status')),
+        page: Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1),
+        showAll: params.get('all') === 'true'
+      })),
+      distinctUntilChanged((left, right) => left.status === right.status && left.page === right.page && left.showAll === right.showAll),
+      tap((query) => {
+        this.currentStatus.set(query.status);
+        this.currentPage.set(query.page);
+        this.showAll.set(query.showAll);
         this.loading.set(true);
         this.error.set(null);
       }),
-      switchMap((status) => this.api.fetchPhotoInbox(status).pipe(
+      switchMap((query) => this.api.fetchPhotoInbox(query.status, query.page, this.pageSize, query.showAll).pipe(
         tap((response) => this.data.set(response)),
         catchError((error: unknown) => {
           this.error.set(error instanceof Error ? error.message : 'No se pudo cargar la bandeja.');
@@ -111,7 +128,8 @@ export class PhotoInboxPageComponent {
   protected setStatus(status: PhotoInboxStatus): void {
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { status }
+      queryParams: { status, page: 1, all: null },
+      queryParamsHandling: 'merge'
     }).catch(() => undefined);
   }
 
@@ -133,11 +151,54 @@ export class PhotoInboxPageComponent {
       return data.discardedCount;
     }
 
-    return data.photos.length;
+    return data.pendingCount + data.assignedCount + data.discardedCount;
   }
 
   protected isActive(status: PhotoInboxStatus): boolean {
     return (this.data()?.currentStatus ?? 'Pending') === status;
+  }
+
+  protected pageCount(): number {
+    const data = this.data();
+    if (!data || data.showAll) {
+      return 1;
+    }
+
+    return Math.max(1, Math.ceil(data.totalCount / data.pageSize));
+  }
+
+  protected pageStart(): number {
+    const data = this.data();
+    if (!data || data.totalCount === 0) {
+      return 0;
+    }
+
+    return data.showAll ? 1 : ((data.page - 1) * data.pageSize) + 1;
+  }
+
+  protected pageEnd(): number {
+    const data = this.data();
+    if (!data) {
+      return 0;
+    }
+
+    return data.showAll ? data.totalCount : Math.min(data.totalCount, data.page * data.pageSize);
+  }
+
+  protected setPage(page: number): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { page: Math.max(1, Math.min(this.pageCount(), page)), all: null },
+      queryParamsHandling: 'merge'
+    }).catch(() => undefined);
+  }
+
+  protected setShowAll(value: boolean): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { all: value ? 'true' : null, page: 1 },
+      queryParamsHandling: 'merge'
+    }).catch(() => undefined);
   }
 
   protected assetUrl(path: string | null | undefined): string | null {
@@ -253,7 +314,7 @@ export class PhotoInboxPageComponent {
   }
 
   private reload(): void {
-    this.api.fetchPhotoInbox(this.currentStatus()).pipe(
+    this.api.fetchPhotoInbox(this.currentStatus(), this.currentPage(), this.pageSize, this.showAll()).pipe(
       tap((response) => this.data.set(response)),
       catchError(() => EMPTY),
       takeUntilDestroyed(this.destroyRef)

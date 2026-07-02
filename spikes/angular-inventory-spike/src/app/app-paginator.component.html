@@ -1,0 +1,43 @@
+<nav class="app-paginator" [class.compact]="compact" aria-label="Paginación">
+  <div class="page-range">
+    <strong>{{ start }}-{{ end }}</strong>
+    <span>de {{ total }} {{ itemLabel }}</span>
+  </div>
+
+  <div class="page-controls">
+    @if (!showAll) {
+      <button mat-icon-button type="button" class="page-icon" [disabled]="!canGoBack()" (click)="previous()" aria-label="Página anterior">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+
+      <div class="page-jump">
+        <span>Página</span>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <input
+            matInput
+            type="number"
+            min="1"
+            [max]="safePageCount()"
+            [(ngModel)]="draftPage"
+            (keydown.enter)="goTo(draftPage)"
+            (blur)="goTo(draftPage)"
+            aria-label="Navegar a página"
+          />
+        </mat-form-field>
+        <span>/ {{ safePageCount() }}</span>
+      </div>
+
+      <button mat-icon-button type="button" class="page-icon" [disabled]="!canGoForward()" (click)="next()" aria-label="Página siguiente">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    } @else {
+      <span class="all-state">Mostrando todo</span>
+    }
+
+    @if (allowShowAll) {
+      <button mat-button type="button" class="show-all-button" (click)="toggleShowAll()">
+        {{ showAll ? 'Paginar' : 'Ver todo' }}
+      </button>
+    }
+  </div>
+</nav>

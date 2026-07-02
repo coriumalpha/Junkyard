@@ -1,7 +1,7 @@
 <main class="dashboard-shell">
   <header class="dashboard-header">
     <div>
-      <p class="eyebrow">Junkyard / Angular SPA</p>
+      <p class="eyebrow">Junkyard</p>
       <h1>Dashboard operativo</h1>
       <p>Resumen compacto del inventario real: salud de clasificación, stock bajo, contenedores recientes y fotos.</p>
     </div>
@@ -90,7 +90,7 @@
                 }
                 <span>
                   <strong>{{ item.name }}</strong>
-                  <small>{{ item.boxCode || 'Sin caja' }} · {{ item.category }}</small>
+                  <small>{{ item.boxCode ? (item.boxCode | inventoryCode) : 'Sin caja' }} · {{ item.category }}</small>
                 </span>
                 <mat-chip>{{ item.quantity }} / {{ item.minQuantity }} {{ item.unit }}</mat-chip>
               </a>

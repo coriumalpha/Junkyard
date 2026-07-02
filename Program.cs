@@ -292,6 +292,21 @@ app.MapGet("/api/inventory/options", async (
     var response = await queryService.GetOptionsAsync(cancellationToken);
     return Results.Json(response);
 });
+app.MapGet("/api/item-classes", async (
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetItemClassesAsync(cancellationToken);
+    return Results.Json(response);
+});
+app.MapGet("/api/item-subtypes", async (
+    int? itemClassId,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetItemSubtypesAsync(itemClassId, cancellationToken);
+    return Results.Json(response);
+});
 app.MapGet("/api/locations", async (
     InventoryDbContext db,
     CancellationToken cancellationToken) =>
@@ -744,7 +759,11 @@ app.MapGet("/api/photos/inbox", async (
     InventoryLiveQueryService queryService,
     CancellationToken cancellationToken) =>
 {
-    var response = await queryService.GetPhotoInboxAsync(httpContext.Request.Query["status"].ToString(), cancellationToken);
+    var query = httpContext.Request.Query;
+    var page = int.TryParse(query["page"], out var parsedPage) ? parsedPage : 1;
+    var pageSize = int.TryParse(query["pageSize"], out var parsedPageSize) ? parsedPageSize : 96;
+    var showAll = bool.TryParse(query["all"], out var parsedAll) && parsedAll;
+    var response = await queryService.GetPhotoInboxAsync(query["status"].ToString(), page, pageSize, showAll, cancellationToken);
     return Results.Json(response);
 });
 app.MapPost("/api/photos/inbox/{id:int}/discard", async (
@@ -807,7 +826,7 @@ app.MapPost("/api/photos/inbox/upload", async (
     }
 
     await db.SaveChangesAsync(cancellationToken);
-    var inboxResponse = await queryService.GetPhotoInboxAsync("Pending", cancellationToken);
+    var inboxResponse = await queryService.GetPhotoInboxAsync("Pending", 1, 96, false, cancellationToken);
     return Results.Json(new { imported, rejected, inbox = inboxResponse });
 });
 app.MapGet("/api/photos/review", async (

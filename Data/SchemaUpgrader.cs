@@ -23,7 +23,12 @@ public static class SchemaUpgrader
         EnsureNullableItemBoxId(db);
         EnsureTags(db);
         EnsureItemConditions(db);
+        EnsureItemClassifications(db);
         EnsureInventoryActions(db);
+        AddColumn(db, "Items", "ItemClassId", "INTEGER NULL");
+        AddColumn(db, "Items", "ItemSubtypeId", "INTEGER NULL");
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_ItemClassId" ON "Items" ("ItemClassId");""");
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_ItemSubtypeId" ON "Items" ("ItemSubtypeId");""");
         AddColumn(db, "InventoryActions", "Kind", "TEXT NOT NULL DEFAULT 'Task'");
         EnsurePhotoInbox(db);
         AddColumn(db, "PhotoInboxes", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");
@@ -129,6 +134,44 @@ public static class SchemaUpgrader
             );
             """);
         db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemConditions_Name" ON "ItemConditions" ("Name");""");
+    }
+
+    private static void EnsureItemClassifications(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "ItemClasses" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ItemClasses" PRIMARY KEY AUTOINCREMENT,
+                "Name" TEXT NOT NULL,
+                "InventoryMode" TEXT NOT NULL,
+                "Description" TEXT NULL,
+                "Color" TEXT NULL,
+                "Icon" TEXT NULL,
+                "SortOrder" INTEGER NULL,
+                "IsActive" INTEGER NOT NULL DEFAULT 1,
+                "CreatedAt" TEXT NOT NULL,
+                "UpdatedAt" TEXT NOT NULL
+            );
+            """);
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "ItemSubtypes" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ItemSubtypes" PRIMARY KEY AUTOINCREMENT,
+                "ItemClassId" INTEGER NOT NULL,
+                "Name" TEXT NOT NULL,
+                "Unit" TEXT NULL,
+                "MinStock" TEXT NULL,
+                "TargetStock" TEXT NULL,
+                "Description" TEXT NULL,
+                "SortOrder" INTEGER NULL,
+                "IsActive" INTEGER NOT NULL DEFAULT 1,
+                "CreatedAt" TEXT NOT NULL,
+                "UpdatedAt" TEXT NOT NULL,
+                CONSTRAINT "FK_ItemSubtypes_ItemClasses_ItemClassId" FOREIGN KEY ("ItemClassId") REFERENCES "ItemClasses" ("Id") ON DELETE CASCADE
+            );
+            """);
+        db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemClasses_Name" ON "ItemClasses" ("Name");""");
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_ItemClasses_IsActive_SortOrder_Name" ON "ItemClasses" ("IsActive", "SortOrder", "Name");""");
+        db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemSubtypes_ItemClassId_Name" ON "ItemSubtypes" ("ItemClassId", "Name");""");
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_ItemSubtypes_ItemClassId_IsActive_SortOrder_Name" ON "ItemSubtypes" ("ItemClassId", "IsActive", "SortOrder", "Name");""");
     }
 
     private static void BackfillCategoryTags(InventoryDbContext db)

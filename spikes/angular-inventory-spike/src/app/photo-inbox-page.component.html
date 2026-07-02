@@ -1,7 +1,7 @@
 <main class="photo-inbox-shell">
   <header class="photo-inbox-header">
     <div>
-      <p class="eyebrow">Inventario / Angular SPA</p>
+      <p class="eyebrow">Fotos</p>
       <h1>Bandeja de fotos</h1>
       <p>Lectura rápida de imágenes pendientes, asignadas y descartadas.</p>
     </div>
@@ -82,6 +82,19 @@
       <span>{{ error() }}</span>
     </section>
   } @else if (data()) {
+    <app-paginator
+      class="photo-pager"
+      [page]="data()!.page"
+      [pageCount]="pageCount()"
+      [start]="pageStart()"
+      [end]="pageEnd()"
+      [total]="data()!.totalCount"
+      itemLabel="fotos"
+      [showAll]="data()!.showAll"
+      [allowShowAll]="data()!.totalCount > data()!.pageSize"
+      (pageChange)="setPage($event)"
+      (showAllChange)="setShowAll($event)" />
+
     <section class="photo-grid">
       @for (photo of data()!.photos; track photo.id) {
         <mat-card class="photo-card">

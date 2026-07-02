@@ -2,22 +2,25 @@
     <header class="workspace-header" id="overview">
       <div class="workspace-title">
         <div class="eyebrow-row">
-          <p class="eyebrow">Inventario / Angular SPA</p>
+          <p class="eyebrow">{{ isContainersPage() ? 'Contenedores' : 'Inventario' }}</p>
           <span class="state-dot"></span>
-          <span class="state-copy">Backend real + Material + CDK</span>
+          <span class="state-copy">{{ isContainersPage() ? 'Cajas y ubicaciones' : 'Ítems y búsqueda' }}</span>
         </div>
-        <h1>Base visual del Inventario</h1>
-        <p class="lede">
-          La vista principal es compacta, lateral y foto-céntrica. El objetivo es dejar una base seria para
-          navegar, filtrar y distinguir contenedores e ítems sin que el header domine la pantalla.
-        </p>
+        <h1>{{ isContainersPage() ? 'Contenedores físicos' : 'Inventario' }}</h1>
       </div>
 
       <div class="workspace-actions">
+        @if (isContainersPage()) {
+          <button mat-flat-button type="button" (click)="toggleCreateBoxForm()">
+            <mat-icon>{{ showCreateBoxForm() ? 'close' : 'add_box' }}</mat-icon>
+            {{ showCreateBoxForm() ? 'Cerrar alta' : 'Nuevo contenedor' }}
+          </button>
+        } @else {
         <button mat-flat-button type="button" (click)="toggleEditMode()" [class.active-action]="editMode()">
           <mat-icon>{{ editMode() ? 'close' : 'edit' }}</mat-icon>
           {{ editMode() ? 'Cerrar edición' : 'Editar' }}
         </button>
+        }
         <a mat-stroked-button class="ghost-link" [href]="currentScopeBackendUrl()" target="_blank" rel="noreferrer">
           <mat-icon>open_in_new</mat-icon>
           Abrir Razor
@@ -58,7 +61,7 @@
           <mat-icon>photo_library</mat-icon>
           <div>
             <strong>Sin miniaturas todavía</strong>
-            <p>Cuando el backend devuelva fotos, este strip queda como referencia visual rápida.</p>
+            <p>Los resultados aparecerán aquí cuando tengan imagen asociada.</p>
           </div>
         </div>
       }
@@ -67,8 +70,8 @@
     <mat-card class="filters-card" id="filters">
       <div class="filters-head">
         <div>
-          <p class="eyebrow">Control</p>
-          <h2>Buscar, acotar y cambiar de modo</h2>
+          <p class="eyebrow">Filtros</p>
+          <h2>{{ isContainersPage() ? 'Buscar contenedores' : 'Filtrar inventario' }}</h2>
         </div>
         <mat-chip-set class="summary-chips">
           @for (item of filterSummary(); track item) {
@@ -89,16 +92,26 @@
           <mat-icon matSuffix>search</mat-icon>
         </mat-form-field>
 
-        <app-searchable-select
-          label="Contenedores"
-          [value]="state().boxIds"
-          [options]="boxOptions()"
-          [multiple]="true"
-          placeholder="Buscar por CT, nombre, ubicación..."
-          (valueChange)="setBoxIds($any($event))" />
+        @if (isContainersPage()) {
+          <app-searchable-select
+            label="Ubicación efectiva"
+            [value]="state().locationId"
+            [options]="locationOptions()"
+            noneLabel="Todas"
+            placeholder="Buscar ubicación..."
+            (valueChange)="setLocationId($any($event))" />
+        } @else {
+          <app-searchable-select
+            label="Contenedores"
+            [value]="state().boxIds"
+            [options]="boxOptions()"
+            [multiple]="true"
+            placeholder="Buscar por CT, nombre, ubicación..."
+            (valueChange)="setBoxIds($any($event))" />
+        }
       </div>
 
-      @if (selectedBoxOptions().length) {
+      @if (selectedBoxOptions().length && !isContainersPage()) {
         <div class="selected-boxes primary-scope">
           <div class="selected-boxes-head">
             <span>{{ selectedBoxOptions().length }} contenedores en alcance</span>
@@ -120,9 +133,10 @@
         </div>
       }
 
+      @if (!isContainersPage()) {
       <div class="mode-row">
         <mat-button-toggle-group [value]="state().layout" (change)="setLayout($event.value)" aria-label="Modo de vista">
-          @for (option of layoutOptions; track option.value) {
+          @for (option of inventoryLayoutOptions; track option.value) {
             <mat-button-toggle [value]="option.value">
               <mat-icon>{{ option.icon }}</mat-icon>
               {{ option.label }}
@@ -130,11 +144,12 @@
           }
         </mat-button-toggle-group>
       </div>
+      }
 
+      @if (!isContainersPage()) {
       <mat-expansion-panel class="advanced-panel" [expanded]="false">
         <mat-expansion-panel-header>
           <mat-panel-title>Filtros avanzados</mat-panel-title>
-          <mat-panel-description>Primero visibles, luego plegados</mat-panel-description>
         </mat-expansion-panel-header>
 
         <div class="advanced-grid">
@@ -142,7 +157,6 @@
             label="Tags"
             [value]="state().tagIds"
             [tags]="options().tags"
-            [compact]="true"
             (valueChange)="setTagIds($any($event))" />
 
           @if (state().tagIds.length) {
@@ -184,9 +198,20 @@
           </mat-slide-toggle>
         </div>
       </mat-expansion-panel>
+      } @else if (state().locationId !== null) {
+        <div class="selected-boxes primary-scope">
+          <div class="selected-boxes-head">
+            <span>Ubicación: {{ locationLabel(state().locationId!) }}</span>
+            <button mat-button type="button" (click)="clearLocationId()">
+              <mat-icon>close</mat-icon>
+              Limpiar
+            </button>
+          </div>
+        </div>
+      }
     </mat-card>
 
-    @if (editMode()) {
+    @if (editMode() && !isContainersPage()) {
       <mat-card class="bulk-card">
         <div class="bulk-summary">
           <p class="eyebrow">Edición bulk</p>
@@ -237,7 +262,7 @@
     @if (loading()) {
       <section class="state-panel">
         <mat-progress-spinner mode="indeterminate" diameter="52" />
-        <p>Cargando el inventario desde el backend...</p>
+        <p>Cargando inventario...</p>
       </section>
     } @else if (error()) {
       <mat-card class="state-panel error">
@@ -347,6 +372,13 @@
                       }
                     </div>
 
+                    <div class="panel-actions">
+                      <a mat-stroked-button [routerLink]="['/boxes', group.code]">
+                        <mat-icon>inventory_2</mat-icon>
+                        Abrir contenedor
+                      </a>
+                    </div>
+
                     <div class="group-items-head">
                       <div>
                         <p class="eyebrow">Inventario del contenedor</p>
@@ -359,29 +391,6 @@
                         </strong>
                       </div>
 
-                      @if (group.items.length > groupPageSize) {
-                        <div class="group-pager" aria-label="Paginación del contenedor">
-                          <button
-                            mat-icon-button
-                            type="button"
-                            [disabled]="!hasPreviousGroupPage(group)"
-                            (click)="setGroupPage(group, groupPage(group) - 1)"
-                            aria-label="Página anterior"
-                          >
-                            <mat-icon>chevron_left</mat-icon>
-                          </button>
-                          <span>{{ groupPage(group) + 1 }} / {{ groupPageCount(group) }}</span>
-                          <button
-                            mat-icon-button
-                            type="button"
-                            [disabled]="!hasNextGroupPage(group)"
-                            (click)="setGroupPage(group, groupPage(group) + 1)"
-                            aria-label="Página siguiente"
-                          >
-                            <mat-icon>chevron_right</mat-icon>
-                          </button>
-                        </div>
-                      }
                     </div>
 
                     <div class="group-items-list">
@@ -445,6 +454,19 @@
                       }
                     </div>
 
+                    @if (group.items.length > groupPageSize) {
+                      <app-paginator
+                        class="group-pager-bottom"
+                        [compact]="true"
+                        [page]="groupPage(group) + 1"
+                        [pageCount]="groupPageCount(group)"
+                        [start]="groupPageStart(group)"
+                        [end]="groupPageEnd(group)"
+                        [total]="group.items.length"
+                        itemLabel="ítems"
+                        (pageChange)="setGroupPage(group, $event - 1)" />
+                    }
+
                     @if (group.children.length) {
                       <section class="child-groups">
                         <div class="child-groups-head">
@@ -459,13 +481,6 @@
                         </div>
                       </section>
                     }
-
-                    <div class="panel-actions">
-                      <a mat-stroked-button [routerLink]="['/boxes', group.code]">
-                        <mat-icon>inventory_2</mat-icon>
-                        Abrir contenedor
-                      </a>
-                    </div>
                   </div>
                 </mat-expansion-panel>
               </ng-template>
@@ -758,23 +773,30 @@
               @for (box of filteredContainers(); track box.id) {
                 <a class="container-card-link" [routerLink]="['/boxes', box.code]">
                   <mat-card class="container-card">
-                    @if (box.coverUrl) {
-                      <img
-                        class="container-cover"
-                        [src]="assetUrl(box.coverUrl)!"
-                        [style.transform]="'rotate(' + box.rotationDegrees + 'deg)'"
-                        [alt]="box.name"
-                      />
-                    } @else {
-                      <div class="container-cover placeholder">
-                        <span>{{ box.code.slice(0, 2) }}</span>
-                      </div>
-                    }
+                    <div class="container-media">
+                      @if (box.coverUrl) {
+                        <img
+                          class="container-cover"
+                          [src]="assetUrl(box.coverUrl)!"
+                          [style.transform]="'rotate(' + box.rotationDegrees + 'deg)'"
+                          [alt]="box.name"
+                        />
+                      } @else {
+                        <div class="container-cover placeholder">
+                          <mat-icon>inventory_2</mat-icon>
+                        </div>
+                      }
+                    </div>
                     <div class="container-copy">
-                      <p class="eyebrow">{{ box.code | inventoryCode }}</p>
+                      <div class="container-card-topline">
+                        <span class="item-code">{{ box.code | inventoryCode }}</span>
+                        <span>{{ box.containerTypeLabel }}</span>
+                      </div>
                       <h3>{{ box.name }}</h3>
-                      <p>{{ box.containerTypeLabel }}</p>
-                      <p>{{ box.locationName || 'Sin ubicación' }}</p>
+                      <p class="container-location">
+                        <mat-icon>place</mat-icon>
+                        <span>{{ box.locationName || 'Sin ubicación' }}</span>
+                      </p>
                       <small>{{ box.path }}</small>
                     </div>
                   </mat-card>

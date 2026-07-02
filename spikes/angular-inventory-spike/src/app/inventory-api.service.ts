@@ -44,6 +44,8 @@ export interface InventoryOptionsResponse {
   categories: string[];
   tags: InventoryTag[];
   conditions: InventoryCondition[];
+  itemClasses: ItemClass[];
+  itemSubtypes: ItemSubtype[];
   locations: InventoryOption[];
   boxes: InventoryBoxOption[];
 }
@@ -66,6 +68,31 @@ export interface InventoryCondition {
   id: number;
   name: string;
   color: string;
+}
+
+export type InventoryMode = 'Individual' | 'Fungible' | 'Kit' | 'Lot';
+
+export interface ItemClass {
+  id: number;
+  name: string;
+  inventoryMode: InventoryMode;
+  description: string | null;
+  color: string | null;
+  icon: string | null;
+  sortOrder: number | null;
+  isActive: boolean;
+}
+
+export interface ItemSubtype {
+  id: number;
+  itemClassId: number;
+  name: string;
+  unit: string | null;
+  minStock: number | null;
+  targetStock: number | null;
+  description: string | null;
+  sortOrder: number | null;
+  isActive: boolean;
 }
 
 export interface TagUpdate {
@@ -159,6 +186,12 @@ export interface InventoryItem {
   boxPath: string | null;
   locationName: string | null;
   category: string;
+  itemClassId: number | null;
+  itemClassName: string | null;
+  inventoryMode: InventoryMode | null;
+  itemSubtypeId: number | null;
+  itemSubtypeName: string | null;
+  itemSubtypeUnit: string | null;
   tags: InventoryTag[];
   quantityLabel: string;
   generatedLabel: string | null;
@@ -240,6 +273,12 @@ export interface InventoryItemDetail {
   code: string;
   name: string;
   category: string;
+  itemClassId: number | null;
+  itemClassName: string | null;
+  inventoryMode: InventoryMode | null;
+  itemSubtypeId: number | null;
+  itemSubtypeName: string | null;
+  itemSubtypeUnit: string | null;
   tags: InventoryTag[];
   quantityLabel: string;
   quantity: number;
@@ -266,6 +305,8 @@ export interface InventoryItemUpdate {
   code: string;
   name: string;
   category: string;
+  itemClassId: number | null;
+  itemSubtypeId: number | null;
   tagIds: number[];
   quantity: number;
   unit: string;
@@ -390,6 +431,10 @@ export interface PhotoInboxResponse {
   pendingCount: number;
   assignedCount: number;
   discardedCount: number;
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  showAll: boolean;
   photos: PhotoInboxItem[];
 }
 
@@ -441,6 +486,8 @@ export interface PhotoReviewPhoto {
 export interface PhotoReviewCreateItem {
   ids: number[];
   boxId: number | null;
+  itemClassId?: number | null;
+  itemSubtypeId?: number | null;
   name: string;
   notes: string;
   quantity: number;
@@ -683,8 +730,14 @@ export class InventoryApiService {
     return this.http.post<PhotoReturnToInboxResponse<InventoryBoxDetail>>(`/api/boxes/${id}/photos/${photoId}/return-to-inbox`, {});
   }
 
-  fetchPhotoInbox(status: PhotoInboxStatus): Observable<PhotoInboxResponse> {
-    const params = new HttpParams().set('status', status);
+  fetchPhotoInbox(status: PhotoInboxStatus, page = 1, pageSize = 96, showAll = false): Observable<PhotoInboxResponse> {
+    let params = new HttpParams()
+      .set('status', status)
+      .set('page', String(page))
+      .set('pageSize', String(pageSize));
+    if (showAll) {
+      params = params.set('all', 'true');
+    }
     return this.http.get<PhotoInboxResponse>('/api/photos/inbox', { params });
   }
 

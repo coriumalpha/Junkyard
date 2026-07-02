@@ -29,6 +29,8 @@
   --app-space-4: 16px;
   --app-space-5: 20px;
   --app-space-6: 24px;
+  --app-page-max: 1760px;
+  --app-page-gutter: clamp(18px, 2.2vw, 40px);
   --app-density-compact: -3;
   --app-density-default: 0;
 

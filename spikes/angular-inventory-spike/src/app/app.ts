@@ -1,5 +1,5 @@
 import { BreakpointObserver } from '@angular/cdk/layout';
-import { Component, DestroyRef, ElementRef, ViewChild, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -44,14 +44,16 @@ export class App {
   protected readonly quickItems = signal<InventoryItem[]>([]);
   protected readonly quickBoxes = signal<InventoryGroup[]>([]);
   protected readonly quickLoading = signal(false);
+  protected readonly quickOpen = signal(false);
+  protected readonly hasQuickResults = computed(() => Boolean(this.quickItems().length || this.quickBoxes().length));
   protected readonly legacyHomeUrl = legacyUrl('/');
 
   private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject(ElementRef<HTMLElement>);
   private readonly breakpointObserver = inject(BreakpointObserver);
   private readonly router = inject(Router);
   private readonly api = inject(InventoryApiService);
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
-  @ViewChild('quickSearchInput') private readonly quickSearchInput?: ElementRef<HTMLInputElement>;
 
   constructor() {
     this.currentUrl.set(this.router.url);
@@ -71,7 +73,10 @@ export class App {
 
     this.router.events.pipe(
       filter((event): event is NavigationEnd => event instanceof NavigationEnd),
-      tap((event) => this.currentUrl.set(event.urlAfterRedirects)),
+      tap((event) => {
+        this.currentUrl.set(event.urlAfterRedirects);
+        this.resetContentScroll();
+      }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
   }
@@ -99,9 +104,11 @@ export class App {
       this.quickItems.set([]);
       this.quickBoxes.set([]);
       this.quickLoading.set(false);
+      this.quickOpen.set(false);
       return;
     }
 
+    this.quickOpen.set(true);
     this.quickLoading.set(true);
     this.searchTimer = setTimeout(() => this.runQuickSearch(query), 180);
   }
@@ -111,16 +118,13 @@ export class App {
     this.quickItems.set([]);
     this.quickBoxes.set([]);
     this.quickLoading.set(false);
+    this.quickOpen.set(false);
   }
 
-  protected openQuickSearch(): void {
-    if (!this.handset()) {
-      this.drawerCollapsed.set(false);
-    } else {
-      this.drawerOpen.set(true);
+  protected openQuickSearchPanel(): void {
+    if (this.quickSearch().trim().length >= 2) {
+      this.quickOpen.set(true);
     }
-
-    setTimeout(() => this.quickSearchInput?.nativeElement.focus(), 0);
   }
 
   protected openQuickItem(item: InventoryItem): void {
@@ -143,15 +147,16 @@ export class App {
 
   protected isInventorySection(): boolean {
     const path = this.currentUrl().split('?')[0];
-    if (path.startsWith('/item/') || path.startsWith('/boxes/')) {
+    if (path.startsWith('/item/')) {
       return true;
     }
 
-    return path.startsWith('/inventory') && !this.hasQueryFlag('onlyConsumable') && !this.hasQueryFlag('onlyOrphans') && !this.hasQueryValue('layout', 'containers');
+    return path.startsWith('/inventory') && !this.hasQueryFlag('onlyConsumable') && !this.hasQueryFlag('onlyOrphans');
   }
 
   protected isContainersSection(): boolean {
-    return this.currentUrl().split('?')[0].startsWith('/inventory') && this.hasQueryValue('layout', 'containers');
+    const path = this.currentUrl().split('?')[0];
+    return path.startsWith('/containers') || path.startsWith('/boxes/');
   }
 
   protected isConsumablesSection(): boolean {
@@ -164,6 +169,36 @@ export class App {
 
   protected isSettingsSection(): boolean {
     return this.currentUrl().split('?')[0].startsWith('/settings');
+  }
+
+  protected tagSummary(item: InventoryItem): string {
+    return item.tags.length ? item.tags.map((tag) => tag.name).join(', ') : item.category;
+  }
+
+  protected boxSummary(box: InventoryGroup): string {
+    const parts = [`${box.itemCount} ítems`];
+    if (box.childCount) {
+      parts.push(`${box.childCount} hijos`);
+    }
+    if (box.locationName) {
+      parts.push(box.locationName);
+    }
+    return parts.join(' · ');
+  }
+
+  protected assetUrl(path: string | null | undefined): string | null {
+    return path ? (path.startsWith('/') ? path : `/${path}`) : null;
+  }
+
+  @HostListener('document:click', ['$event'])
+  protected closeQuickSearchOnOutsideClick(event: MouseEvent): void {
+    const target = event.target instanceof Node ? event.target : null;
+    const search = this.host.nativeElement.querySelector('.top-search-control');
+    if (target && search?.contains(target)) {
+      return;
+    }
+
+    this.quickOpen.set(false);
   }
 
   private hasQueryFlag(name: string): boolean {
@@ -191,8 +226,8 @@ export class App {
       view: 'flat'
     }).pipe(
       tap((response) => {
-        this.quickItems.set(response.items.slice(0, 6));
-        this.quickBoxes.set(response.groups.filter((group) => group.boxId !== null).slice(0, 4));
+        this.quickItems.set(response.items.slice(0, 8));
+        this.quickBoxes.set(response.groups.filter((group) => group.boxId !== null).slice(0, 5));
       }),
       catchError(() => {
         this.quickItems.set([]);
@@ -202,5 +237,12 @@ export class App {
       finalize(() => this.quickLoading.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
+  }
+
+  private resetContentScroll(): void {
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('.app-content')?.scrollTo({ top: 0, left: 0 });
+      window.scrollTo({ top: 0, left: 0 });
+    });
   }
 }

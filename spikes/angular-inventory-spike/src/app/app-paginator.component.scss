@@ -1,0 +1,115 @@
+:host {
+  display: block;
+}
+
+.app-paginator {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.app-paginator.compact {
+  justify-content: center;
+  padding: 8px;
+  background: rgba(7, 12, 26, 0.38);
+}
+
+.page-range,
+.page-controls,
+.page-jump {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.page-range {
+  flex-wrap: wrap;
+}
+
+.page-range strong {
+  color: var(--app-text);
+}
+
+.page-range span,
+.page-jump,
+.all-state {
+  color: var(--app-muted);
+  font-size: 0.86rem;
+}
+
+.page-controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.page-icon {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--app-text);
+}
+
+.page-icon:not(:disabled):hover {
+  border-color: rgba(72, 255, 176, 0.38);
+  background: rgba(72, 255, 176, 0.12);
+}
+
+.page-icon mat-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  margin: 0 auto;
+  font-size: 22px;
+  line-height: 22px;
+}
+
+.page-jump mat-form-field {
+  width: 72px;
+}
+
+.page-jump ::ng-deep .mat-mdc-text-field-wrapper {
+  height: 36px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.page-jump ::ng-deep .mat-mdc-form-field-infix {
+  min-height: 36px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.page-jump input {
+  text-align: center;
+  font-weight: 800;
+}
+
+.show-all-button {
+  min-height: 36px;
+}
+
+@media (max-width: 560px) {
+  .app-paginator,
+  .page-controls {
+    justify-content: stretch;
+  }
+
+  .page-range,
+  .page-controls {
+    width: 100%;
+  }
+
+  .page-jump {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}

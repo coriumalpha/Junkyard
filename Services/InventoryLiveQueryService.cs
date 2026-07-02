@@ -11,6 +11,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         var item = await db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
             .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
+            .Include(i => i.ItemClass)
+            .Include(i => i.ItemSubtype)
             .Include(i => i.ItemTags).ThenInclude(itemTag => itemTag.Tag)
             .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
 
@@ -35,6 +37,12 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.Code,
             item.Name,
             item.Category,
+            item.ItemClassId,
+            item.ItemClass?.Name,
+            item.ItemClass?.InventoryMode.ToString(),
+            item.ItemSubtypeId,
+            item.ItemSubtype?.Name,
+            item.ItemSubtype?.Unit,
             ToTagDtos(item),
             $"{item.Quantity} {item.Unit}",
             item.Quantity,
@@ -72,6 +80,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
     {
         var item = await db.Items
             .Include(i => i.ItemTags)
+            .Include(i => i.ItemClass)
+            .Include(i => i.ItemSubtype)
             .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
         if (item is null)
         {
@@ -85,15 +95,18 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (null, "El nombre es obligatorio.");
         }
 
-        if (tagIds.Count == 0)
-        {
-            return (null, "Selecciona al menos un tag.");
-        }
-
-        var tags = await db.Tags.Where(tag => tagIds.Contains(tag.Id)).ToListAsync(cancellationToken);
+        var tags = tagIds.Count == 0
+            ? []
+            : await db.Tags.Where(tag => tagIds.Contains(tag.Id)).ToListAsync(cancellationToken);
         if (tags.Count != tagIds.Count)
         {
             return (null, "Algún tag seleccionado no existe.");
+        }
+
+        var classValidationError = await ValidateItemClassSelectionAsync(input.ItemClassId, input.ItemSubtypeId, cancellationToken);
+        if (classValidationError is not null)
+        {
+            return (null, classValidationError);
         }
 
         if (input.BoxId is int boxId && boxId > 0 && !await db.Boxes.AnyAsync(box => box.Id == boxId, cancellationToken))
@@ -122,7 +135,9 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
 
         item.Code = normalizedCode;
         item.Name = name;
-        item.Category = tags.OrderBy(tag => tag.Name).First().Name;
+        item.Category = tags.OrderBy(tag => tag.Name).FirstOrDefault()?.Name ?? "";
+        item.ItemClassId = input.ItemClassId is > 0 ? input.ItemClassId : null;
+        item.ItemSubtypeId = input.ItemSubtypeId is > 0 ? input.ItemSubtypeId : null;
         item.Quantity = input.Quantity;
         item.Unit = string.IsNullOrWhiteSpace(input.Unit) ? null : input.Unit.Trim();
         item.MinQuantity = input.MinQuantity;
@@ -188,7 +203,6 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             }
         }
 
-        var fallbackTag = removeTag is null ? null : await GetOrCreateDefaultTagAsync(cancellationToken);
         var items = await db.Items
             .Include(item => item.ItemTags)
             .ThenInclude(itemTag => itemTag.Tag)
@@ -220,10 +234,6 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                     item.ItemTags.Remove(itemTag);
                 }
 
-                if (item.ItemTags.Count == 0 && fallbackTag is not null)
-                {
-                    item.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = fallbackTag.Id, Tag = fallbackTag });
-                }
             }
 
             var primaryTag = item.ItemTags
@@ -231,7 +241,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 .Where(tag => tag is not null)
                 .OrderBy(tag => tag!.Name)
                 .FirstOrDefault();
-            item.Category = primaryTag?.Name ?? fallbackTag?.Name ?? item.Category;
+            item.Category = primaryTag?.Name ?? "";
             item.UpdatedAt = DateTime.UtcNow;
         }
 
@@ -768,9 +778,11 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         return (await GetBoxDetailAsync(box.Code, cancellationToken), null);
     }
 
-    public async Task<PhotoInboxResponseDto> GetPhotoInboxAsync(string? status, CancellationToken cancellationToken)
+    public async Task<PhotoInboxResponseDto> GetPhotoInboxAsync(string? status, int page, int pageSize, bool showAll, CancellationToken cancellationToken)
     {
         var currentStatus = string.IsNullOrWhiteSpace(status) ? "Pending" : status.Trim();
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 24, 240);
         var pendingCount = await db.PhotoInboxes.CountAsync(photo => photo.Status == PhotoInboxStatus.Pending, cancellationToken);
         var assignedCount = await db.PhotoInboxes.CountAsync(photo => photo.Status == PhotoInboxStatus.Assigned, cancellationToken);
         var discardedCount = await db.PhotoInboxes.CountAsync(photo => photo.Status == PhotoInboxStatus.Discarded, cancellationToken);
@@ -788,16 +800,21 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             currentStatus = "All";
         }
 
-        var photos = await query
-            .OrderByDescending(photo => photo.ImportedAt)
-            .Take(300)
-            .ToListAsync(cancellationToken);
+        var totalCount = await query.CountAsync(cancellationToken);
+        var ordered = query.OrderByDescending(photo => photo.ImportedAt);
+        var photos = showAll
+            ? await ordered.ToListAsync(cancellationToken)
+            : await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
 
         return new PhotoInboxResponseDto(
             currentStatus,
             pendingCount,
             assignedCount,
             discardedCount,
+            totalCount,
+            showAll ? 1 : page,
+            showAll ? totalCount : pageSize,
+            showAll,
             photos.Select(photo => new PhotoInboxItemDto(
                 photo.Id,
                 PhotoStorage.ThumbUrl(photo.Filename, photo.UpdatedAt),
@@ -978,19 +995,27 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
 
         var tagIds = input.TagIds?.Where(tagId => tagId > 0).Distinct().ToList() ?? [];
         var tags = tagIds.Count == 0
-            ? [await GetOrCreateDefaultTagAsync(cancellationToken)]
+            ? []
             : await db.Tags.Where(tag => tagIds.Contains(tag.Id)).ToListAsync(cancellationToken);
-        if (tags.Count != Math.Max(1, tagIds.Count))
+        if (tags.Count != tagIds.Count)
         {
             return (await GetPhotoReviewAsync(currentId, cancellationToken), [], "Algún tag seleccionado no existe.");
+        }
+
+        var classValidationError = await ValidateItemClassSelectionAsync(input.ItemClassId, input.ItemSubtypeId, cancellationToken);
+        if (classValidationError is not null)
+        {
+            return (await GetPhotoReviewAsync(currentId, cancellationToken), [], classValidationError);
         }
 
         var ids = ReviewSelectedIds(currentId, input.Ids);
         var item = new Item
         {
             BoxId = input.BoxId is > 0 ? input.BoxId : null,
+            ItemClassId = input.ItemClassId is > 0 ? input.ItemClassId : null,
+            ItemSubtypeId = input.ItemSubtypeId is > 0 ? input.ItemSubtypeId : null,
             Name = name,
-            Category = tags.OrderBy(tag => tag.Name).First().Name,
+            Category = tags.OrderBy(tag => tag.Name).FirstOrDefault()?.Name ?? "",
             Quantity = input.Quantity <= 0 ? 1 : input.Quantity,
             Unit = string.IsNullOrWhiteSpace(input.Unit) ? "uds" : input.Unit.Trim(),
             Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim()
@@ -1325,6 +1350,37 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             .OrderBy(condition => condition.Name)
             .Select(condition => new ItemConditionDto(condition.Id, condition.Name, condition.Color))
             .ToListAsync(cancellationToken);
+        var itemClasses = await db.ItemClasses.AsNoTracking()
+            .Where(itemClass => itemClass.IsActive)
+            .OrderBy(itemClass => itemClass.SortOrder ?? int.MaxValue)
+            .ThenBy(itemClass => itemClass.Name)
+            .Select(itemClass => new ItemClassDto(
+                itemClass.Id,
+                itemClass.Name,
+                itemClass.InventoryMode.ToString(),
+                itemClass.Description,
+                itemClass.Color,
+                itemClass.Icon,
+                itemClass.SortOrder,
+                itemClass.IsActive))
+            .ToListAsync(cancellationToken);
+        var itemSubtypes = await db.ItemSubtypes.AsNoTracking()
+            .Where(subtype => subtype.IsActive && subtype.ItemClass.IsActive)
+            .OrderBy(subtype => subtype.ItemClass.SortOrder ?? int.MaxValue)
+            .ThenBy(subtype => subtype.ItemClass.Name)
+            .ThenBy(subtype => subtype.SortOrder ?? int.MaxValue)
+            .ThenBy(subtype => subtype.Name)
+            .Select(subtype => new ItemSubtypeDto(
+                subtype.Id,
+                subtype.ItemClassId,
+                subtype.Name,
+                subtype.Unit,
+                subtype.MinStock,
+                subtype.TargetStock,
+                subtype.Description,
+                subtype.SortOrder,
+                subtype.IsActive))
+            .ToListAsync(cancellationToken);
 
         var locations = await db.Locations.AsNoTracking()
             .OrderBy(location => location.Name)
@@ -1355,7 +1411,56 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 RotationFor(boxCoverStates, box.CoverPhoto)))
             .ToList();
 
-        return new InventoryOptionsDto(categories, tags, conditions, locations, boxes);
+        return new InventoryOptionsDto(categories, tags, conditions, itemClasses, itemSubtypes, locations, boxes);
+    }
+
+    public async Task<ItemClassesResponseDto> GetItemClassesAsync(CancellationToken cancellationToken)
+    {
+        var classes = await db.ItemClasses.AsNoTracking()
+            .Where(itemClass => itemClass.IsActive)
+            .OrderBy(itemClass => itemClass.SortOrder ?? int.MaxValue)
+            .ThenBy(itemClass => itemClass.Name)
+            .Select(itemClass => new ItemClassDto(
+                itemClass.Id,
+                itemClass.Name,
+                itemClass.InventoryMode.ToString(),
+                itemClass.Description,
+                itemClass.Color,
+                itemClass.Icon,
+                itemClass.SortOrder,
+                itemClass.IsActive))
+            .ToListAsync(cancellationToken);
+
+        return new ItemClassesResponseDto(classes);
+    }
+
+    public async Task<ItemSubtypesResponseDto> GetItemSubtypesAsync(int? itemClassId, CancellationToken cancellationToken)
+    {
+        var query = db.ItemSubtypes.AsNoTracking()
+            .Where(subtype => subtype.IsActive && subtype.ItemClass.IsActive);
+        if (itemClassId is > 0)
+        {
+            query = query.Where(subtype => subtype.ItemClassId == itemClassId);
+        }
+
+        var subtypes = await query
+            .OrderBy(subtype => subtype.ItemClass.SortOrder ?? int.MaxValue)
+            .ThenBy(subtype => subtype.ItemClass.Name)
+            .ThenBy(subtype => subtype.SortOrder ?? int.MaxValue)
+            .ThenBy(subtype => subtype.Name)
+            .Select(subtype => new ItemSubtypeDto(
+                subtype.Id,
+                subtype.ItemClassId,
+                subtype.Name,
+                subtype.Unit,
+                subtype.MinStock,
+                subtype.TargetStock,
+                subtype.Description,
+                subtype.SortOrder,
+                subtype.IsActive))
+            .ToListAsync(cancellationToken);
+
+        return new ItemSubtypesResponseDto(subtypes);
     }
 
     public async Task<InventoryLiveResponseDto> GetLiveAsync(
@@ -1384,6 +1489,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         var query = db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
             .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
+            .Include(i => i.ItemClass)
+            .Include(i => i.ItemSubtype)
             .Include(i => i.ItemTags).ThenInclude(itemTag => itemTag.Tag)
             .AsQueryable();
 
@@ -1647,6 +1754,12 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             path,
             locationName,
             item.Category,
+            item.ItemClassId,
+            item.ItemClass?.Name,
+            item.ItemClass?.InventoryMode.ToString(),
+            item.ItemSubtypeId,
+            item.ItemSubtype?.Name,
+            item.ItemSubtype?.Unit,
             ToTagDtos(item),
             $"{item.Quantity} {item.Unit}",
             string.IsNullOrWhiteSpace(item.CoverPhoto) ? item.Name[..Math.Min(1, item.Name.Length)] : null,
@@ -1672,6 +1785,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 (item.Name, 80),
                 (item.Category, 35),
                 (string.Join(' ', item.ItemTags.Select(itemTag => itemTag.Tag.Name)), 55),
+                (item.ItemClass?.Name, 45),
+                (item.ItemSubtype?.Name, 45),
                 (item.Notes, 30),
                 (item.Unit, 10)
             ]);
@@ -1700,6 +1815,38 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             photo.ImportedAt,
             photo.SourceBox is null ? null : new InventoryBoxLinkDto(photo.SourceBox.Id, photo.SourceBox.Code, photo.SourceBox.Name),
             photo.Notes);
+    }
+
+    private async Task<string?> ValidateItemClassSelectionAsync(int? itemClassId, int? itemSubtypeId, CancellationToken cancellationToken)
+    {
+        var normalizedClassId = itemClassId is > 0 ? itemClassId : null;
+        var normalizedSubtypeId = itemSubtypeId is > 0 ? itemSubtypeId : null;
+
+        if (normalizedClassId is null && normalizedSubtypeId is null)
+        {
+            return null;
+        }
+
+        if (normalizedClassId is null)
+        {
+            return "Selecciona una clase antes de seleccionar un subtipo.";
+        }
+
+        var itemClassExists = await db.ItemClasses.AnyAsync(itemClass => itemClass.Id == normalizedClassId, cancellationToken);
+        if (!itemClassExists)
+        {
+            return "La clase seleccionada no existe.";
+        }
+
+        if (normalizedSubtypeId is null)
+        {
+            return null;
+        }
+
+        var subtypeBelongsToClass = await db.ItemSubtypes.AnyAsync(
+            subtype => subtype.Id == normalizedSubtypeId && subtype.ItemClassId == normalizedClassId,
+            cancellationToken);
+        return subtypeBelongsToClass ? null : "El subtipo seleccionado no pertenece a la clase del ítem.";
     }
 
     private async Task<Tag> GetOrCreateDefaultTagAsync(CancellationToken cancellationToken)
@@ -2124,6 +2271,12 @@ public record InventoryItemDetailDto(
     string Code,
     string Name,
     string Category,
+    int? ItemClassId,
+    string? ItemClassName,
+    string? InventoryMode,
+    int? ItemSubtypeId,
+    string? ItemSubtypeName,
+    string? ItemSubtypeUnit,
     List<TagDto> Tags,
     string QuantityLabel,
     decimal Quantity,
@@ -2149,6 +2302,8 @@ public record InventoryItemUpdateDto(
     string? Code,
     string? Name,
     string? Category,
+    int? ItemClassId,
+    int? ItemSubtypeId,
     List<int>? TagIds,
     decimal Quantity,
     string? Unit,
@@ -2230,6 +2385,10 @@ public record PhotoInboxResponseDto(
     int PendingCount,
     int AssignedCount,
     int DiscardedCount,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool ShowAll,
     List<PhotoInboxItemDto> Photos);
 
 public record PhotoInboxItemDto(
@@ -2272,6 +2431,8 @@ public record PhotoReviewAssignItemDto(List<int>? Ids, int ItemId);
 public record PhotoReviewCreateItemDto(
     List<int>? Ids,
     int? BoxId,
+    int? ItemClassId,
+    int? ItemSubtypeId,
     string? Name,
     string? Notes,
     decimal Quantity,
@@ -2347,6 +2508,8 @@ public record InventoryOptionsDto(
     List<string> Categories,
     List<TagDto> Tags,
     List<ItemConditionDto> Conditions,
+    List<ItemClassDto> ItemClasses,
+    List<ItemSubtypeDto> ItemSubtypes,
     List<InventoryOptionDto> Locations,
     List<InventoryBoxOptionDto> Boxes);
 
@@ -2411,6 +2574,12 @@ public record InventoryItemDto(
     string? BoxPath,
     string? LocationName,
     string Category,
+    int? ItemClassId,
+    string? ItemClassName,
+    string? InventoryMode,
+    int? ItemSubtypeId,
+    string? ItemSubtypeName,
+    string? ItemSubtypeUnit,
     List<TagDto> Tags,
     string QuantityLabel,
     string? GeneratedLabel,
@@ -2431,6 +2600,31 @@ public record InventoryHierarchyNodeDto(
 public record TagsResponseDto(List<TagDto> Tags);
 
 public record TagDto(int Id, string Name, string Color);
+
+public record ItemClassesResponseDto(List<ItemClassDto> ItemClasses);
+
+public record ItemSubtypesResponseDto(List<ItemSubtypeDto> ItemSubtypes);
+
+public record ItemClassDto(
+    int Id,
+    string Name,
+    string InventoryMode,
+    string? Description,
+    string? Color,
+    string? Icon,
+    int? SortOrder,
+    bool IsActive);
+
+public record ItemSubtypeDto(
+    int Id,
+    int ItemClassId,
+    string Name,
+    string? Unit,
+    decimal? MinStock,
+    decimal? TargetStock,
+    string? Description,
+    int? SortOrder,
+    bool IsActive);
 
 public record TagUpdateDto(string? Name, string? Color);
 

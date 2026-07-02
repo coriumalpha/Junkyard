@@ -4,7 +4,7 @@
 
 .tag-picker {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -34,6 +34,37 @@
   white-space: nowrap;
 }
 
+.selected-block {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tag-section-label,
+.tag-list-head {
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tag-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+}
+
+.tag-list-head button {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .selected-tags,
 .tag-grid {
   min-width: 0;
@@ -47,8 +78,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
   gap: 8px;
-  max-height: 220px;
+  max-height: 260px;
+  padding: 2px;
   overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .compact .tag-grid {
@@ -70,11 +103,13 @@
   cursor: pointer;
   text-align: left;
   overflow-wrap: anywhere;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
 }
 
 .tag-option:hover {
   border-color: color-mix(in srgb, var(--tag-color) 70%, white 12%);
   background: color-mix(in srgb, var(--tag-color) 18%, rgba(255, 255, 255, 0.045));
+  transform: translateY(-1px);
 }
 
 .tag-option.active {
@@ -100,6 +135,16 @@
   height: 18px;
   font-size: 18px;
   color: var(--app-accent);
+}
+
+.tag-grid p {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed var(--app-border);
+  border-radius: 12px;
+  color: var(--app-muted);
+  background: rgba(255, 255, 255, 0.025);
 }
 
 @media (max-width: 560px) {

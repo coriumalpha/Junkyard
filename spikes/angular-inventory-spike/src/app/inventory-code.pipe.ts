@@ -13,9 +13,7 @@ export function formatInventoryCode(value: string | null | undefined): string {
 
   const prefix = match[1];
   const digits = match[2].padStart(6, '0').slice(-6);
-  return prefix === 'IT'
-    ? `IT-${digits.slice(0, 3)}-${digits.slice(3)}`
-    : `CT-${digits}`;
+  return `${prefix}-${digits.slice(0, 3)}-${digits.slice(3)}`;
 }
 
 @Pipe({

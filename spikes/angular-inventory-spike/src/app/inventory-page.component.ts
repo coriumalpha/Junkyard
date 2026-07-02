@@ -19,6 +19,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { InventoryApiService, InventoryBoxOption, InventoryBoxUpdate, InventoryBulkUpdate, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { legacyUrl } from './legacy-url';
+import { AppPaginatorComponent } from './app-paginator.component';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
 
@@ -129,6 +130,7 @@ const BOX_STATUS_OPTIONS: SearchableSelectOption[] = ['Active', 'Quarantine', 'A
     MatIconModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    AppPaginatorComponent,
     SearchableSelectComponent,
     TagPickerComponent,
     InventoryCodePipe,
@@ -140,9 +142,10 @@ const BOX_STATUS_OPTIONS: SearchableSelectOption[] = ['Active', 'Quarantine', 'A
   styleUrl: './inventory-page.component.scss'
 })
 export class InventoryPageComponent {
+  protected readonly isContainersPage = signal(false);
   protected readonly state = signal<InventoryQueryState>({ ...DEFAULT_STATE });
   protected readonly data = signal<InventoryLiveResponse | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], itemClasses: [], itemSubtypes: [], locations: [], boxes: [] });
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly expandedGroups = signal<Record<string, boolean>>({});
@@ -207,6 +210,7 @@ export class InventoryPageComponent {
       placeholder: formatInventoryCode(box.code)
     })));
   protected readonly layoutOptions = LAYOUT_OPTIONS;
+  protected readonly inventoryLayoutOptions = LAYOUT_OPTIONS.filter((option) => option.value !== 'containers');
   protected readonly containerTypeOptions = CONTAINER_TYPE_OPTIONS;
   protected readonly boxStatusOptions = BOX_STATUS_OPTIONS;
   protected readonly groupPageSize = 12;
@@ -218,6 +222,8 @@ export class InventoryPageComponent {
   private readonly stateKey = (state: InventoryQueryState) => JSON.stringify(state);
 
   constructor() {
+    this.isContainersPage.set(this.route.snapshot.routeConfig?.path === 'containers');
+
     this.route.queryParamMap.pipe(
       map((params) => this.parseState(params)),
       distinctUntilChanged((left, right) => this.stateKey(left) === this.stateKey(right)),
@@ -280,6 +286,10 @@ export class InventoryPageComponent {
 
   protected setLocationId(value: number | null): void {
     this.navigate({ locationId: value });
+  }
+
+  protected clearLocationId(): void {
+    this.navigate({ locationId: null });
   }
 
   protected setLayout(value: InventoryLayoutMode): void {
@@ -426,6 +436,10 @@ export class InventoryPageComponent {
   }
 
   protected currentScopeBackendUrl(): string {
+    if (this.isContainersPage()) {
+      return this.backendUrl('/Boxes');
+    }
+
     const state = this.state();
     const params = new URLSearchParams();
 
@@ -492,6 +506,19 @@ export class InventoryPageComponent {
   protected filterSummary(): string[] {
     const state = this.state();
     const summary: string[] = [];
+
+    if (this.isContainersPage()) {
+      if (state.q.trim()) {
+        summary.push(`q=${state.q.trim()}`);
+      }
+
+      if (state.locationId !== null) {
+        summary.push(this.locationLabel(state.locationId));
+      }
+
+      summary.push('Contenedores');
+      return summary;
+    }
 
     if (state.q.trim()) {
       summary.push(`q=${state.q.trim()}`);
@@ -705,6 +732,18 @@ export class InventoryPageComponent {
     next.boxIds = Array.from(new Set(next.boxIds.filter((boxId) => boxId > 0))).sort((left, right) => left - right);
     next.tagIds = Array.from(new Set(next.tagIds.filter((tagId) => tagId > 0))).sort((left, right) => left - right);
 
+    if (this.isContainersPage()) {
+      next.category = '';
+      next.tagIds = [];
+      next.box = '';
+      next.boxIds = [];
+      next.includeChildren = false;
+      next.onlyConsumable = false;
+      next.onlyOrphans = false;
+      next.layout = 'containers';
+      next.view = 'grouped';
+    }
+
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: this.buildQueryParams(next)
@@ -712,6 +751,20 @@ export class InventoryPageComponent {
   }
 
   private buildQueryParams(state: InventoryQueryState): Record<string, string> {
+    if (this.isContainersPage()) {
+      const params: Record<string, string> = {};
+
+      if (state.q.trim()) {
+        params['q'] = state.q.trim();
+      }
+
+      if (state.locationId !== null) {
+        params['locationId'] = String(state.locationId);
+      }
+
+      return params;
+    }
+
     const params: Record<string, string> = {
       layout: state.layout,
       view: state.view
@@ -759,7 +812,17 @@ export class InventoryPageComponent {
   private parseState(params: ParamMap): InventoryQueryState {
     const serverView = params.get('view') === 'flat' ? 'flat' : 'grouped';
     const layoutParam = params.get('layout');
-    const layout = this.isLayoutMode(layoutParam) ? layoutParam : serverView;
+    const layout = this.isLayoutMode(layoutParam) && layoutParam !== 'containers' ? layoutParam : serverView;
+
+    if (this.isContainersPage()) {
+      return {
+        ...DEFAULT_STATE,
+        q: params.get('q') ?? '',
+        locationId: this.parseNumber(params.get('locationId')),
+        layout: 'containers',
+        view: 'grouped'
+      };
+    }
 
     return {
       q: params.get('q') ?? '',

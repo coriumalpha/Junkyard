@@ -43,7 +43,7 @@ export class ActionsPageComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly busyId = signal<number | null>(null);
   protected readonly data = signal<InventoryActionsResponse | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], itemClasses: [], itemSubtypes: [], locations: [], boxes: [] });
   protected readonly items = signal<InventoryItem[]>([]);
   protected readonly newTitle = signal('');
   protected readonly newDescription = signal('');

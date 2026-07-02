@@ -5,7 +5,7 @@
 }
 
 .review-shell {
-  width: min(1540px, calc(100% - 32px));
+  width: min(var(--app-page-max), calc(100% - (var(--app-page-gutter) * 2)));
   margin: 0 auto;
   padding: 20px 0 34px;
 }
@@ -145,6 +145,18 @@
   color: var(--app-muted);
   font-size: 0.84rem;
   line-height: 1.35;
+}
+
+.panel-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.panel-title-row span {
+  color: var(--app-muted);
+  font-size: 0.78rem;
 }
 
 .keycap {

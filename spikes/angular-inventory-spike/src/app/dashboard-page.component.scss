@@ -2,14 +2,12 @@
   display: block;
   min-height: 100vh;
   color: var(--app-text);
-  background:
-    linear-gradient(180deg, rgba(7, 11, 22, 0.98), rgba(10, 15, 29, 1));
 }
 
 .dashboard-shell {
-  max-width: 1480px;
+  width: min(var(--app-page-max), calc(100% - (var(--app-page-gutter) * 2)));
   margin: 0 auto;
-  padding: 20px;
+  padding: 20px 0 34px;
 }
 
 .dashboard-header,

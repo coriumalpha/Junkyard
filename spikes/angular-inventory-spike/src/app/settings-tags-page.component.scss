@@ -5,7 +5,7 @@
 }
 
 .settings-shell {
-  width: min(1500px, calc(100% - 32px));
+  width: min(var(--app-page-max), calc(100% - (var(--app-page-gutter) * 2)));
   margin: 0 auto;
   padding: 20px 0 34px;
 }

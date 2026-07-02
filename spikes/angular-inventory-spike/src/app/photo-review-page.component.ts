@@ -27,7 +27,7 @@ type ReviewPanel = 'none' | 'create' | 'assignItem' | 'assignBox';
 })
 export class PhotoReviewPageComponent {
   protected readonly review = signal<PhotoReviewResponse | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], itemClasses: [], itemSubtypes: [], locations: [], boxes: [] });
   protected readonly items = signal<InventoryItem[]>([]);
   protected readonly selectedIds = signal<number[]>([]);
   protected readonly loading = signal(true);
@@ -143,7 +143,7 @@ export class PhotoReviewPageComponent {
       this.draftQuantity.set(1);
       this.draftUnit.set('uds');
       this.draftBoxId.set(current.sourceBox?.id ?? null);
-      this.draftTagIds.set(this.options().tags.find((tag) => tag.name === 'Otros') ? [this.options().tags.find((tag) => tag.name === 'Otros')!.id] : []);
+      this.draftTagIds.set([]);
     }
 
     if (panel === 'assignBox') {

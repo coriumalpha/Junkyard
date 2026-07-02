@@ -67,11 +67,12 @@ export class DetailPageComponent {
   protected readonly saving = signal(false);
   protected readonly saveMessage = signal<string | null>(null);
   protected readonly formError = signal<string | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], itemClasses: [], itemSubtypes: [], locations: [], boxes: [] });
   protected readonly itemForm = signal<InventoryItemUpdate>(this.emptyItemForm());
   protected readonly boxForm = signal<InventoryBoxUpdate>(this.emptyBoxForm());
   protected readonly newTagName = signal('');
   protected readonly newTagColor = signal('#48ffb0');
+  protected readonly tagCreateOpen = signal(false);
   protected readonly activePhotoIndex = signal(0);
   protected readonly modalPhoto = signal<InventoryPhoto | null>(null);
   protected readonly boxItemsView = signal<BoxItemsView>('list');
@@ -271,6 +272,8 @@ export class DetailPageComponent {
       name: item.name,
       code: item.code,
       category: item.category,
+      itemClassId: item.itemClassId,
+      itemSubtypeId: item.itemSubtypeId,
       tagIds: item.tags.map((tag) => tag.id),
       quantity: item.quantity,
       unit: item.unit,
@@ -338,11 +341,6 @@ export class DetailPageComponent {
       return;
     }
 
-    if (!form.tagIds.length) {
-      this.formError.set('Selecciona o crea al menos un tag.');
-      return;
-    }
-
     this.saving.set(true);
     this.formError.set(null);
     this.saveMessage.set(null);
@@ -363,6 +361,8 @@ export class DetailPageComponent {
           name: updated.name,
           code: updated.code,
           category: updated.category,
+          itemClassId: updated.itemClassId,
+          itemSubtypeId: updated.itemSubtypeId,
           tagIds: updated.tags.map((tag) => tag.id),
           quantity: updated.quantity,
           unit: updated.unit,
@@ -1020,6 +1020,7 @@ export class DetailPageComponent {
         }));
         this.newTagName.set('');
         this.newTagColor.set('#48ffb0');
+        this.tagCreateOpen.set(false);
       }),
       catchError((error: unknown) => {
         this.formError.set(error instanceof Error ? error.message : 'No se pudo crear el tag.');
@@ -1028,6 +1029,21 @@ export class DetailPageComponent {
       finalize(() => this.saving.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
+  }
+
+  protected openTagCreate(): void {
+    this.formError.set(null);
+    this.tagCreateOpen.set(true);
+  }
+
+  protected closeTagCreate(): void {
+    if (this.saving()) {
+      return;
+    }
+
+    this.tagCreateOpen.set(false);
+    this.newTagName.set('');
+    this.newTagColor.set('#48ffb0');
   }
 
   protected setNewTagName(value: string): void {
@@ -1073,7 +1089,9 @@ export class DetailPageComponent {
     return {
       code: '',
       name: '',
-      category: 'Otros',
+      category: '',
+      itemClassId: null,
+      itemSubtypeId: null,
       tagIds: [],
       quantity: 1,
       unit: '',

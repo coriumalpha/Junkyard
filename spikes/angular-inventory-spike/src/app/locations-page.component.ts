@@ -46,7 +46,7 @@ export class LocationsPageComponent {
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
-  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], locations: [], boxes: [] });
+  protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], itemClasses: [], itemSubtypes: [], locations: [], boxes: [] });
   protected readonly locations = signal<InventoryLocation[]>([]);
   protected readonly draftName = signal('');
   protected readonly draftDescription = signal('');

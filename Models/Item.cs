@@ -8,6 +8,10 @@ public class Item
     public string Code { get; set; } = "";
     public int? BoxId { get; set; }
     public Box? Box { get; set; }
+    public int? ItemClassId { get; set; }
+    public ItemClass? ItemClass { get; set; }
+    public int? ItemSubtypeId { get; set; }
+    public ItemSubtype? ItemSubtype { get; set; }
     public string Name { get; set; } = "";
     public string Category { get; set; } = "Otros";
     public decimal Quantity { get; set; } = 1;

@@ -24,58 +24,6 @@
       </button>
     </div>
 
-    @if (!drawerCollapsed() || handset()) {
-      <section class="quick-search">
-        <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Búsqueda rápida</mat-label>
-          <mat-icon matPrefix>search</mat-icon>
-          <input
-            #quickSearchInput
-            matInput
-            [ngModel]="quickSearch()"
-            (ngModelChange)="updateQuickSearch($event)"
-            placeholder="IT, CT, nombre, tag..."
-          />
-          @if (quickSearch()) {
-            <button mat-icon-button matSuffix type="button" (click)="clearQuickSearch()" aria-label="Limpiar búsqueda">
-              <mat-icon>close</mat-icon>
-            </button>
-          }
-        </mat-form-field>
-
-        @if (quickLoading()) {
-          <div class="quick-state">
-            <mat-progress-spinner mode="indeterminate" diameter="20" />
-            <span>Buscando...</span>
-          </div>
-        } @else if (quickSearch().trim().length >= 2) {
-          <div class="quick-results">
-            @for (item of quickItems(); track item.id) {
-              <button type="button" class="quick-result" (click)="openQuickItem(item)">
-                <span class="quick-kind">IT</span>
-                <strong>{{ item.code | inventoryCode }}</strong>
-                <span>{{ item.name }}</span>
-              </button>
-            }
-            @for (box of quickBoxes(); track box.boxId) {
-              <button type="button" class="quick-result" (click)="openQuickBox(box)">
-                <span class="quick-kind">CT</span>
-                <strong>{{ box.code | inventoryCode }}</strong>
-                <span>{{ box.name }}</span>
-              </button>
-            }
-            @if (!quickItems().length && !quickBoxes().length) {
-              <div class="quick-empty">Sin resultados</div>
-            }
-          </div>
-        }
-      </section>
-    } @else {
-      <button mat-icon-button type="button" class="quick-search-collapsed" (click)="openQuickSearch()" aria-label="Búsqueda rápida">
-        <mat-icon>search</mat-icon>
-      </button>
-    }
-
     <mat-nav-list class="drawer-nav">
       <a mat-list-item routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
         <mat-icon matListItemIcon>dashboard</mat-icon>
@@ -91,8 +39,8 @@
           <span matListItemLine>Filtros y resultados</span>
         }
       </a>
-      <a mat-list-item routerLink="/inventory" [queryParams]="{ layout: 'containers', view: 'grouped' }" [class.active]="isContainersSection()" (click)="closeDrawer()">
-        <mat-icon matListItemIcon>inventory</mat-icon>
+      <a mat-list-item routerLink="/containers" [class.active]="isContainersSection()" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>warehouse</mat-icon>
         <span matListItemTitle>Contenedores</span>
         @if (!drawerCollapsed() || handset()) {
           <span matListItemLine>Cajas y ubicaciones</span>
@@ -173,6 +121,84 @@
         Menú
       </button>
     }
+    <section class="top-search" role="search">
+      <div class="top-search-inner">
+        <div class="top-search-control">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Buscar</mat-label>
+            <mat-icon matPrefix>search</mat-icon>
+            <input
+              #quickSearchInput
+              matInput
+              [ngModel]="quickSearch()"
+              (ngModelChange)="updateQuickSearch($event)"
+              (focus)="openQuickSearchPanel()"
+              placeholder="Ítem, contenedor, código, tag..."
+            />
+            @if (quickSearch()) {
+              <button mat-icon-button matSuffix type="button" (click)="clearQuickSearch()" aria-label="Limpiar búsqueda">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </mat-form-field>
+
+          @if (quickOpen() && quickLoading()) {
+            <div class="quick-results top-search-panel">
+              <div class="quick-state">
+                <mat-progress-spinner mode="indeterminate" diameter="20" />
+                <span>Buscando...</span>
+              </div>
+            </div>
+          } @else if (quickOpen() && quickSearch().trim().length >= 2) {
+            <div class="quick-results top-search-panel">
+              @if (hasQuickResults()) {
+                @if (quickBoxes().length) {
+                  <div class="quick-section">
+                    <div class="quick-section-title">Contenedores</div>
+                    @for (box of quickBoxes(); track box.boxId) {
+                      <button type="button" class="quick-result quick-container" (click)="openQuickBox(box)">
+                        @if (box.coverUrl) {
+                          <img [src]="assetUrl(box.coverUrl)!" [style.transform]="'rotate(' + box.rotationDegrees + 'deg)'" [alt]="box.name" />
+                        } @else {
+                          <span class="quick-thumb quick-container-thumb">
+                            <mat-icon>inventory_2</mat-icon>
+                          </span>
+                        }
+                        <span class="quick-copy">
+                          <strong>{{ box.name }}</strong>
+                          <small>{{ box.code | inventoryCode }} · {{ boxSummary(box) }}</small>
+                        </span>
+                      </button>
+                    }
+                  </div>
+                }
+
+                @if (quickItems().length) {
+                  <div class="quick-section">
+                    <div class="quick-section-title">Ítems</div>
+                    @for (item of quickItems(); track item.id) {
+                      <button type="button" class="quick-result" (click)="openQuickItem(item)">
+                        @if (item.coverUrl) {
+                          <img [src]="assetUrl(item.coverUrl)!" [style.transform]="'rotate(' + item.rotationDegrees + 'deg)'" [alt]="item.name" />
+                        } @else {
+                          <span class="quick-thumb">{{ item.generatedLabel || item.name.slice(0, 1) }}</span>
+                        }
+                        <span class="quick-copy">
+                          <strong>{{ item.name }}</strong>
+                          <small>{{ item.code | inventoryCode }} · {{ tagSummary(item) }}</small>
+                        </span>
+                      </button>
+                    }
+                  </div>
+                }
+              } @else {
+                <div class="quick-empty">Sin resultados</div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </section>
     <router-outlet />
   </mat-sidenav-content>
 </mat-sidenav-container>

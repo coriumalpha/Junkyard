@@ -1,7 +1,7 @@
 <div class="tag-picker" [class.compact]="compact">
   <div class="tag-picker-head">
     <span>{{ label }}</span>
-    <small>{{ value.length }} seleccionadas</small>
+    <small>{{ resultLabel() }}</small>
     @if (value.length) {
       <button mat-button type="button" (click)="clear()">
         <mat-icon>backspace</mat-icon>
@@ -12,7 +12,7 @@
 
   <mat-form-field appearance="outline" subscriptSizing="dynamic">
     <mat-label>Buscar tag</mat-label>
-    <input matInput [value]="query()" (input)="query.set($any($event.target).value)" placeholder="Nombre, tema, familia..." />
+    <input matInput [value]="query()" (input)="query.set($any($event.target).value)" [placeholder]="placeholder" />
     @if (query()) {
       <button mat-icon-button matSuffix type="button" (click)="query.set('')" aria-label="Limpiar búsqueda de tags">
         <mat-icon>close</mat-icon>
@@ -21,17 +21,27 @@
   </mat-form-field>
 
   @if (selected().length) {
-    <mat-chip-set class="selected-tags" aria-label="Tags seleccionadas">
-      @for (tag of selected(); track tag.id) {
-        <mat-chip [style.--tag-color]="tag.color" (removed)="toggle(tag.id)">
-          {{ tag.name }}
-          <button matChipRemove type="button" [attr.aria-label]="'Quitar ' + tag.name">
-            <mat-icon>cancel</mat-icon>
-          </button>
-        </mat-chip>
-      }
-    </mat-chip-set>
+    <div class="selected-block">
+      <div class="tag-section-label">Seleccionadas</div>
+      <mat-chip-set class="selected-tags" aria-label="Tags seleccionadas">
+        @for (tag of selected(); track tag.id) {
+          <mat-chip [style.--tag-color]="tag.color">
+            {{ tag.name }}
+            <button matChipRemove type="button" [attr.aria-label]="'Quitar ' + tag.name" (click)="remove(tag.id); $event.stopPropagation()">
+              <mat-icon>cancel</mat-icon>
+            </button>
+          </mat-chip>
+        }
+      </mat-chip-set>
+    </div>
   }
+
+  <div class="tag-list-head">
+    <span>{{ query() ? 'Resultados' : 'Todas las tags' }}</span>
+    @if (query()) {
+      <button mat-button type="button" (click)="query.set('')">Ver todas</button>
+    }
+  </div>
 
   <div class="tag-grid">
     @for (tag of filtered(); track tag.id) {
@@ -49,7 +59,7 @@
         }
       </button>
     } @empty {
-      <p>Sin tags disponibles.</p>
+      <p>{{ query() ? 'No hay tags con ese texto.' : 'No hay tags disponibles.' }}</p>
     }
   </div>
 </div>
