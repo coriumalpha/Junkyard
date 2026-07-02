@@ -308,6 +308,13 @@ app.MapGet("/api/item-subtypes", async (
     var response = await queryService.GetItemSubtypesAsync(itemClassId, cancellationToken);
     return Results.Json(response);
 });
+app.MapGet("/api/cleanup/item-classification", async (
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetItemClassificationCleanupReportAsync(cancellationToken);
+    return Results.Json(response);
+});
 app.MapGet("/api/locations", async (
     InventoryDbContext db,
     CancellationToken cancellationToken) =>

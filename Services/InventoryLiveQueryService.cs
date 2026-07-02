@@ -1,6 +1,7 @@
 using Inventario.Data;
 using Inventario.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 
 namespace Inventario.Services;
 
@@ -469,10 +470,52 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
     {
         var tags = await db.Tags.AsNoTracking()
             .OrderBy(tag => tag.Name)
-            .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color))
+            .Select(tag => new TagDto(
+                tag.Id,
+                tag.Name,
+                tag.Color,
+                tag.ItemTags.Count,
+                tag.Name.Contains("(temporal)")))
             .ToListAsync(cancellationToken);
 
         return new TagsResponseDto(tags);
+    }
+
+    public async Task<ItemClassificationCleanupReportDto> GetItemClassificationCleanupReportAsync(CancellationToken cancellationToken)
+    {
+        const string lotKitTagName = "Lote / Kit (temporal)";
+        const string quarantineTagName = "Cuarentena";
+
+        var lotKitItems = await ItemsWithTagAsync(lotKitTagName, cancellationToken);
+        var quarantineItems = await ItemsWithTagAsync(quarantineTagName, cancellationToken);
+        var untypedConsumables = await db.Items.AsNoTracking()
+            .Include(i => i.Box)!.ThenInclude(b => b!.Location)
+            .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
+            .Include(i => i.ItemClass)
+            .Include(i => i.ItemSubtype)
+            .Include(i => i.ItemTags).ThenInclude(itemTag => itemTag.Tag)
+            .Where(item => item.Consumable && (item.ItemClass == null || item.ItemClass.InventoryMode != InventoryMode.Fungible || item.ItemSubtypeId == null))
+            .OrderBy(item => item.Code)
+            .ToListAsync(cancellationToken);
+
+        var migrated = lotKitItems
+            .Where(item => item.ItemClassId != null)
+            .Select(item => ToCleanupItemDto(item, MigrationSuggestionForLotKit(item)))
+            .ToList();
+        var pending = lotKitItems
+            .Where(item => item.ItemClassId == null)
+            .Select(item => ToCleanupItemDto(item, MigrationSuggestionForLotKit(item)))
+            .ToList();
+
+        return new ItemClassificationCleanupReportDto(
+            lotKitItems.Count,
+            migrated.Count,
+            pending.Count,
+            pending,
+            quarantineItems.Count,
+            quarantineItems.Select(item => ToCleanupItemDto(item, "Migración futura: estado/booleano IsQuarantined, no ItemClass.")).ToList(),
+            untypedConsumables.Count,
+            untypedConsumables.Select(item => ToCleanupItemDto(item, SuggestConsumableClassification(item))).ToList());
     }
 
     public async Task<(TagDto? Tag, string? Error)> CreateTagAsync(TagUpdateDto input, CancellationToken cancellationToken)
@@ -1344,7 +1387,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             .ToListAsync(cancellationToken);
         var tags = await db.Tags.AsNoTracking()
             .OrderBy(tag => tag.Name)
-            .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color))
+            .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color, 0, tag.Name.Contains("(temporal)")))
             .ToListAsync(cancellationToken);
         var conditions = await db.ItemConditions.AsNoTracking()
             .OrderBy(condition => condition.Name)
@@ -1994,8 +2037,94 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             .Where(itemTag => itemTag.Tag is not null)
             .Select(itemTag => itemTag.Tag)
             .OrderBy(tag => tag.Name)
-            .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color))
+            .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color, 0, tag.Name.Contains("(temporal)")))
             .ToList();
+    }
+
+    private async Task<List<Item>> ItemsWithTagAsync(string tagName, CancellationToken cancellationToken)
+    {
+        return await db.Items.AsNoTracking()
+            .Include(i => i.Box)!.ThenInclude(b => b!.Location)
+            .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
+            .Include(i => i.ItemClass)
+            .Include(i => i.ItemSubtype)
+            .Include(i => i.ItemTags).ThenInclude(itemTag => itemTag.Tag)
+            .Where(item => item.ItemTags.Any(itemTag => itemTag.Tag != null && itemTag.Tag.Name == tagName))
+            .OrderBy(item => item.Code)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static ItemClassificationCleanupItemDto ToCleanupItemDto(Item item, string? suggestion)
+    {
+        return new ItemClassificationCleanupItemDto(
+            item.Id,
+            item.Code,
+            item.Name,
+            $"{item.Quantity} {item.Unit}",
+            item.Box is null ? "Sin caja" : BuildBoxPath(item.Box),
+            item.ItemTags
+                .Where(itemTag => itemTag.Tag is not null)
+                .Select(itemTag => itemTag.Tag!.Name)
+                .OrderBy(name => name)
+                .ToList(),
+            item.ItemClass?.Name,
+            item.ItemSubtype?.Name,
+            suggestion);
+    }
+
+    private static string? MigrationSuggestionForLotKit(Item item)
+    {
+        if (item.ItemClassId is not null)
+        {
+            return null;
+        }
+
+        if (Regex.IsMatch(item.Name, @"^Kit\b", RegexOptions.IgnoreCase))
+        {
+            return "Migrable: ItemClass Kit.";
+        }
+
+        if (Regex.IsMatch(item.Name, @"^Lote\b", RegexOptions.IgnoreCase))
+        {
+            return "Migrable: ItemClass Lote.";
+        }
+
+        return "Pendiente: distinguir manualmente entre Kit, Lote o tag transversal.";
+    }
+
+    private static string? SuggestConsumableClassification(Item item)
+    {
+        var tagNames = item.ItemTags
+            .Where(itemTag => itemTag.Tag is not null)
+            .Select(itemTag => itemTag.Tag!.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!tagNames.Contains("Pilas y baterías"))
+        {
+            return null;
+        }
+
+        var name = item.Name.ToUpperInvariant();
+        if (name.Contains("CR2032", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Sugerencia: Pila / CR2032.";
+        }
+
+        if (Regex.IsMatch(name, @"\b18650\b"))
+        {
+            return "Sugerencia: Pila / 18650.";
+        }
+
+        if (Regex.IsMatch(name, @"\bAAA\b"))
+        {
+            return "Sugerencia: Pila / AAA.";
+        }
+
+        if (Regex.IsMatch(name, @"\bAA\b") && !Regex.IsMatch(name, @"\bAAA\b|\bAAAA\b"))
+        {
+            return "Sugerencia: Pila / AA.";
+        }
+
+        return "Sugerencia: revisar como Pila; subtipo no obvio.";
     }
 
     private static string NormalizeTagColor(string? color)
@@ -2611,7 +2740,28 @@ public record InventoryHierarchyNodeDto(
 
 public record TagsResponseDto(List<TagDto> Tags);
 
-public record TagDto(int Id, string Name, string Color);
+public record TagDto(int Id, string Name, string Color, int ItemCount = 0, bool IsTemporary = false);
+
+public record ItemClassificationCleanupReportDto(
+    int LotKitTemporaryCount,
+    int LotKitMigratedCount,
+    int LotKitPendingCount,
+    List<ItemClassificationCleanupItemDto> LotKitPending,
+    int QuarantineCount,
+    List<ItemClassificationCleanupItemDto> QuarantineItems,
+    int UntypedConsumableCount,
+    List<ItemClassificationCleanupItemDto> UntypedConsumables);
+
+public record ItemClassificationCleanupItemDto(
+    int Id,
+    string Code,
+    string Name,
+    string QuantityLabel,
+    string BoxPath,
+    List<string> Tags,
+    string? ItemClassName,
+    string? ItemSubtypeName,
+    string? Suggestion);
 
 public record ItemClassesResponseDto(List<ItemClassDto> ItemClasses);
 

@@ -36,20 +36,27 @@
       <div class="tag-table-head">
         <span>Color</span>
         <span>Tag</span>
+        <span>Uso</span>
         <span>Hex</span>
         <span>Acciones</span>
       </div>
       @for (tag of tags(); track tag.id) {
         <div class="tag-table-row" [class.active]="editingTag()?.id === tag.id">
           <span class="tag-swatch" [style.background]="tag.color"></span>
-          <strong>{{ tag.name }}</strong>
+          <strong>
+            {{ tag.name }}
+            @if (tag.isTemporary) {
+              <small class="temporary-badge">Temporal</small>
+            }
+          </strong>
+          <span>{{ tag.itemCount }} ítems</span>
           <span>{{ tag.color }}</span>
           <div class="row-actions">
             <button mat-stroked-button type="button" (click)="startEdit(tag)" [disabled]="saving()">
               <mat-icon>edit</mat-icon>
               Editar
             </button>
-            <button mat-icon-button type="button" (click)="deleteTag(tag)" [disabled]="saving()" aria-label="Eliminar tag">
+            <button mat-icon-button type="button" (click)="deleteTag(tag)" [disabled]="saving()" [title]="tag.itemCount ? 'No se puede borrar mientras tenga ítems asignados' : 'Eliminar tag'" aria-label="Eliminar tag">
               <mat-icon>delete</mat-icon>
             </button>
           </div>

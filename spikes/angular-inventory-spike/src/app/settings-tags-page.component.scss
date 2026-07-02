@@ -73,7 +73,7 @@
 .tag-table-head,
 .tag-table-row {
   display: grid;
-  grid-template-columns: 64px minmax(180px, 1fr) minmax(100px, 160px) auto;
+  grid-template-columns: 64px minmax(180px, 1fr) minmax(78px, 110px) minmax(100px, 160px) auto;
   gap: 12px;
   align-items: center;
 }
@@ -99,6 +99,16 @@
 .tag-table-row span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.temporary-badge {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255, 200, 107, 0.14);
+  color: #ffe2a6;
+  font-size: 0.72rem;
 }
 
 .tag-swatch {

@@ -27,6 +27,7 @@ Junkyard is a compact ASP.NET Core Razor Pages application.
 - `Item` may be assigned to one box or left unboxed as an orphan.
 - `Photo` belongs to either a box or an item and stores logical rotation in `RotationDegrees`.
 - `PhotoInbox` stores uploaded photos before assignment and preserves rotation while being reviewed.
+- `ItemClass`, `InventoryMode` and `ItemSubtype` describe specialized item behavior and stock grouping. See `docs/ITEM-CLASSIFICATION.md`.
 
 ## Runtime Storage
 

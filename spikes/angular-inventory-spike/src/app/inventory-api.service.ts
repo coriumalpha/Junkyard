@@ -68,6 +68,8 @@ export interface InventoryTag {
   id: number;
   name: string;
   color: string;
+  itemCount: number;
+  isTemporary: boolean;
 }
 
 export interface ConditionsResponse {
