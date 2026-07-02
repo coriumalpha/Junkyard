@@ -16,7 +16,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatToolbarModule } from '@angular/material/toolbar';
 
-import { InventoryApiService, InventoryBoxOption, InventoryBoxUpdate, InventoryBulkUpdate, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
+import { InventoryApiService, InventoryBoxOption, InventoryBoxUpdate, InventoryBulkUpdate, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryMode, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { legacyUrl } from './legacy-url';
 import { AppPaginatorComponent } from './app-paginator.component';
@@ -43,6 +43,16 @@ interface InventoryGroupNode extends InventoryGroup {
   children: InventoryGroupNode[];
 }
 
+interface ConsumableSubtypeGroup {
+  key: string;
+  className: string;
+  subtypeName: string;
+  mode: InventoryMode;
+  unit: string;
+  total: number;
+  items: InventoryItem[];
+}
+
 const DEFAULT_STATE: InventoryQueryState = {
   q: '',
   category: '',
@@ -53,6 +63,7 @@ const DEFAULT_STATE: InventoryQueryState = {
   includeChildren: false,
   onlyConsumable: false,
   onlyOrphans: false,
+  onlyUntagged: false,
   layout: 'grouped',
   view: 'grouped'
 };
@@ -171,7 +182,7 @@ export class InventoryPageComponent {
   protected readonly shouldAutoExpandGroups = computed(() => {
     const state = this.state();
     return state.layout === 'grouped'
-      && Boolean(state.q.trim() || state.category.trim() || state.tagIds.length || state.boxIds.length || state.locationId !== null || state.onlyConsumable || state.onlyOrphans);
+      && Boolean(state.q.trim() || state.category.trim() || state.tagIds.length || state.boxIds.length || state.locationId !== null || state.onlyConsumable || state.onlyOrphans || state.onlyUntagged);
   });
   protected readonly filteredContainers = computed(() => {
     const state = this.state();
@@ -192,6 +203,9 @@ export class InventoryPageComponent {
     });
   });
   protected readonly focusVisuals = computed(() => this.buildFocusVisuals());
+  protected readonly fungibleConsumableGroups = computed(() => this.buildFungibleConsumableGroups());
+  protected readonly untypedConsumables = computed(() => this.items()
+    .filter((item) => item.consumable && !(item.inventoryMode === 'Fungible' && item.itemClassId !== null && item.itemSubtypeId !== null)));
   protected readonly selectedBoxOptions = computed(() => {
     const selected = new Set(this.state().boxIds);
     return this.options().boxes.filter((box) => selected.has(box.id));
@@ -312,6 +326,10 @@ export class InventoryPageComponent {
       onlyOrphans: value,
       onlyConsumable: value ? false : this.state().onlyConsumable
     });
+  }
+
+  protected setOnlyUntagged(value: boolean): void {
+    this.navigate({ onlyUntagged: value });
   }
 
   protected toggleEditMode(): void {
@@ -479,6 +497,10 @@ export class InventoryPageComponent {
       params.set('onlyOrphans', 'true');
     }
 
+    if (state.onlyUntagged) {
+      params.set('onlyUntagged', 'true');
+    }
+
     params.set('view', state.view);
     return this.backendUrl(`/items?${params.toString()}`);
   }
@@ -554,6 +576,10 @@ export class InventoryPageComponent {
 
     if (state.onlyOrphans) {
       summary.push('huérfanos');
+    }
+
+    if (state.onlyUntagged) {
+      summary.push('sin tags');
     }
 
     summary.push(this.layoutLabel(state.layout));
@@ -740,6 +766,7 @@ export class InventoryPageComponent {
       next.includeChildren = false;
       next.onlyConsumable = false;
       next.onlyOrphans = false;
+      next.onlyUntagged = false;
       next.layout = 'containers';
       next.view = 'grouped';
     }
@@ -806,6 +833,10 @@ export class InventoryPageComponent {
       params['onlyOrphans'] = 'true';
     }
 
+    if (state.onlyUntagged) {
+      params['onlyUntagged'] = 'true';
+    }
+
     return params;
   }
 
@@ -834,6 +865,7 @@ export class InventoryPageComponent {
       includeChildren: params.get('includeChildren') === 'true',
       onlyConsumable: params.get('onlyConsumable') === 'true',
       onlyOrphans: params.get('onlyOrphans') === 'true',
+      onlyUntagged: params.get('onlyUntagged') === 'true',
       layout,
       view: this.deriveBackendView(layout)
     };
@@ -953,6 +985,62 @@ export class InventoryPageComponent {
 
   protected tagSummary(item: InventoryItem): string {
     return item.tags.length ? item.tags.map((tag) => tag.name).join(', ') : item.category;
+  }
+
+  protected itemClassificationLabel(item: InventoryItem): string | null {
+    if (!item.itemClassName) {
+      return null;
+    }
+
+    return item.itemSubtypeName ? `${item.itemClassName} / ${item.itemSubtypeName}` : item.itemClassName;
+  }
+
+  protected inventoryModeLabel(mode: InventoryMode | null): string {
+    switch (mode) {
+      case 'Individual':
+        return 'Individual';
+      case 'Fungible':
+        return 'Fungible';
+      case 'Kit':
+        return 'Kit';
+      case 'Lot':
+        return 'Lote';
+      default:
+        return '';
+    }
+  }
+
+  protected consumableGroupQuantity(group: ConsumableSubtypeGroup): string {
+    return `${group.total} ${group.unit}`.trim();
+  }
+
+  private buildFungibleConsumableGroups(): ConsumableSubtypeGroup[] {
+    const groups = new Map<string, ConsumableSubtypeGroup>();
+
+    for (const item of this.items()) {
+      if (!item.consumable || item.inventoryMode !== 'Fungible' || item.itemClassId === null || item.itemSubtypeId === null) {
+        continue;
+      }
+
+      const unit = item.itemSubtypeUnit || item.unit || '';
+      const key = `${item.itemClassId}:${item.itemSubtypeId}:${unit}`;
+      const group = groups.get(key) ?? {
+        key,
+        className: item.itemClassName ?? 'Sin clase',
+        subtypeName: item.itemSubtypeName ?? 'Sin subtipo',
+        mode: item.inventoryMode,
+        unit,
+        total: 0,
+        items: []
+      };
+
+      group.total += item.quantity;
+      group.items.push(item);
+      groups.set(key, group);
+    }
+
+    return [...groups.values()].sort((left, right) =>
+      `${left.className} ${left.subtypeName}`.localeCompare(`${right.className} ${right.subtypeName}`, 'es', { numeric: true, sensitivity: 'base' }));
   }
 
   private buildGroupTree(groups: InventoryGroup[]): InventoryGroupNode[] {

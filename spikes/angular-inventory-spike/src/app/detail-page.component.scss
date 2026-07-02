@@ -419,7 +419,14 @@
   gap: 6px;
 }
 
-.tag-pill {
+.meta-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-pill,
+.meta-pill {
   --tag-color: #48ffb0;
   display: inline-flex;
   align-items: center;
@@ -432,6 +439,39 @@
   color: color-mix(in srgb, var(--tag-color) 72%, white);
   font-size: 0.82rem;
   line-height: 1.2;
+}
+
+.meta-pill {
+  --tag-color: #8ad6ff;
+  border-color: rgba(138, 214, 255, 0.34);
+  background: rgba(138, 214, 255, 0.12);
+  color: #d9f3ff;
+}
+
+.meta-pill.muted {
+  --tag-color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--app-muted);
+}
+
+.meta-pill.unit {
+  --tag-color: #ffc86b;
+  border-color: rgba(255, 200, 107, 0.34);
+  background: rgba(255, 200, 107, 0.12);
+  color: #ffe2a6;
+}
+
+.classification-note {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  padding: 0 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: var(--app-muted);
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 0.84rem;
 }
 
 .photo-modal {

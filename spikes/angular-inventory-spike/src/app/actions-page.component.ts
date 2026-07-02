@@ -97,6 +97,7 @@ export class ActionsPageComponent {
       includeChildren: false,
       onlyConsumable: false,
       onlyOrphans: false,
+      onlyUntagged: false,
       layout: 'flat',
       view: 'flat'
     }).pipe(

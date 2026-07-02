@@ -145,6 +145,7 @@ app.MapGet("/api/inventory/live", async (
         string.Equals(query["includeChildren"], "true", StringComparison.OrdinalIgnoreCase),
         string.Equals(query["onlyConsumable"], "true", StringComparison.OrdinalIgnoreCase),
         string.Equals(query["onlyOrphans"], "true", StringComparison.OrdinalIgnoreCase),
+        string.Equals(query["onlyUntagged"], "true", StringComparison.OrdinalIgnoreCase),
         query["view"].ToString(),
         cancellationToken);
 

@@ -155,6 +155,28 @@
               [tags]="options().tags"
               [compact]="true"
               (valueChange)="draftTagIds.set($any($event))" />
+            <div class="classification-row">
+              <app-searchable-select
+                label="Clase"
+                [value]="draftItemClassId()"
+                [options]="itemClassOptions()"
+                noneLabel="Sin clase"
+                placeholder="Buscar clase..."
+                (valueChange)="setDraftItemClassId($event)" />
+              @if (draftItemClassId() && itemSubtypeOptions().length) {
+                <app-searchable-select
+                  label="Subtipo"
+                  [value]="draftItemSubtypeId()"
+                  [options]="itemSubtypeOptions()"
+                  noneLabel="Sin subtipo"
+                  placeholder="Buscar subtipo..."
+                  (valueChange)="setDraftItemSubtypeId($event)" />
+              } @else {
+                <div class="classification-note">
+                  <span>{{ selectedItemClass() ? inventoryModeLabel(selectedItemClass()!.inventoryMode) : 'Sin clase' }}</span>
+                </div>
+              }
+            </div>
             <app-searchable-select
               label="Contenedor"
               [value]="draftBoxId()"

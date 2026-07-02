@@ -222,6 +222,7 @@ export class App {
       includeChildren: true,
       onlyConsumable: false,
       onlyOrphans: false,
+      onlyUntagged: false,
       layout: 'flat',
       view: 'flat'
     }).pipe(

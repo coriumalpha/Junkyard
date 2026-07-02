@@ -196,6 +196,10 @@
           <mat-slide-toggle [checked]="state().onlyOrphans" (change)="setOnlyOrphans($event.checked)">
             Solo huérfanos
           </mat-slide-toggle>
+
+          <mat-slide-toggle [checked]="state().onlyUntagged" (change)="setOnlyUntagged($event.checked)">
+            Sin tags
+          </mat-slide-toggle>
         </div>
       </mat-expansion-panel>
       } @else if (state().locationId !== null) {
@@ -303,6 +307,54 @@
       }
 
       <section class="results-section" id="results" [ngClass]="layoutGridClass()" [class.edit-mode]="editMode()">
+        @if (state().onlyConsumable && !isContainersPage()) {
+          <section class="consumables-panel">
+            @if (fungibleConsumableGroups().length) {
+              <div class="consumable-group-grid">
+                @for (group of fungibleConsumableGroups(); track group.key) {
+                  <article class="consumable-group-card">
+                    <div class="consumable-group-head">
+                      <div>
+                        <p class="eyebrow">{{ inventoryModeLabel(group.mode) }}</p>
+                        <h3>{{ group.className }} / {{ group.subtypeName }}</h3>
+                      </div>
+                      <strong>{{ consumableGroupQuantity(group) }}</strong>
+                    </div>
+                    <div class="consumable-breakdown">
+                      @for (item of group.items; track trackByItem($index, item)) {
+                        <a [routerLink]="['/item', item.id]" class="consumable-row">
+                          <span class="item-code">{{ item.code | inventoryCode }}</span>
+                          <strong>{{ item.name }}</strong>
+                          <span>{{ item.quantityLabel }}</span>
+                          <small>{{ item.boxPath || 'Sin caja' }}</small>
+                        </a>
+                      }
+                    </div>
+                  </article>
+                }
+              </div>
+            }
+
+            @if (untypedConsumables().length) {
+              <section class="legacy-consumables">
+                <div class="section-mini-head">
+                  <p class="eyebrow">Sin tipo asignado</p>
+                  <span>{{ untypedConsumables().length }} ítems</span>
+                </div>
+                <div class="legacy-consumable-list">
+                  @for (item of untypedConsumables(); track trackByItem($index, item)) {
+                    <a [routerLink]="['/item', item.id]" class="consumable-row legacy">
+                      <span class="item-code">{{ item.code | inventoryCode }}</span>
+                      <strong>{{ item.name }}</strong>
+                      <span>{{ item.quantityLabel }}</span>
+                      <small>{{ tagSummary(item) }}</small>
+                    </a>
+                  }
+                </div>
+              </section>
+            }
+          </section>
+        } @else {
         @switch (state().layout) {
           @case ('grouped') {
             <div class="grouped-list">
@@ -420,7 +472,7 @@
                           <div class="group-item-main">
                             <span class="item-code">{{ item.code | inventoryCode }}</span>
                             <strong>{{ item.name }}</strong>
-                            <span>{{ tagSummary(item) }}</span>
+                            <span>{{ itemClassificationLabel(item) || tagSummary(item) }}</span>
                           </div>
 
                           <div class="group-item-meta">
@@ -520,6 +572,9 @@
                       <p class="eyebrow">{{ item.code | inventoryCode }} · {{ tagSummary(item) }}</p>
                       <h3>{{ item.name }}</h3>
                       <p>{{ item.quantityLabel }}</p>
+                      @if (itemClassificationLabel(item)) {
+                        <p class="item-classification">{{ itemClassificationLabel(item) }}</p>
+                      }
                       <p class="item-path">{{ item.boxPath || 'Sin caja' }}</p>
                       @if (item.locationName) {
                         <p class="item-location">{{ item.locationName }}</p>
@@ -587,6 +642,9 @@
                       @if (item.consumable) {
                         <span class="badge cool">Consumible</span>
                       }
+                      @if (itemClassificationLabel(item)) {
+                        <span class="badge info">{{ itemClassificationLabel(item) }}</span>
+                      }
                       @if (item.lowStock) {
                         <span class="badge low">Bajo stock</span>
                       }
@@ -640,7 +698,7 @@
 
                   <div class="table-main">
                     <strong>{{ item.name }}</strong>
-                    <span>{{ tagSummary(item) }}</span>
+                    <span>{{ itemClassificationLabel(item) || tagSummary(item) }}</span>
                     @if (item.locationName) {
                       <span>{{ item.locationName }}</span>
                     }
@@ -812,6 +870,7 @@
               }
             </div>
           }
+        }
         }
       </section>
 

@@ -20,7 +20,7 @@ import { EntityMiniCardComponent } from './entity-mini-card.component';
 import { ColorPickerComponent } from './color-picker.component';
 import { HierarchyTrailComponent, HierarchyTrailNode } from './hierarchy-trail.component';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
-import { InventoryAction, InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryOptionsResponse, InventoryPhoto } from './inventory-api.service';
+import { InventoryAction, InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryMode, InventoryOptionsResponse, InventoryPhoto, ItemClass, ItemSubtype } from './inventory-api.service';
 import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
@@ -68,6 +68,8 @@ export class DetailPageComponent {
   protected readonly saveMessage = signal<string | null>(null);
   protected readonly formError = signal<string | null>(null);
   protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], itemClasses: [], itemSubtypes: [], locations: [], boxes: [] });
+  protected readonly itemClasses = signal<ItemClass[]>([]);
+  protected readonly itemSubtypes = signal<ItemSubtype[]>([]);
   protected readonly itemForm = signal<InventoryItemUpdate>(this.emptyItemForm());
   protected readonly boxForm = signal<InventoryBoxUpdate>(this.emptyBoxForm());
   protected readonly newTagName = signal('');
@@ -117,6 +119,22 @@ export class DetailPageComponent {
     this.options().tags.map((tag) => ({ value: tag.id, label: tag.name, hint: tag.color })));
   protected readonly conditionOptions = computed<SearchableSelectOption[]>(() =>
     this.options().conditions.map((condition) => ({ value: condition.name, label: condition.name, hint: condition.color })));
+  protected readonly itemClassOptions = computed<SearchableSelectOption[]>(() =>
+    this.itemClasses().map((itemClass) => ({
+      value: itemClass.id,
+      label: itemClass.name,
+      hint: this.inventoryModeLabel(itemClass.inventoryMode),
+      icon: itemClass.icon ?? 'category'
+    })));
+  protected readonly itemSubtypeOptions = computed<SearchableSelectOption[]>(() =>
+    this.itemSubtypes().map((subtype) => ({
+      value: subtype.id,
+      label: subtype.name,
+      hint: [subtype.unit, subtype.description].filter(Boolean).join(' · ') || null,
+      icon: 'label'
+    })));
+  protected readonly selectedItemClass = computed(() =>
+    this.itemClasses().find((itemClass) => itemClass.id === this.itemForm().itemClassId) ?? null);
   protected readonly locationOptions = computed<SearchableSelectOption[]>(() =>
     this.options().locations.map((location) => ({ value: location.id, label: location.name })));
   protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
@@ -260,6 +278,12 @@ export class DetailPageComponent {
       catchError(() => EMPTY),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
+
+    this.api.fetchItemClasses().pipe(
+      tap((response) => this.itemClasses.set(response.itemClasses)),
+      catchError(() => EMPTY),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
   }
 
   protected startItemEdit(): void {
@@ -286,6 +310,7 @@ export class DetailPageComponent {
       notes: item.notes ?? '',
       boxId: item.box?.id ?? null
     });
+    this.loadItemSubtypes(item.itemClassId);
     this.formError.set(null);
     this.saveMessage.set(null);
     this.editingItem.set(true);
@@ -329,6 +354,22 @@ export class DetailPageComponent {
     this.itemForm.update((current) => ({ ...current, ...patch }));
   }
 
+  protected setItemClassId(value: number | string | null | (number | string | null)[]): void {
+    const itemClassId = typeof value === 'number' && value > 0 ? value : null;
+    this.itemForm.update((current) => ({ ...current, itemClassId, itemSubtypeId: null }));
+    this.loadItemSubtypes(itemClassId);
+  }
+
+  protected setItemSubtypeId(value: number | string | null | (number | string | null)[]): void {
+    const itemSubtypeId = typeof value === 'number' && value > 0 ? value : null;
+    if (itemSubtypeId !== null && !this.itemSubtypes().some((subtype) => subtype.id === itemSubtypeId)) {
+      this.formError.set('El subtipo no pertenece a la clase seleccionada.');
+      return;
+    }
+
+    this.itemForm.update((current) => ({ ...current, itemSubtypeId }));
+  }
+
   protected saveItem(): void {
     const item = this.item();
     if (!item || this.saving()) {
@@ -338,6 +379,11 @@ export class DetailPageComponent {
     const form = this.itemForm();
     if (!form.name.trim()) {
       this.formError.set('El nombre es obligatorio.');
+      return;
+    }
+
+    if (form.itemSubtypeId !== null && !this.itemSubtypes().some((subtype) => subtype.id === form.itemSubtypeId)) {
+      this.formError.set('El subtipo no pertenece a la clase seleccionada.');
       return;
     }
 
@@ -644,6 +690,29 @@ export class DetailPageComponent {
       flags.push('Obsoleto');
     }
     return flags;
+  }
+
+  protected inventoryModeLabel(mode: InventoryMode | null): string {
+    switch (mode) {
+      case 'Individual':
+        return 'Individual';
+      case 'Fungible':
+        return 'Fungible';
+      case 'Kit':
+        return 'Kit';
+      case 'Lot':
+        return 'Lote';
+      default:
+        return '';
+    }
+  }
+
+  protected itemClassificationLabel(item: InventoryItemDetail | InventoryItem): string | null {
+    if (!item.itemClassName) {
+      return null;
+    }
+
+    return item.itemSubtypeName ? `${item.itemClassName} / ${item.itemSubtypeName}` : item.itemClassName;
   }
 
   protected boxLegacyUrl(): string {
@@ -1082,7 +1151,7 @@ export class DetailPageComponent {
 
   protected primaryTagName(tagIds: number[]): string {
     const first = this.options().tags.find((tag) => tagIds.includes(tag.id));
-    return first?.name ?? 'Otros';
+    return first?.name ?? '';
   }
 
   private emptyItemForm(): InventoryItemUpdate {
@@ -1104,6 +1173,28 @@ export class DetailPageComponent {
       notes: '',
       boxId: null
     };
+  }
+
+  private loadItemSubtypes(itemClassId: number | null): void {
+    if (!itemClassId) {
+      this.itemSubtypes.set([]);
+      return;
+    }
+
+    this.api.fetchItemSubtypes(itemClassId).pipe(
+      tap((response) => {
+        this.itemSubtypes.set(response.itemSubtypes);
+        const selectedSubtypeId = this.itemForm().itemSubtypeId;
+        if (selectedSubtypeId !== null && !response.itemSubtypes.some((subtype) => subtype.id === selectedSubtypeId)) {
+          this.itemForm.update((current) => ({ ...current, itemSubtypeId: null }));
+        }
+      }),
+      catchError(() => {
+        this.itemSubtypes.set([]);
+        return EMPTY;
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
   }
 
   private boxItemSortValue(item: InventoryItem, key: BoxItemSortKey): string {

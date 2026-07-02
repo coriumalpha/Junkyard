@@ -11,7 +11,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { InventoryApiService, InventoryItem, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse } from './inventory-api.service';
+import { InventoryApiService, InventoryItem, InventoryMode, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse, ItemClass, ItemSubtype } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
@@ -43,7 +43,11 @@ export class PhotoReviewPageComponent {
   protected readonly draftQuantity = signal(1);
   protected readonly draftUnit = signal('uds');
   protected readonly draftTagIds = signal<number[]>([]);
+  protected readonly draftItemClassId = signal<number | null>(null);
+  protected readonly draftItemSubtypeId = signal<number | null>(null);
   protected readonly draftBoxId = signal<number | null>(null);
+  protected readonly itemClasses = signal<ItemClass[]>([]);
+  protected readonly itemSubtypes = signal<ItemSubtype[]>([]);
   protected readonly boxOptions = computed<SearchableSelectOption[]>(() =>
     this.options().boxes.map((box) => ({
       value: box.id,
@@ -55,6 +59,22 @@ export class PhotoReviewPageComponent {
     })));
   protected readonly tagOptions = computed<SearchableSelectOption[]>(() =>
     this.options().tags.map((tag) => ({ value: tag.id, label: tag.name, hint: tag.color })));
+  protected readonly itemClassOptions = computed<SearchableSelectOption[]>(() =>
+    this.itemClasses().map((itemClass) => ({
+      value: itemClass.id,
+      label: itemClass.name,
+      hint: this.inventoryModeLabel(itemClass.inventoryMode),
+      icon: itemClass.icon ?? 'category'
+    })));
+  protected readonly itemSubtypeOptions = computed<SearchableSelectOption[]>(() =>
+    this.itemSubtypes().map((subtype) => ({
+      value: subtype.id,
+      label: subtype.name,
+      hint: [subtype.unit, subtype.description].filter(Boolean).join(' · ') || null,
+      icon: 'label'
+    })));
+  protected readonly selectedItemClass = computed(() =>
+    this.itemClasses().find((itemClass) => itemClass.id === this.draftItemClassId()) ?? null);
   protected readonly itemOptions = computed<SearchableSelectOption[]>(() =>
     this.items().map((item) => ({
       value: item.id,
@@ -82,6 +102,11 @@ export class PhotoReviewPageComponent {
       catchError(() => EMPTY),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
+    this.api.fetchItemClasses().pipe(
+      tap((response) => this.itemClasses.set(response.itemClasses)),
+      catchError(() => EMPTY),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
     this.api.fetchInventory({
       q: '',
       category: '',
@@ -92,6 +117,7 @@ export class PhotoReviewPageComponent {
       includeChildren: false,
       onlyConsumable: false,
       onlyOrphans: false,
+      onlyUntagged: false,
       layout: 'flat',
       view: 'flat'
     }).pipe(
@@ -144,6 +170,9 @@ export class PhotoReviewPageComponent {
       this.draftUnit.set('uds');
       this.draftBoxId.set(current.sourceBox?.id ?? null);
       this.draftTagIds.set([]);
+      this.draftItemClassId.set(null);
+      this.draftItemSubtypeId.set(null);
+      this.itemSubtypes.set([]);
     }
 
     if (panel === 'assignBox') {
@@ -205,6 +234,12 @@ export class PhotoReviewPageComponent {
       return;
     }
 
+    const subtypeId = this.draftItemSubtypeId();
+    if (subtypeId !== null && !this.itemSubtypes().some((subtype) => subtype.id === subtypeId)) {
+      this.error.set('El subtipo no pertenece a la clase seleccionada.');
+      return;
+    }
+
     this.mutate(() => this.api.createItemFromReviewPhotos(current.id, {
       ids: this.selection(current.id),
       boxId: this.draftBoxId(),
@@ -212,8 +247,42 @@ export class PhotoReviewPageComponent {
       notes: this.draftNotes().trim(),
       quantity: this.draftQuantity(),
       unit: this.draftUnit().trim(),
+      itemClassId: this.draftItemClassId(),
+      itemSubtypeId: this.draftItemSubtypeId(),
       tagIds: this.draftTagIds()
     }), 'Ítem creado desde foto.');
+  }
+
+  protected setDraftItemClassId(value: number | string | null | (number | string | null)[]): void {
+    const itemClassId = typeof value === 'number' && value > 0 ? value : null;
+    this.draftItemClassId.set(itemClassId);
+    this.draftItemSubtypeId.set(null);
+    this.loadItemSubtypes(itemClassId);
+  }
+
+  protected setDraftItemSubtypeId(value: number | string | null | (number | string | null)[]): void {
+    const itemSubtypeId = typeof value === 'number' && value > 0 ? value : null;
+    if (itemSubtypeId !== null && !this.itemSubtypes().some((subtype) => subtype.id === itemSubtypeId)) {
+      this.error.set('El subtipo no pertenece a la clase seleccionada.');
+      return;
+    }
+
+    this.draftItemSubtypeId.set(itemSubtypeId);
+  }
+
+  protected inventoryModeLabel(mode: InventoryMode | null): string {
+    switch (mode) {
+      case 'Individual':
+        return 'Individual';
+      case 'Fungible':
+        return 'Fungible';
+      case 'Kit':
+        return 'Kit';
+      case 'Lot':
+        return 'Lote';
+      default:
+        return '';
+    }
   }
 
   protected undo(): void {
@@ -358,5 +427,27 @@ export class PhotoReviewPageComponent {
         this.assignBoxSelect?.open();
       }
     });
+  }
+
+  private loadItemSubtypes(itemClassId: number | null): void {
+    if (!itemClassId) {
+      this.itemSubtypes.set([]);
+      return;
+    }
+
+    this.api.fetchItemSubtypes(itemClassId).pipe(
+      tap((response) => {
+        this.itemSubtypes.set(response.itemSubtypes);
+        const selectedSubtypeId = this.draftItemSubtypeId();
+        if (selectedSubtypeId !== null && !response.itemSubtypes.some((subtype) => subtype.id === selectedSubtypeId)) {
+          this.draftItemSubtypeId.set(null);
+        }
+      }),
+      catchError(() => {
+        this.itemSubtypes.set([]);
+        return EMPTY;
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
   }
 }

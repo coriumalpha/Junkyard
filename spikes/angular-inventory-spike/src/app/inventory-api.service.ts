@@ -15,6 +15,7 @@ export interface InventoryQueryState {
   includeChildren: boolean;
   onlyConsumable: boolean;
   onlyOrphans: boolean;
+  onlyUntagged: boolean;
   layout: InventoryLayoutMode;
   view: InventoryViewMode;
 }
@@ -30,6 +31,7 @@ export interface InventoryLiveResponse {
   includeChildren: boolean;
   onlyConsumable: boolean;
   onlyOrphans: boolean;
+  onlyUntagged: boolean;
   viewMode: InventoryViewMode;
   selectedBoxes: InventorySelectedBox[];
   selectedBox: InventoryContext | null;
@@ -52,6 +54,14 @@ export interface InventoryOptionsResponse {
 
 export interface TagsResponse {
   tags: InventoryTag[];
+}
+
+export interface ItemClassesResponse {
+  itemClasses: ItemClass[];
+}
+
+export interface ItemSubtypesResponse {
+  itemSubtypes: ItemSubtype[];
 }
 
 export interface InventoryTag {
@@ -193,6 +203,8 @@ export interface InventoryItem {
   itemSubtypeName: string | null;
   itemSubtypeUnit: string | null;
   tags: InventoryTag[];
+  quantity: number;
+  unit: string;
   quantityLabel: string;
   generatedLabel: string | null;
   consumable: boolean;
@@ -565,6 +577,10 @@ export class InventoryApiService {
       params = params.set('onlyOrphans', 'true');
     }
 
+    if (state.onlyUntagged) {
+      params = params.set('onlyUntagged', 'true');
+    }
+
     params = params.set('view', state.view);
 
     return this.http.get<InventoryLiveResponse>('/api/inventory/live', { params });
@@ -572,6 +588,15 @@ export class InventoryApiService {
 
   fetchOptions(): Observable<InventoryOptionsResponse> {
     return this.http.get<InventoryOptionsResponse>('/api/inventory/options');
+  }
+
+  fetchItemClasses(): Observable<ItemClassesResponse> {
+    return this.http.get<ItemClassesResponse>('/api/item-classes');
+  }
+
+  fetchItemSubtypes(itemClassId: number): Observable<ItemSubtypesResponse> {
+    const params = new HttpParams().set('itemClassId', String(itemClassId));
+    return this.http.get<ItemSubtypesResponse>('/api/item-subtypes', { params });
   }
 
   fetchLocations(): Observable<LocationsResponse> {

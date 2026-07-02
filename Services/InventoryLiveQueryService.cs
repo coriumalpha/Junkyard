@@ -44,9 +44,9 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.ItemSubtype?.Name,
             item.ItemSubtype?.Unit,
             ToTagDtos(item),
-            $"{item.Quantity} {item.Unit}",
             item.Quantity,
             item.Unit ?? "",
+            $"{item.Quantity} {item.Unit}",
             item.MinQuantity,
             item.Condition,
             item.Retention,
@@ -1474,6 +1474,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         bool includeChildren,
         bool onlyConsumable,
         bool onlyOrphans,
+        bool onlyUntagged,
         string? view,
         CancellationToken cancellationToken)
     {
@@ -1599,6 +1600,11 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             query = query.Where(i => i.BoxId == null);
         }
 
+        if (onlyUntagged)
+        {
+            query = query.Where(i => !i.ItemTags.Any());
+        }
+
         if (!string.IsNullOrWhiteSpace(categoryValue))
         {
             query = query.Where(i => i.Category == categoryValue);
@@ -1705,6 +1711,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             includeChildren,
             onlyConsumable,
             onlyOrphans,
+            onlyUntagged,
             viewMode,
             selectedBoxes.Select(boxSelection => new InventorySelectedBoxDto(
                 boxSelection.Id,
@@ -1761,6 +1768,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.ItemSubtype?.Name,
             item.ItemSubtype?.Unit,
             ToTagDtos(item),
+            item.Quantity,
+            item.Unit ?? "",
             $"{item.Quantity} {item.Unit}",
             string.IsNullOrWhiteSpace(item.CoverPhoto) ? item.Name[..Math.Min(1, item.Name.Length)] : null,
             item.Consumable,
@@ -2246,6 +2255,7 @@ public record InventoryLiveResponseDto(
     bool IncludeChildren,
     bool OnlyConsumable,
     bool OnlyOrphans,
+    bool OnlyUntagged,
     string ViewMode,
     List<InventorySelectedBoxDto> SelectedBoxes,
     InventoryContextDto? SelectedBox,
@@ -2278,9 +2288,9 @@ public record InventoryItemDetailDto(
     string? ItemSubtypeName,
     string? ItemSubtypeUnit,
     List<TagDto> Tags,
-    string QuantityLabel,
     decimal Quantity,
     string Unit,
+    string QuantityLabel,
     decimal? MinQuantity,
     string? Condition,
     string? Retention,
@@ -2581,6 +2591,8 @@ public record InventoryItemDto(
     string? ItemSubtypeName,
     string? ItemSubtypeUnit,
     List<TagDto> Tags,
+    decimal Quantity,
+    string Unit,
     string QuantityLabel,
     string? GeneratedLabel,
     bool Consumable,

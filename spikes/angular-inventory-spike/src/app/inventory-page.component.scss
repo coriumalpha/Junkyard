@@ -470,6 +470,44 @@
   display: block;
 }
 
+.consumable-group-card,
+.legacy-consumables {
+  display: grid;
+  gap: 12px;
+}
+
+.consumable-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+
+.consumable-group-card,
+.legacy-consumables {
+  padding: 15px;
+  border: 1px solid var(--app-border);
+  border-radius: 18px;
+  background: var(--app-surface-raised);
+}
+
+.consumable-group-head,
+.section-mini-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.consumable-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 9px;
+  border-radius: 13px;
+  color: inherit;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.035);
+}
+
 .result-grid {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));

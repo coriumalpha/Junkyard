@@ -139,9 +139,24 @@
             @for (tag of item()!.tags; track tag.id) {
               <span class="tag-pill" [style.--tag-color]="tag.color">{{ tag.name }}</span>
             } @empty {
-              {{ item()!.category }}
+              Sin tags
             }
           </strong>
+          @if (item()!.itemClassName) {
+            <span>Clase</span>
+            <strong class="meta-chip-row">
+              <span class="meta-pill">{{ item()!.itemClassName }}</span>
+              @if (item()!.itemSubtypeName) {
+                <span class="meta-pill">{{ item()!.itemSubtypeName }}</span>
+              }
+              @if (item()!.inventoryMode) {
+                <span class="meta-pill muted">{{ inventoryModeLabel(item()!.inventoryMode) }}</span>
+              }
+              @if (item()!.inventoryMode === 'Fungible' && item()!.itemSubtypeUnit) {
+                <span class="meta-pill unit">{{ item()!.itemSubtypeUnit }}</span>
+              }
+            </strong>
+          }
           <span>Cantidad</span><strong>{{ item()!.quantityLabel }}</strong>
           <span>Mínimo</span><strong>{{ item()!.minQuantity ?? 'Sin mínimo' }}</strong>
           <span>Estado</span><strong>{{ item()!.condition || 'Sin estado' }}</strong>
@@ -209,6 +224,28 @@
               </button>
               <span>La tag nueva quedará seleccionada en esta ficha.</span>
             </div>
+
+            <app-searchable-select
+              label="Clase"
+              [value]="itemForm().itemClassId"
+              [options]="itemClassOptions()"
+              noneLabel="Sin clase"
+              placeholder="Buscar clase..."
+              (valueChange)="setItemClassId($event)" />
+
+            @if (itemForm().itemClassId && itemSubtypeOptions().length) {
+              <app-searchable-select
+                label="Subtipo"
+                [value]="itemForm().itemSubtypeId"
+                [options]="itemSubtypeOptions()"
+                noneLabel="Sin subtipo"
+                placeholder="Buscar subtipo..."
+                (valueChange)="setItemSubtypeId($event)" />
+            } @else {
+              <div class="classification-note">
+                <span>{{ selectedItemClass() ? inventoryModeLabel(selectedItemClass()!.inventoryMode) : 'Sin clase' }}</span>
+              </div>
+            }
 
             <app-searchable-select
               label="Contenedor"
