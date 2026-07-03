@@ -1,5 +1,5 @@
 import { BreakpointObserver } from '@angular/cdk/layout';
-import { Component, DestroyRef, ElementRef, HostListener, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -45,6 +45,7 @@ export class App {
   protected readonly quickBoxes = signal<InventoryGroup[]>([]);
   protected readonly quickLoading = signal(false);
   protected readonly quickOpen = signal(false);
+  protected readonly searchExpanded = signal(false);
   protected readonly hasQuickResults = computed(() => Boolean(this.quickItems().length || this.quickBoxes().length));
   protected readonly legacyHomeUrl = legacyUrl('/');
 
@@ -54,6 +55,7 @@ export class App {
   private readonly router = inject(Router);
   private readonly api = inject(InventoryApiService);
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
+  @ViewChild('quickSearchInput') private readonly quickSearchInput?: ElementRef<HTMLInputElement>;
 
   constructor() {
     this.currentUrl.set(this.router.url);
@@ -121,7 +123,26 @@ export class App {
     this.quickOpen.set(false);
   }
 
+  protected toggleQuickSearch(): void {
+    this.searchExpanded() ? this.closeQuickSearch() : this.openQuickSearch();
+  }
+
+  protected openQuickSearch(): void {
+    this.searchExpanded.set(true);
+    if (this.quickSearch().trim().length >= 2) {
+      this.quickOpen.set(true);
+    }
+
+    window.requestAnimationFrame(() => this.quickSearchInput?.nativeElement.focus());
+  }
+
+  protected closeQuickSearch(): void {
+    this.quickOpen.set(false);
+    this.searchExpanded.set(false);
+  }
+
   protected openQuickSearchPanel(): void {
+    this.searchExpanded.set(true);
     if (this.quickSearch().trim().length >= 2) {
       this.quickOpen.set(true);
     }
@@ -193,12 +214,40 @@ export class App {
   @HostListener('document:click', ['$event'])
   protected closeQuickSearchOnOutsideClick(event: MouseEvent): void {
     const target = event.target instanceof Node ? event.target : null;
-    const search = this.host.nativeElement.querySelector('.top-search-control');
+    const search = this.host.nativeElement.querySelector('.global-search');
     if (target && search?.contains(target)) {
       return;
     }
 
     this.quickOpen.set(false);
+    if (!this.quickSearch().trim()) {
+      this.searchExpanded.set(false);
+    }
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  protected handleQuickSearchKeys(event: KeyboardEvent): void {
+    const target = event.target as HTMLElement | null;
+    const tagName = target?.tagName.toLowerCase();
+    const typing = tagName === 'input' || tagName === 'textarea' || target?.isContentEditable;
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      this.openQuickSearch();
+      return;
+    }
+
+    if (!typing && event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      this.openQuickSearch();
+      return;
+    }
+
+    if (event.key === 'Escape' && this.searchExpanded()) {
+      event.preventDefault();
+      this.clearQuickSearch();
+      this.closeQuickSearch();
+    }
   }
 
   private hasQueryFlag(name: string): boolean {

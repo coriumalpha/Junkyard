@@ -273,9 +273,19 @@ export interface DashboardResponse {
   lowStockCount: number;
   orphanCount: number;
   photoInboxPendingCount: number;
+  classedItemCount: number;
+  untypedConsumableCount: number;
+  lotKitPendingCount: number;
+  quarantinedCount: number;
+  openActionCount: number;
+  highPriorityActionCount: number;
   recentBoxes: DashboardBox[];
   lowStockItems: DashboardItem[];
+  lowConsumableGroups: DashboardConsumableGroup[];
   recentPhotos: DashboardPhoto[];
+  openActions: InventoryAction[];
+  inventoryModeStats: DashboardMetric[];
+  boxStatusStats: DashboardMetric[];
 }
 
 export interface DashboardBox {
@@ -304,6 +314,19 @@ export interface DashboardItem {
   rotationDegrees: number;
 }
 
+export interface DashboardConsumableGroup {
+  className: string;
+  subtypeName: string;
+  color: string | null;
+  icon: string | null;
+  unit: string | null;
+  totalQuantity: number;
+  minStock: number | null;
+  targetStock: number | null;
+  itemCount: number;
+  status: string;
+}
+
 export interface DashboardPhoto {
   id: number;
   url: string;
@@ -311,6 +334,12 @@ export interface DashboardPhoto {
   caption: string | null;
   entityType: string;
   entityId: number;
+}
+
+export interface DashboardMetric {
+  label: string;
+  count: number;
+  tone: string;
 }
 
 export interface InventoryActionsResponse {

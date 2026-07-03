@@ -1130,6 +1130,21 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         var itemCount = await db.Items.CountAsync(cancellationToken);
         var orphanCount = await db.Items.CountAsync(item => item.BoxId == null, cancellationToken);
         var photoInboxPendingCount = await db.PhotoInboxes.CountAsync(photo => photo.Status == PhotoInboxStatus.Pending, cancellationToken);
+        var classedItemCount = await db.Items.CountAsync(item => item.ItemClassId != null, cancellationToken);
+        var untypedConsumableCount = await db.Items.CountAsync(item => item.Consumable && (item.ItemClassId == null || item.ItemSubtypeId == null), cancellationToken);
+        var quarantinedCount = await db.Items.CountAsync(item => item.IsQuarantined, cancellationToken);
+        var lotKitPendingCount = await db.Items.CountAsync(item =>
+            item.ItemTags.Any(itemTag => itemTag.Tag.Name == "Lote / Kit (temporal)")
+            && (item.ItemClassId == null || item.ItemSubtypeId == null),
+            cancellationToken);
+        var openActionCount = await db.InventoryActions.CountAsync(action =>
+            action.Kind == InventoryActionKind.Task && action.Status == InventoryActionStatus.Open,
+            cancellationToken);
+        var highPriorityActionCount = await db.InventoryActions.CountAsync(action =>
+            action.Kind == InventoryActionKind.Task
+            && action.Status == InventoryActionStatus.Open
+            && action.Priority >= 4,
+            cancellationToken);
 
         var lowStockItems = await db.Items
             .AsNoTracking()
@@ -1138,6 +1153,57 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             .OrderBy(item => item.Name)
             .Take(8)
             .ToListAsync(cancellationToken);
+
+        var fungibleConsumables = await db.Items
+            .AsNoTracking()
+            .Include(item => item.ItemClass)
+            .Include(item => item.ItemSubtype)
+            .Where(item =>
+                item.Consumable
+                && item.ItemClass != null
+                && item.ItemClass.InventoryMode == InventoryMode.Fungible
+                && item.ItemSubtype != null)
+            .ToListAsync(cancellationToken);
+
+        var lowFungibleGroups = fungibleConsumables
+            .GroupBy(item => new
+            {
+                ClassId = item.ItemClassId!.Value,
+                ClassName = item.ItemClass!.Name,
+                item.ItemClass.Color,
+                item.ItemClass.Icon,
+                SubtypeId = item.ItemSubtypeId!.Value,
+                SubtypeName = item.ItemSubtype!.Name,
+                item.ItemSubtype.Unit,
+                item.ItemSubtype.MinStock,
+                item.ItemSubtype.TargetStock
+            })
+            .Select(group =>
+            {
+                var total = group.Sum(item => item.Quantity);
+                var status = group.Key.MinStock is not null && total < group.Key.MinStock
+                    ? "Bajo mínimo"
+                    : group.Key.TargetStock is not null && total < group.Key.TargetStock
+                        ? "Bajo objetivo"
+                        : "OK";
+                return new DashboardConsumableGroupDto(
+                    group.Key.ClassName,
+                    group.Key.SubtypeName,
+                    group.Key.Color,
+                    group.Key.Icon,
+                    group.Key.Unit,
+                    total,
+                    group.Key.MinStock,
+                    group.Key.TargetStock,
+                    group.Count(),
+                    status);
+            })
+            .Where(group => group.Status != "OK")
+            .OrderBy(group => group.Status == "Bajo mínimo" ? 0 : 1)
+            .ThenBy(group => group.ClassName)
+            .ThenBy(group => group.SubtypeName)
+            .Take(8)
+            .ToList();
 
         var recentBoxes = await db.Boxes
             .AsNoTracking()
@@ -1153,6 +1219,51 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             .Take(8)
             .ToListAsync(cancellationToken);
 
+        var dashboardActions = await db.InventoryActions.AsNoTracking()
+            .Where(action => action.Kind == InventoryActionKind.Task && action.Status == InventoryActionStatus.Open)
+            .OrderByDescending(action => action.Priority)
+            .ThenByDescending(action => action.CreatedAt)
+            .Take(5)
+            .ToListAsync(cancellationToken);
+
+        var actionBoxIds = dashboardActions
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Box && action.LinkedEntityId.HasValue)
+            .Select(action => action.LinkedEntityId!.Value)
+            .Distinct()
+            .ToList();
+        var actionItemIds = dashboardActions
+            .Where(action => action.LinkedEntityType == InventoryActionLinkedEntityType.Item && action.LinkedEntityId.HasValue)
+            .Select(action => action.LinkedEntityId!.Value)
+            .Distinct()
+            .ToList();
+        var actionBoxes = actionBoxIds.Count == 0
+            ? new Dictionary<int, Box>()
+            : await db.Boxes.AsNoTracking()
+                .Where(box => actionBoxIds.Contains(box.Id))
+                .ToDictionaryAsync(box => box.Id, cancellationToken);
+        var actionItems = actionItemIds.Count == 0
+            ? new Dictionary<int, Item>()
+            : await db.Items.AsNoTracking()
+                .Include(item => item.Box)
+                .Where(item => actionItemIds.Contains(item.Id))
+                .ToDictionaryAsync(item => item.Id, cancellationToken);
+
+        var modeStats = await db.Items.AsNoTracking()
+            .Where(item => item.ItemClass != null)
+            .GroupBy(item => item.ItemClass!.InventoryMode)
+            .Select(group => new DashboardMetricDto(group.Key.ToString(), group.Count(), ""))
+            .ToListAsync(cancellationToken);
+        var unclassedCount = itemCount - classedItemCount;
+        if (unclassedCount > 0)
+        {
+            modeStats.Add(new DashboardMetricDto("Sin clase", unclassedCount, "muted"));
+        }
+
+        var boxStatusStats = await db.Boxes.AsNoTracking()
+            .GroupBy(box => box.Status)
+            .Select(group => new DashboardMetricDto(group.Key.ToString(), group.Count(), ""))
+            .ToListAsync(cancellationToken);
+
         var filenames = recentBoxes.Select(box => box.CoverPhoto)
             .Concat(lowStockItems.Select(item => item.CoverPhoto))
             .Concat(recentPhotos.Select(photo => photo.Filename))
@@ -1166,9 +1277,15 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             locationCount,
             boxCount,
             itemCount,
-            lowStockItems.Count,
+            lowFungibleGroups.Count + lowStockItems.Count,
             orphanCount,
             photoInboxPendingCount,
+            classedItemCount,
+            untypedConsumableCount,
+            lotKitPendingCount,
+            quarantinedCount,
+            openActionCount,
+            highPriorityActionCount,
             recentBoxes.Select(box => new DashboardBoxDto(
                 box.Id,
                 box.Code,
@@ -1191,13 +1308,17 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 item.Unit ?? "",
                 ThumbUrl(photoStates, item.CoverPhoto),
                 RotationFor(photoStates, item.CoverPhoto))).ToList(),
+            lowFungibleGroups,
             recentPhotos.Select(photo => new DashboardPhotoDto(
                 photo.Id,
                 PhotoStorage.ThumbUrl(photo.Filename, photoStates.GetValueOrDefault(photo.Filename)?.UpdatedAt ?? photo.UpdatedAt),
                 photoStates.TryGetValue(photo.Filename, out var state) ? state.RotationDegrees : photo.RotationDegrees,
                 photo.Caption,
                 photo.EntityType.ToString(),
-                photo.EntityId)).ToList());
+                photo.EntityId)).ToList(),
+            dashboardActions.Select(action => ToActionDto(action, actionBoxes, actionItems)).ToList(),
+            modeStats,
+            boxStatusStats);
     }
 
     public async Task<InventoryActionsResponseDto> GetActionsAsync(CancellationToken cancellationToken)
@@ -2430,9 +2551,19 @@ public record DashboardDto(
     int LowStockCount,
     int OrphanCount,
     int PhotoInboxPendingCount,
+    int ClassedItemCount,
+    int UntypedConsumableCount,
+    int LotKitPendingCount,
+    int QuarantinedCount,
+    int OpenActionCount,
+    int HighPriorityActionCount,
     List<DashboardBoxDto> RecentBoxes,
     List<DashboardItemDto> LowStockItems,
-    List<DashboardPhotoDto> RecentPhotos);
+    List<DashboardConsumableGroupDto> LowConsumableGroups,
+    List<DashboardPhotoDto> RecentPhotos,
+    List<InventoryActionDto> OpenActions,
+    List<DashboardMetricDto> InventoryModeStats,
+    List<DashboardMetricDto> BoxStatusStats);
 
 public record InventoryItemDetailDto(
     int Id,
@@ -2636,6 +2767,18 @@ public record DashboardItemDto(
     string? CoverUrl,
     int RotationDegrees);
 
+public record DashboardConsumableGroupDto(
+    string ClassName,
+    string SubtypeName,
+    string? Color,
+    string? Icon,
+    string? Unit,
+    decimal TotalQuantity,
+    decimal? MinStock,
+    decimal? TargetStock,
+    int ItemCount,
+    string Status);
+
 public record DashboardPhotoDto(
     int Id,
     string Url,
@@ -2643,6 +2786,11 @@ public record DashboardPhotoDto(
     string? Caption,
     string EntityType,
     int EntityId);
+
+public record DashboardMetricDto(
+    string Label,
+    int Count,
+    string Tone);
 
 public record InventoryActionsResponseDto(
     int OpenCount,
