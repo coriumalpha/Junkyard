@@ -107,7 +107,7 @@ export class DetailPageComponent {
     { value: 'zone', label: 'Zona física' },
     { value: 'other', label: 'Otro soporte' }
   ];
-  protected readonly boxStatuses = ['Active', 'Quarantine', 'Archived'];
+  protected readonly boxStatuses = ['Active', 'Quarantine'];
   protected readonly containerTypeOptions: SearchableSelectOption[] = this.containerTypes.map((type) => ({ value: type.value, label: type.label }));
   protected readonly boxStatusOptions: SearchableSelectOption[] = this.boxStatuses.map((status) => ({ value: status, label: status }));
   protected readonly title = computed(() => this.item()?.name ?? this.box()?.name ?? 'Detalle');
@@ -485,6 +485,107 @@ export class DetailPageComponent {
     ).subscribe();
   }
 
+  protected archiveCurrentItem(): void {
+    const item = this.item();
+    if (!item || this.saving() || item.archived) {
+      return;
+    }
+
+    const comment = window.prompt('Motivo de archivado opcional') ?? '';
+    this.saving.set(true);
+    this.formError.set(null);
+    this.saveMessage.set(null);
+    this.api.archiveItem(item.id, { comment }).pipe(
+      tap((updated) => {
+        this.item.set(updated);
+        this.editingItem.set(false);
+        this.saveMessage.set('Ítem archivado. Ya no aparece en el inventario activo.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo archivar el ítem.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected restoreCurrentItem(): void {
+    const item = this.item();
+    if (!item || this.saving() || !item.archived) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    this.saveMessage.set(null);
+    this.api.restoreItem(item.id).pipe(
+      tap((updated) => {
+        this.item.set(updated);
+        this.saveMessage.set('Ítem restaurado al inventario activo.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo restaurar el ítem.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected archiveCurrentBox(): void {
+    const box = this.box();
+    if (!box || this.saving() || box.status === 'Archived') {
+      return;
+    }
+
+    const hasContents = Boolean(box.items.length || box.children.length);
+    if (hasContents && !window.confirm('Este contenedor tiene contenido. Se archivará el contenedor, los ítems quedarán sin contenedor y los hijos subirán un nivel.')) {
+      return;
+    }
+
+    const comment = window.prompt('Motivo de archivado opcional') ?? '';
+    this.saving.set(true);
+    this.formError.set(null);
+    this.saveMessage.set(null);
+    this.api.archiveBox(box.id, { comment, targetBoxId: null, orphanContents: hasContents }).pipe(
+      tap((updated) => {
+        this.box.set(updated);
+        this.editingBox.set(false);
+        this.saveMessage.set('Contenedor archivado. Ya no aparece en vistas activas.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo archivar el contenedor.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected restoreCurrentBox(): void {
+    const box = this.box();
+    if (!box || this.saving() || box.status !== 'Archived') {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+    this.saveMessage.set(null);
+    this.api.restoreBox(box.id).pipe(
+      tap((updated) => {
+        this.box.set(updated);
+        this.saveMessage.set('Contenedor restaurado al inventario activo.');
+      }),
+      catchError((error: unknown) => {
+        this.formError.set(error instanceof Error ? error.message : 'No se pudo restaurar el contenedor.');
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
   protected createLinkedAction(): void {
     const title = this.newActionTitle().trim();
     if (!title || this.saving()) {
@@ -679,6 +780,9 @@ export class DetailPageComponent {
 
   protected itemFlags(item: InventoryItemDetail | InventoryItem): string[] {
     const flags: string[] = [];
+    if ('archived' in item && item.archived) {
+      flags.push('Archivado');
+    }
     if (item.consumable) {
       flags.push('Consumible');
     }

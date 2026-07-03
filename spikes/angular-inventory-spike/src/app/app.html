@@ -74,6 +74,13 @@
           <span matListItemLine>Tareas operativas</span>
         }
       </a>
+      <a mat-list-item routerLink="/archive" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>archive</mat-icon>
+        <span matListItemTitle>Archivo</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Retirado y restaurable</span>
+        }
+      </a>
       <a mat-list-item routerLink="/locations" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
         <mat-icon matListItemIcon>place</mat-icon>
         <span matListItemTitle>Ubicaciones</span>

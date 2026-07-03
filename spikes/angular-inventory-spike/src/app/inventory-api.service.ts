@@ -342,6 +342,60 @@ export interface DashboardMetric {
   tone: string;
 }
 
+export interface ArchiveResponse {
+  boxCount: number;
+  itemCount: number;
+  photoCount: number;
+  boxes: ArchiveBox[];
+  items: ArchiveItem[];
+  photos: ArchivePhoto[];
+}
+
+export interface ArchiveBox {
+  id: number;
+  code: string;
+  name: string;
+  containerTypeLabel: string;
+  locationName: string | null;
+  archivedAt: string | null;
+  coverUrl: string | null;
+  rotationDegrees: number;
+  legacyUrl: string;
+}
+
+export interface ArchiveItem {
+  id: number;
+  code: string;
+  name: string;
+  boxCode: string | null;
+  boxName: string | null;
+  tags: string[];
+  archivedAt: string | null;
+  coverUrl: string | null;
+  rotationDegrees: number;
+  legacyUrl: string;
+}
+
+export interface ArchivePhoto {
+  id: number;
+  entityType: string;
+  entityId: number;
+  caption: string | null;
+  archivedAt: string | null;
+  url: string;
+  rotationDegrees: number;
+}
+
+export interface ArchiveEntityRequest {
+  comment: string;
+}
+
+export interface ArchiveBoxRequest {
+  comment: string;
+  targetBoxId: number | null;
+  orphanContents: boolean;
+}
+
 export interface InventoryActionsResponse {
   openCount: number;
   completedCount: number;
@@ -776,6 +830,10 @@ export class InventoryApiService {
     return this.http.get<DashboardResponse>('/api/dashboard');
   }
 
+  fetchArchive(): Observable<ArchiveResponse> {
+    return this.http.get<ArchiveResponse>('/api/archive');
+  }
+
   fetchActions(): Observable<InventoryActionsResponse> {
     return this.http.get<InventoryActionsResponse>('/api/actions');
   }
@@ -824,6 +882,14 @@ export class InventoryApiService {
     return this.http.put<InventoryItemDetail>(`/api/items/${id}`, input);
   }
 
+  archiveItem(id: number, input: ArchiveEntityRequest): Observable<InventoryItemDetail> {
+    return this.http.post<InventoryItemDetail>(`/api/items/${id}/archive`, input);
+  }
+
+  restoreItem(id: number): Observable<InventoryItemDetail> {
+    return this.http.post<InventoryItemDetail>(`/api/items/${id}/restore`, {});
+  }
+
   bulkUpdateItems(input: InventoryBulkUpdate): Observable<InventoryBulkUpdateResponse> {
     return this.http.post<InventoryBulkUpdateResponse>('/api/items/bulk', input);
   }
@@ -858,6 +924,14 @@ export class InventoryApiService {
 
   updateBox(id: number, input: InventoryBoxUpdate): Observable<InventoryBoxDetail> {
     return this.http.put<InventoryBoxDetail>(`/api/boxes/${id}`, input);
+  }
+
+  archiveBox(id: number, input: ArchiveBoxRequest): Observable<InventoryBoxDetail> {
+    return this.http.post<InventoryBoxDetail>(`/api/boxes/${id}/archive`, input);
+  }
+
+  restoreBox(id: number): Observable<InventoryBoxDetail> {
+    return this.http.post<InventoryBoxDetail>(`/api/boxes/${id}/restore`, {});
   }
 
   setBoxCoverPhoto(id: number, photoId: number): Observable<InventoryBoxDetail> {

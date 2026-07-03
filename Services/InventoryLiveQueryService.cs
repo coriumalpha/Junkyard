@@ -9,7 +9,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
 {
     public async Task<InventoryItemDetailDto?> GetItemDetailAsync(int id, CancellationToken cancellationToken)
     {
-        var item = await db.Items.AsNoTracking()
+        var item = await db.Items.IgnoreQueryFilters().AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
             .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
             .Include(i => i.ItemClass)
@@ -73,6 +73,73 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             ToPhotoDtos(photos, photoStates),
             linkedRows.Actions,
             linkedRows.Comments);
+    }
+
+    public async Task<ArchiveDto> GetArchiveAsync(CancellationToken cancellationToken)
+    {
+        var boxes = await db.Boxes.IgnoreQueryFilters().AsNoTracking()
+            .Include(box => box.Location)
+            .Where(box => box.ArchivedAt != null)
+            .OrderByDescending(box => box.ArchivedAt)
+            .Take(200)
+            .ToListAsync(cancellationToken);
+
+        var items = await db.Items.IgnoreQueryFilters().AsNoTracking()
+            .Include(item => item.Box)
+            .Include(item => item.ItemTags).ThenInclude(itemTag => itemTag.Tag)
+            .Where(item => item.ArchivedAt != null)
+            .OrderByDescending(item => item.ArchivedAt)
+            .Take(300)
+            .ToListAsync(cancellationToken);
+
+        var photos = await db.Photos.AsNoTracking()
+            .Where(photo => photo.Status == PhotoStatus.Archived)
+            .OrderByDescending(photo => photo.ArchivedAt ?? photo.UpdatedAt)
+            .Take(120)
+            .ToListAsync(cancellationToken);
+
+        var filenames = boxes.Select(box => box.CoverPhoto)
+            .Concat(items.Select(item => item.CoverPhoto))
+            .Concat(photos.Select(photo => photo.Filename))
+            .Where(filename => !string.IsNullOrWhiteSpace(filename))
+            .Select(filename => filename!)
+            .Distinct()
+            .ToList();
+        var photoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
+
+        return new ArchiveDto(
+            boxes.Count,
+            items.Count,
+            photos.Count,
+            boxes.Select(box => new ArchiveBoxDto(
+                box.Id,
+                box.Code,
+                box.Name,
+                box.ContainerTypeLabel,
+                box.Location?.Name,
+                box.ArchivedAt,
+                ThumbUrl(photoStates, box.CoverPhoto),
+                RotationFor(photoStates, box.CoverPhoto),
+                $"/Boxes/Details?code={Uri.EscapeDataString(box.Code)}")).ToList(),
+            items.Select(item => new ArchiveItemDto(
+                item.Id,
+                item.Code,
+                item.Name,
+                item.Box?.Code,
+                item.Box?.Name,
+                item.ItemTags.Select(itemTag => itemTag.Tag.Name).OrderBy(name => name).ToList(),
+                item.ArchivedAt,
+                ThumbUrl(photoStates, item.CoverPhoto),
+                RotationFor(photoStates, item.CoverPhoto),
+                $"/Items/Edit?id={item.Id}")).ToList(),
+            photos.Select(photo => new ArchivePhotoDto(
+                photo.Id,
+                photo.EntityType.ToString(),
+                photo.EntityId,
+                photo.Caption,
+                photo.ArchivedAt,
+                PhotoStorage.ThumbUrl(photo.Filename, photoStates.GetValueOrDefault(photo.Filename)?.UpdatedAt ?? photo.UpdatedAt),
+                photoStates.TryGetValue(photo.Filename, out var state) ? state.RotationDegrees : photo.RotationDegrees)).ToList());
     }
 
     public async Task<(InventoryItemDetailDto? Item, string? Error)> UpdateItemAsync(
@@ -157,6 +224,64 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = tag.Id });
         }
 
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetItemDetailAsync(id, cancellationToken), null);
+    }
+
+    public async Task<(InventoryItemDetailDto? Item, string? Error)> ArchiveItemAsync(
+        int id,
+        ArchiveEntityDto input,
+        CancellationToken cancellationToken)
+    {
+        var item = await db.Items.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (item is null)
+        {
+            return (null, null);
+        }
+
+        if (item.ArchivedAt is null)
+        {
+            item.ArchivedAt = DateTime.UtcNow;
+            item.UpdatedAt = DateTime.UtcNow;
+            var comment = (input.Comment ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(comment))
+            {
+                db.InventoryActions.Add(new InventoryAction
+                {
+                    Title = "Motivo de archivado",
+                    Description = comment,
+                    Kind = InventoryActionKind.ArchiveReason,
+                    Status = InventoryActionStatus.Archived,
+                    LinkedEntityType = InventoryActionLinkedEntityType.Item,
+                    LinkedEntityId = item.Id
+                });
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return (await GetItemDetailAsync(id, cancellationToken), null);
+    }
+
+    public async Task<(InventoryItemDetailDto? Item, string? Error)> RestoreItemAsync(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var item = await db.Items.IgnoreQueryFilters().FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (item is null)
+        {
+            return (null, null);
+        }
+
+        var codeInUse = await db.Items.AsNoTracking()
+            .AnyAsync(existing => existing.Id != item.Id && existing.ArchivedAt == null && existing.Code == item.Code, cancellationToken);
+        if (codeInUse)
+        {
+            return (null, $"No se puede restaurar {item.Code}: ya existe un ítem activo con ese IT.");
+        }
+
+        item.ArchivedAt = null;
+        item.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         return (await GetItemDetailAsync(id, cancellationToken), null);
     }
@@ -615,7 +740,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         return null;
     }
 
-    public async Task<InventoryBoxDetailDto?> GetBoxDetailAsync(string code, CancellationToken cancellationToken)
+    public async Task<InventoryBoxDetailDto?> GetBoxDetailAsync(string code, CancellationToken cancellationToken, bool includeArchived = false)
     {
         var normalizedCode = Box.NormalizePublicCode(code);
         if (string.IsNullOrWhiteSpace(normalizedCode))
@@ -623,7 +748,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return null;
         }
 
-        var box = await db.Boxes.AsNoTracking()
+        var boxesQuery = includeArchived ? db.Boxes.IgnoreQueryFilters() : db.Boxes;
+        var box = await boxesQuery.AsNoTracking()
             .Include(b => b.Location)
             .Include(b => b.ParentBox)
             .Include(b => b.ChildBoxes)
@@ -742,7 +868,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         box.Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim();
         box.LocationId = locationId;
         box.ParentBoxId = parentBoxId;
-        box.Status = Enum.TryParse<BoxStatus>(input.Status, true, out var status) ? status : BoxStatus.Active;
+        var requestedStatus = Enum.TryParse<BoxStatus>(input.Status, true, out var status) ? status : BoxStatus.Active;
+        box.Status = requestedStatus == BoxStatus.Archived ? BoxStatus.Active : requestedStatus;
         box.UpdatedAt = DateTime.UtcNow;
 
         try
@@ -807,7 +934,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim(),
             LocationId = locationId,
             ParentBoxId = parentBoxId,
-            Status = Enum.TryParse<BoxStatus>(input.Status, true, out var status) ? status : BoxStatus.Active,
+            Status = Enum.TryParse<BoxStatus>(input.Status, true, out var status) && status != BoxStatus.Archived ? status : BoxStatus.Active,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -822,6 +949,92 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (null, "Ese CT ya existe.");
         }
 
+        return (await GetBoxDetailAsync(box.Code, cancellationToken), null);
+    }
+
+    public async Task<(InventoryBoxDetailDto? Box, string? Error)> ArchiveBoxAsync(
+        int id,
+        ArchiveBoxRequestDto input,
+        CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes
+            .Include(box => box.Items)
+            .Include(box => box.ChildBoxes)
+            .FirstOrDefaultAsync(box => box.Id == id, cancellationToken);
+        if (box is null)
+        {
+            return (null, null);
+        }
+
+        var targetBoxId = input.TargetBoxId is > 0 ? input.TargetBoxId : null;
+        if (targetBoxId == box.Id)
+        {
+            return (null, "El contenedor destino no puede ser el mismo que se archiva.");
+        }
+
+        if (targetBoxId is int targetId && !await db.Boxes.AnyAsync(candidate => candidate.Id == targetId, cancellationToken))
+        {
+            return (null, "El contenedor destino no existe.");
+        }
+
+        if ((box.Items.Count > 0 || box.ChildBoxes.Count > 0) && targetBoxId is null && !input.OrphanContents)
+        {
+            return (null, "Este contenedor tiene contenido. Elige un destino o deja los ítems sin contenedor antes de archivar.");
+        }
+
+        foreach (var item in box.Items)
+        {
+            item.BoxId = targetBoxId;
+        }
+
+        foreach (var child in box.ChildBoxes)
+        {
+            child.ParentBoxId = box.ParentBoxId;
+        }
+
+        box.ArchivedAt = DateTime.UtcNow;
+        box.Status = BoxStatus.Archived;
+        box.UpdatedAt = DateTime.UtcNow;
+
+        var comment = (input.Comment ?? "").Trim();
+        if (!string.IsNullOrWhiteSpace(comment))
+        {
+            db.InventoryActions.Add(new InventoryAction
+            {
+                Title = "Motivo de archivado",
+                Description = comment,
+                Kind = InventoryActionKind.ArchiveReason,
+                Status = InventoryActionStatus.Archived,
+                LinkedEntityType = InventoryActionLinkedEntityType.Box,
+                LinkedEntityId = box.Id
+            });
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetBoxDetailAsync(box.Code, cancellationToken, includeArchived: true), null);
+    }
+
+    public async Task<(InventoryBoxDetailDto? Box, string? Error)> RestoreBoxAsync(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var box = await db.Boxes.IgnoreQueryFilters().FirstOrDefaultAsync(box => box.Id == id, cancellationToken);
+        if (box is null)
+        {
+            return (null, null);
+        }
+
+        var codeInUse = await db.Boxes.AsNoTracking()
+            .AnyAsync(existing => existing.Id != box.Id && existing.ArchivedAt == null && existing.Code == box.Code, cancellationToken);
+        if (codeInUse)
+        {
+            return (null, $"No se puede restaurar {box.Code}: ya existe un contenedor activo con ese CT.");
+        }
+
+        box.ArchivedAt = null;
+        box.Status = BoxStatus.Active;
+        box.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
         return (await GetBoxDetailAsync(box.Code, cancellationToken), null);
     }
 
@@ -2564,6 +2777,53 @@ public record DashboardDto(
     List<InventoryActionDto> OpenActions,
     List<DashboardMetricDto> InventoryModeStats,
     List<DashboardMetricDto> BoxStatusStats);
+
+public record ArchiveDto(
+    int BoxCount,
+    int ItemCount,
+    int PhotoCount,
+    List<ArchiveBoxDto> Boxes,
+    List<ArchiveItemDto> Items,
+    List<ArchivePhotoDto> Photos);
+
+public record ArchiveBoxDto(
+    int Id,
+    string Code,
+    string Name,
+    string ContainerTypeLabel,
+    string? LocationName,
+    DateTime? ArchivedAt,
+    string? CoverUrl,
+    int RotationDegrees,
+    string LegacyUrl);
+
+public record ArchiveItemDto(
+    int Id,
+    string Code,
+    string Name,
+    string? BoxCode,
+    string? BoxName,
+    List<string> Tags,
+    DateTime? ArchivedAt,
+    string? CoverUrl,
+    int RotationDegrees,
+    string LegacyUrl);
+
+public record ArchivePhotoDto(
+    int Id,
+    string EntityType,
+    int EntityId,
+    string? Caption,
+    DateTime? ArchivedAt,
+    string Url,
+    int RotationDegrees);
+
+public record ArchiveEntityDto(string? Comment);
+
+public record ArchiveBoxRequestDto(
+    string? Comment,
+    int? TargetBoxId,
+    bool OrphanContents);
 
 public record InventoryItemDetailDto(
     int Id,

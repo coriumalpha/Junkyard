@@ -8,10 +8,21 @@
 
     <nav class="detail-actions" aria-label="Acciones de detalle">
       @if (kind() === 'item' && item()) {
-        <button mat-flat-button type="button" (click)="startItemEdit()">
-          <mat-icon>edit</mat-icon>
-          Editar
-        </button>
+        @if (item()!.archived) {
+          <button mat-flat-button type="button" (click)="restoreCurrentItem()" [disabled]="saving()">
+            <mat-icon>unarchive</mat-icon>
+            Restaurar
+          </button>
+        } @else {
+          <button mat-flat-button type="button" (click)="startItemEdit()">
+            <mat-icon>edit</mat-icon>
+            Editar
+          </button>
+          <button mat-stroked-button type="button" class="danger-action" (click)="archiveCurrentItem()" [disabled]="saving()">
+            <mat-icon>archive</mat-icon>
+            Archivar
+          </button>
+        }
         <a mat-stroked-button [href]="itemLegacyUrl()" target="_blank" rel="noreferrer">
           <mat-icon>open_in_new</mat-icon>
           Legacy
@@ -22,10 +33,21 @@
         </a>
       }
       @if (kind() === 'box' && box()) {
-        <button mat-flat-button type="button" (click)="startBoxEdit()">
-          <mat-icon>edit</mat-icon>
-          Editar
-        </button>
+        @if (box()!.status === 'Archived') {
+          <button mat-flat-button type="button" (click)="restoreCurrentBox()" [disabled]="saving()">
+            <mat-icon>unarchive</mat-icon>
+            Restaurar
+          </button>
+        } @else {
+          <button mat-flat-button type="button" (click)="startBoxEdit()">
+            <mat-icon>edit</mat-icon>
+            Editar
+          </button>
+          <button mat-stroked-button type="button" class="danger-action" (click)="archiveCurrentBox()" [disabled]="saving()">
+            <mat-icon>archive</mat-icon>
+            Archivar
+          </button>
+        }
         <a mat-stroked-button [href]="boxLegacyUrl()" target="_blank" rel="noreferrer">
           <mat-icon>open_in_new</mat-icon>
           Legacy

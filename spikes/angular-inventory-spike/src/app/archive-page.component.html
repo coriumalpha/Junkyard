@@ -1,0 +1,156 @@
+<main class="archive-shell">
+  <header class="archive-header app-page-header">
+    <div>
+      <p class="eyebrow">Mantenimiento</p>
+      <h1>Archivo</h1>
+      <p>Ítems y contenedores retirados del inventario activo sin borrado físico.</p>
+    </div>
+    <div class="archive-stats">
+      <span><strong>{{ items().length }}</strong> ítems</span>
+      <span><strong>{{ boxes().length }}</strong> contenedores</span>
+      <span><strong>{{ photos().length }}</strong> fotos</span>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="42" />
+      <span>Cargando archivo...</span>
+    </section>
+  } @else {
+    @if (error()) {
+      <section class="state-panel error">
+        <mat-icon>warning</mat-icon>
+        <span>{{ error() }}</span>
+      </section>
+    }
+    @if (message()) {
+      <section class="state-panel success">
+        <mat-icon>check_circle</mat-icon>
+        <span>{{ message() }}</span>
+      </section>
+    }
+
+    <section class="archive-grid">
+      <mat-card class="archive-card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Objetos</p>
+            <h2>Ítems archivados</h2>
+          </div>
+        </div>
+        <div class="archive-list">
+          @for (item of items(); track item.id) {
+            <article class="archive-row">
+              @if (item.coverUrl) {
+                <img [src]="assetUrl(item.coverUrl)!" [style.transform]="'rotate(' + item.rotationDegrees + 'deg)'" [alt]="item.name" />
+              } @else {
+                <span class="placeholder">{{ item.name.slice(0, 1) }}</span>
+              }
+              <div class="archive-copy">
+                <strong>{{ item.code | inventoryCode }} · {{ item.name }}</strong>
+                <small>
+                  @if (item.boxCode) {
+                    {{ item.boxCode | inventoryCode }} · {{ item.boxName }}
+                  } @else {
+                    Sin contenedor
+                  }
+                  @if (item.archivedAt) {
+                    · {{ item.archivedAt | date:'short' }}
+                  }
+                </small>
+                @if (item.tags.length) {
+                  <mat-chip-set>
+                    @for (tag of item.tags; track tag) {
+                      <mat-chip>{{ tag }}</mat-chip>
+                    }
+                  </mat-chip-set>
+                }
+              </div>
+              <div class="row-actions">
+                <a mat-button [routerLink]="['/item', item.id]">
+                  <mat-icon>visibility</mat-icon>
+                  Ver
+                </a>
+                <button mat-flat-button type="button" (click)="restoreItem(item)" [disabled]="savingId() === 'item-' + item.id">
+                  <mat-icon>unarchive</mat-icon>
+                  Restaurar
+                </button>
+              </div>
+            </article>
+          } @empty {
+            <p class="empty-note">No hay ítems archivados.</p>
+          }
+        </div>
+      </mat-card>
+
+      <mat-card class="archive-card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Contenedores</p>
+            <h2>Cajas archivadas</h2>
+          </div>
+        </div>
+        <div class="archive-list">
+          @for (box of boxes(); track box.id) {
+            <article class="archive-row">
+              @if (box.coverUrl) {
+                <img [src]="assetUrl(box.coverUrl)!" [style.transform]="'rotate(' + box.rotationDegrees + 'deg)'" [alt]="box.name" />
+              } @else {
+                <span class="placeholder box">
+                  <mat-icon>inventory_2</mat-icon>
+                </span>
+              }
+              <div class="archive-copy">
+                <strong>{{ box.code | inventoryCode }} · {{ box.name }}</strong>
+                <small>
+                  {{ box.containerTypeLabel }}
+                  @if (box.locationName) {
+                    · {{ box.locationName }}
+                  }
+                  @if (box.archivedAt) {
+                    · {{ box.archivedAt | date:'short' }}
+                  }
+                </small>
+              </div>
+              <div class="row-actions">
+                <a mat-button [href]="legacyUrl(box.legacyUrl)" target="_blank" rel="noreferrer">
+                  <mat-icon>open_in_new</mat-icon>
+                  Legacy
+                </a>
+                <button mat-flat-button type="button" (click)="restoreBox(box)" [disabled]="savingId() === 'box-' + box.id">
+                  <mat-icon>unarchive</mat-icon>
+                  Restaurar
+                </button>
+              </div>
+            </article>
+          } @empty {
+            <p class="empty-note">No hay contenedores archivados.</p>
+          }
+        </div>
+      </mat-card>
+
+      <mat-card class="archive-card photos-card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Fotos</p>
+            <h2>Fotografías archivadas</h2>
+          </div>
+        </div>
+        <div class="photo-grid">
+          @for (photo of photos(); track photo.id) {
+            <article class="photo-row">
+              <img [src]="assetUrl(photo.url)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.caption || 'Foto archivada'" />
+              <div>
+                <strong>{{ photo.caption || 'Sin caption' }}</strong>
+                <small>{{ photo.entityType }} #{{ photo.entityId }} @if (photo.archivedAt) { · {{ photo.archivedAt | date:'short' }} }</small>
+              </div>
+            </article>
+          } @empty {
+            <p class="empty-note">No hay fotografías archivadas.</p>
+          }
+        </div>
+      </mat-card>
+    </section>
+  }
+</main>

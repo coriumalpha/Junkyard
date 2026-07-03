@@ -52,6 +52,11 @@ export const routes: Routes = [
     loadComponent: () => import('./actions-page.component').then((m) => m.ActionsPageComponent)
   },
   {
+    path: 'archive',
+    title: 'Archivo · Junkyard',
+    loadComponent: () => import('./archive-page.component').then((m) => m.ArchivePageComponent)
+  },
+  {
     path: 'cleanup/classification',
     title: 'Diagnóstico de clasificación · Junkyard',
     loadComponent: () => import('./classification-cleanup-page.component').then((m) => m.ClassificationCleanupPageComponent)

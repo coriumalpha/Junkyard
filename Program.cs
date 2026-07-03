@@ -464,6 +464,13 @@ app.MapGet("/api/cleanup/item-classification", async (
     var response = await queryService.GetItemClassificationCleanupReportAsync(cancellationToken);
     return Results.Json(response);
 });
+app.MapGet("/api/archive", async (
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetArchiveAsync(cancellationToken);
+    return Results.Json(response);
+});
 app.MapGet("/api/locations", async (
     InventoryDbContext db,
     CancellationToken cancellationToken) =>
@@ -581,6 +588,33 @@ app.MapPut("/api/items/{id:int}", async (
     CancellationToken cancellationToken) =>
 {
     var (item, error) = await queryService.UpdateItemAsync(id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return item is null ? Results.NotFound() : Results.Json(item);
+});
+app.MapPost("/api/items/{id:int}/archive", async (
+    int id,
+    ArchiveEntityDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (item, error) = await queryService.ArchiveItemAsync(id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return item is null ? Results.NotFound() : Results.Json(item);
+});
+app.MapPost("/api/items/{id:int}/restore", async (
+    int id,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (item, error) = await queryService.RestoreItemAsync(id, cancellationToken);
     if (error is not null)
     {
         return Results.BadRequest(new { error });
@@ -790,6 +824,33 @@ app.MapPut("/api/boxes/{id:int}", async (
     CancellationToken cancellationToken) =>
 {
     var (box, error) = await queryService.UpdateBoxAsync(id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return box is null ? Results.NotFound() : Results.Json(box);
+});
+app.MapPost("/api/boxes/{id:int}/archive", async (
+    int id,
+    ArchiveBoxRequestDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (box, error) = await queryService.ArchiveBoxAsync(id, input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return box is null ? Results.NotFound() : Results.Json(box);
+});
+app.MapPost("/api/boxes/{id:int}/restore", async (
+    int id,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (box, error) = await queryService.RestoreBoxAsync(id, cancellationToken);
     if (error is not null)
     {
         return Results.BadRequest(new { error });
