@@ -317,8 +317,14 @@
                       <div>
                         <p class="eyebrow">{{ inventoryModeLabel(group.mode) }}</p>
                         <h3>{{ group.className }} / {{ group.subtypeName }}</h3>
+                        <small class="stock-targets">
+                          Min {{ group.minStock ?? '-' }} · Objetivo {{ group.targetStock ?? '-' }}
+                        </small>
                       </div>
-                      <strong>{{ consumableGroupQuantity(group) }}</strong>
+                      <div class="consumable-stock-summary">
+                        <strong>{{ consumableGroupQuantity(group) }}</strong>
+                        <span [class]="consumableStockTone(group)">{{ consumableStockLabel(group) }}</span>
+                      </div>
                     </div>
                     <div class="consumable-breakdown">
                       @for (item of group.items; track trackByItem($index, item)) {

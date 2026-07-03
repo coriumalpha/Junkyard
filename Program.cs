@@ -294,19 +294,167 @@ app.MapGet("/api/inventory/options", async (
     return Results.Json(response);
 });
 app.MapGet("/api/item-classes", async (
+    bool? includeInactive,
     InventoryLiveQueryService queryService,
     CancellationToken cancellationToken) =>
 {
-    var response = await queryService.GetItemClassesAsync(cancellationToken);
+    var response = await queryService.GetItemClassesAsync(cancellationToken, includeInactive == true);
     return Results.Json(response);
+});
+app.MapPost("/api/item-classes", async (
+    ItemClassUpdateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var (name, error) = ValidateRequiredName(input.Name, "El nombre de la clase es obligatorio.");
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    if (!Enum.TryParse<InventoryMode>(input.InventoryMode, ignoreCase: true, out var mode))
+    {
+        return Results.BadRequest(new { error = "Selecciona un modo de inventario válido." });
+    }
+
+    var normalizedName = name.ToLower();
+    if (await db.ItemClasses.AnyAsync(itemClass => itemClass.Name.ToLower() == normalizedName, cancellationToken))
+    {
+        return Results.BadRequest(new { error = "Ya existe una clase con ese nombre." });
+    }
+
+    var itemClass = new ItemClass
+    {
+        Name = name,
+        InventoryMode = mode,
+        Description = NormalizeOptional(input.Description),
+        Color = NormalizeOptional(input.Color),
+        Icon = NormalizeOptional(input.Icon),
+        SortOrder = input.SortOrder,
+        IsActive = input.IsActive
+    };
+    db.ItemClasses.Add(itemClass);
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(ToItemClassDto(itemClass));
+});
+app.MapPut("/api/item-classes/{id:int}", async (
+    int id,
+    ItemClassUpdateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var itemClass = await db.ItemClasses.FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+    if (itemClass is null)
+    {
+        return Results.NotFound();
+    }
+
+    var (name, error) = ValidateRequiredName(input.Name, "El nombre de la clase es obligatorio.");
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    if (!Enum.TryParse<InventoryMode>(input.InventoryMode, ignoreCase: true, out var mode))
+    {
+        return Results.BadRequest(new { error = "Selecciona un modo de inventario válido." });
+    }
+
+    var normalizedName = name.ToLower();
+    if (await db.ItemClasses.AnyAsync(candidate => candidate.Id != id && candidate.Name.ToLower() == normalizedName, cancellationToken))
+    {
+        return Results.BadRequest(new { error = "Ya existe una clase con ese nombre." });
+    }
+
+    itemClass.Name = name;
+    itemClass.InventoryMode = mode;
+    itemClass.Description = NormalizeOptional(input.Description);
+    itemClass.Color = NormalizeOptional(input.Color);
+    itemClass.Icon = NormalizeOptional(input.Icon);
+    itemClass.SortOrder = input.SortOrder;
+    itemClass.IsActive = input.IsActive;
+    itemClass.UpdatedAt = DateTime.UtcNow;
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(ToItemClassDto(itemClass));
+});
+app.MapPatch("/api/item-classes/{id:int}/active", async (
+    int id,
+    ActiveStateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var itemClass = await db.ItemClasses.FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+    if (itemClass is null)
+    {
+        return Results.NotFound();
+    }
+
+    itemClass.IsActive = input.IsActive;
+    itemClass.UpdatedAt = DateTime.UtcNow;
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(ToItemClassDto(itemClass));
 });
 app.MapGet("/api/item-subtypes", async (
     int? itemClassId,
+    bool? includeInactive,
     InventoryLiveQueryService queryService,
     CancellationToken cancellationToken) =>
 {
-    var response = await queryService.GetItemSubtypesAsync(itemClassId, cancellationToken);
+    var response = await queryService.GetItemSubtypesAsync(itemClassId, cancellationToken, includeInactive == true);
     return Results.Json(response);
+});
+app.MapPost("/api/item-subtypes", async (
+    ItemSubtypeUpdateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var (subtype, error) = await ApplySubtypeUpdateAsync(new ItemSubtype(), input, db, cancellationToken, isNew: true);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    db.ItemSubtypes.Add(subtype!);
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(ToItemSubtypeDto(subtype!));
+});
+app.MapPut("/api/item-subtypes/{id:int}", async (
+    int id,
+    ItemSubtypeUpdateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var subtype = await db.ItemSubtypes.FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+    if (subtype is null)
+    {
+        return Results.NotFound();
+    }
+
+    var (_, error) = await ApplySubtypeUpdateAsync(subtype, input, db, cancellationToken, isNew: false);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(ToItemSubtypeDto(subtype));
+});
+app.MapPatch("/api/item-subtypes/{id:int}/active", async (
+    int id,
+    ActiveStateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    var subtype = await db.ItemSubtypes.FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+    if (subtype is null)
+    {
+        return Results.NotFound();
+    }
+
+    subtype.IsActive = input.IsActive;
+    subtype.UpdatedAt = DateTime.UtcNow;
+    await db.SaveChangesAsync(cancellationToken);
+    return Results.Json(ToItemSubtypeDto(subtype));
 });
 app.MapGet("/api/cleanup/item-classification", async (
     InventoryLiveQueryService queryService,
@@ -1042,6 +1190,100 @@ app.MapRazorPages();
 
 app.Run();
 
+static (string Name, string? Error) ValidateRequiredName(string? value, string error)
+{
+    var name = (value ?? "").Trim();
+    return string.IsNullOrWhiteSpace(name) ? ("", error) : (name, null);
+}
+
+static string? NormalizeOptional(string? value)
+{
+    var normalized = (value ?? "").Trim();
+    return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+}
+
+static ItemClassDto ToItemClassDto(ItemClass itemClass)
+{
+    return new ItemClassDto(
+        itemClass.Id,
+        itemClass.Name,
+        itemClass.InventoryMode.ToString(),
+        itemClass.Description,
+        itemClass.Color,
+        itemClass.Icon,
+        itemClass.SortOrder,
+        itemClass.IsActive);
+}
+
+static ItemSubtypeDto ToItemSubtypeDto(ItemSubtype subtype)
+{
+    return new ItemSubtypeDto(
+        subtype.Id,
+        subtype.ItemClassId,
+        subtype.Name,
+        subtype.Unit,
+        subtype.MinStock,
+        subtype.TargetStock,
+        subtype.Description,
+        subtype.SortOrder,
+        subtype.IsActive);
+}
+
+static async Task<(ItemSubtype? Subtype, string? Error)> ApplySubtypeUpdateAsync(
+    ItemSubtype subtype,
+    ItemSubtypeUpdateDto input,
+    InventoryDbContext db,
+    CancellationToken cancellationToken,
+    bool isNew)
+{
+    if (input.ItemClassId <= 0)
+    {
+        return (null, "Selecciona una clase para el subtipo.");
+    }
+
+    if (!await db.ItemClasses.AnyAsync(itemClass => itemClass.Id == input.ItemClassId, cancellationToken))
+    {
+        return (null, "La clase seleccionada no existe.");
+    }
+
+    var (name, error) = ValidateRequiredName(input.Name, "El nombre del subtipo es obligatorio.");
+    if (error is not null)
+    {
+        return (null, error);
+    }
+
+    var normalizedName = name.ToLower();
+    var duplicate = await db.ItemSubtypes.AnyAsync(candidate =>
+        candidate.ItemClassId == input.ItemClassId
+        && candidate.Id != subtype.Id
+        && candidate.Name.ToLower() == normalizedName,
+        cancellationToken);
+    if (duplicate)
+    {
+        return (null, "Ya existe un subtipo con ese nombre dentro de la clase.");
+    }
+
+    if (input.MinStock is < 0 || input.TargetStock is < 0)
+    {
+        return (null, "Los stocks mínimo y objetivo no pueden ser negativos.");
+    }
+
+    subtype.ItemClassId = input.ItemClassId;
+    subtype.Name = name;
+    subtype.Unit = NormalizeOptional(input.Unit);
+    subtype.MinStock = input.MinStock;
+    subtype.TargetStock = input.TargetStock;
+    subtype.Description = NormalizeOptional(input.Description);
+    subtype.SortOrder = input.SortOrder;
+    subtype.IsActive = input.IsActive;
+    if (!isNew)
+    {
+        subtype.UpdatedAt = DateTime.UtcNow;
+    }
+
+    return (subtype, null);
+}
+
 static string NormalizeSwatch(string? value, string fallback)
 {
     var color = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
@@ -1116,3 +1358,21 @@ public record LocationDto(int Id, string Name, string? Description, int BoxesCou
 public record LocationUpdateDto(string Name, string? Description);
 public record ItemConditionDto(int Id, string Name, string Color);
 public record ItemConditionUpdateDto(string? Name, string? Color);
+public record ActiveStateDto(bool IsActive);
+public record ItemClassUpdateDto(
+    string? Name,
+    string? InventoryMode,
+    string? Description,
+    string? Color,
+    string? Icon,
+    int? SortOrder,
+    bool IsActive);
+public record ItemSubtypeUpdateDto(
+    int ItemClassId,
+    string? Name,
+    string? Unit,
+    decimal? MinStock,
+    decimal? TargetStock,
+    string? Description,
+    int? SortOrder,
+    bool IsActive);

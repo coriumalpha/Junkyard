@@ -50,6 +50,8 @@ interface ConsumableSubtypeGroup {
   mode: InventoryMode;
   unit: string;
   total: number;
+  minStock: number | null;
+  targetStock: number | null;
   items: InventoryItem[];
 }
 
@@ -1014,6 +1016,30 @@ export class InventoryPageComponent {
     return `${group.total} ${group.unit}`.trim();
   }
 
+  protected consumableStockLabel(group: ConsumableSubtypeGroup): string {
+    if (group.minStock !== null && group.total < group.minStock) {
+      return 'Bajo mínimo';
+    }
+
+    if (group.targetStock !== null && group.total < group.targetStock) {
+      return 'Bajo objetivo';
+    }
+
+    return 'OK';
+  }
+
+  protected consumableStockTone(group: ConsumableSubtypeGroup): string {
+    if (group.minStock !== null && group.total < group.minStock) {
+      return 'danger';
+    }
+
+    if (group.targetStock !== null && group.total < group.targetStock) {
+      return 'warn';
+    }
+
+    return 'ok';
+  }
+
   private buildFungibleConsumableGroups(): ConsumableSubtypeGroup[] {
     const groups = new Map<string, ConsumableSubtypeGroup>();
 
@@ -1031,10 +1057,14 @@ export class InventoryPageComponent {
         mode: item.inventoryMode,
         unit,
         total: 0,
+        minStock: item.itemSubtypeMinStock,
+        targetStock: item.itemSubtypeTargetStock,
         items: []
       };
 
       group.total += item.quantity;
+      group.minStock ??= item.itemSubtypeMinStock;
+      group.targetStock ??= item.itemSubtypeTargetStock;
       group.items.push(item);
       groups.set(key, group);
     }

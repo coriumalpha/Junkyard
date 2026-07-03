@@ -13,3 +13,22 @@ La categoría queda como clasificación/navegación heredada.
 Estados como `Cuarentena` no deben mezclarse con clase ni con `InventoryMode`; deben migrar a estado o booleano específico cuando se aborde esa fase.
 
 No usar `Subcategoría` para este modelo. Usar `Subtipo`.
+
+## Operación
+
+La SPA gestiona clases y subtipos en `/settings/classes`.
+
+El informe operativo de limpieza está visible en `/cleanup/classification` y consume `/api/cleanup/item-classification`.
+
+Endpoints mínimos:
+
+- `GET /api/item-classes?includeInactive=true`
+- `POST /api/item-classes`
+- `PUT /api/item-classes/{id}`
+- `PATCH /api/item-classes/{id}/active`
+- `GET /api/item-subtypes?itemClassId={id}&includeInactive=true`
+- `POST /api/item-subtypes`
+- `PUT /api/item-subtypes/{id}`
+- `PATCH /api/item-subtypes/{id}/active`
+
+No hay borrado físico desde la SPA. Las clases/subtipos usados se conservan y se operan con `IsActive`.

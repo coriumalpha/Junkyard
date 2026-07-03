@@ -64,6 +64,29 @@ export interface ItemSubtypesResponse {
   itemSubtypes: ItemSubtype[];
 }
 
+export interface ItemClassificationCleanupReport {
+  lotKitTemporaryCount: number;
+  lotKitMigratedCount: number;
+  lotKitPendingCount: number;
+  lotKitPending: ItemClassificationCleanupItem[];
+  quarantineCount: number;
+  quarantineItems: ItemClassificationCleanupItem[];
+  untypedConsumableCount: number;
+  untypedConsumables: ItemClassificationCleanupItem[];
+}
+
+export interface ItemClassificationCleanupItem {
+  id: number;
+  code: string;
+  name: string;
+  quantityLabel: string;
+  boxPath: string;
+  tags: string[];
+  itemClassName: string | null;
+  itemSubtypeName: string | null;
+  suggestion: string | null;
+}
+
 export interface InventoryTag {
   id: number;
   name: string;
@@ -95,6 +118,16 @@ export interface ItemClass {
   isActive: boolean;
 }
 
+export interface ItemClassUpdate {
+  name: string;
+  inventoryMode: InventoryMode;
+  description: string;
+  color: string | null;
+  icon: string;
+  sortOrder: number | null;
+  isActive: boolean;
+}
+
 export interface ItemSubtype {
   id: number;
   itemClassId: number;
@@ -103,6 +136,17 @@ export interface ItemSubtype {
   minStock: number | null;
   targetStock: number | null;
   description: string | null;
+  sortOrder: number | null;
+  isActive: boolean;
+}
+
+export interface ItemSubtypeUpdate {
+  itemClassId: number;
+  name: string;
+  unit: string;
+  minStock: number | null;
+  targetStock: number | null;
+  description: string;
   sortOrder: number | null;
   isActive: boolean;
 }
@@ -204,6 +248,8 @@ export interface InventoryItem {
   itemSubtypeId: number | null;
   itemSubtypeName: string | null;
   itemSubtypeUnit: string | null;
+  itemSubtypeMinStock: number | null;
+  itemSubtypeTargetStock: number | null;
   tags: InventoryTag[];
   quantity: number;
   unit: string;
@@ -592,13 +638,45 @@ export class InventoryApiService {
     return this.http.get<InventoryOptionsResponse>('/api/inventory/options');
   }
 
-  fetchItemClasses(): Observable<ItemClassesResponse> {
-    return this.http.get<ItemClassesResponse>('/api/item-classes');
+  fetchItemClasses(includeInactive = false): Observable<ItemClassesResponse> {
+    const params = includeInactive ? new HttpParams().set('includeInactive', 'true') : undefined;
+    return this.http.get<ItemClassesResponse>('/api/item-classes', { params });
   }
 
-  fetchItemSubtypes(itemClassId: number): Observable<ItemSubtypesResponse> {
-    const params = new HttpParams().set('itemClassId', String(itemClassId));
+  createItemClass(input: ItemClassUpdate): Observable<ItemClass> {
+    return this.http.post<ItemClass>('/api/item-classes', input);
+  }
+
+  updateItemClass(id: number, input: ItemClassUpdate): Observable<ItemClass> {
+    return this.http.put<ItemClass>(`/api/item-classes/${id}`, input);
+  }
+
+  setItemClassActive(id: number, isActive: boolean): Observable<ItemClass> {
+    return this.http.patch<ItemClass>(`/api/item-classes/${id}/active`, { isActive });
+  }
+
+  fetchItemSubtypes(itemClassId: number, includeInactive = false): Observable<ItemSubtypesResponse> {
+    let params = new HttpParams().set('itemClassId', String(itemClassId));
+    if (includeInactive) {
+      params = params.set('includeInactive', 'true');
+    }
     return this.http.get<ItemSubtypesResponse>('/api/item-subtypes', { params });
+  }
+
+  createItemSubtype(input: ItemSubtypeUpdate): Observable<ItemSubtype> {
+    return this.http.post<ItemSubtype>('/api/item-subtypes', input);
+  }
+
+  updateItemSubtype(id: number, input: ItemSubtypeUpdate): Observable<ItemSubtype> {
+    return this.http.put<ItemSubtype>(`/api/item-subtypes/${id}`, input);
+  }
+
+  setItemSubtypeActive(id: number, isActive: boolean): Observable<ItemSubtype> {
+    return this.http.patch<ItemSubtype>(`/api/item-subtypes/${id}/active`, { isActive });
+  }
+
+  fetchItemClassificationCleanup(): Observable<ItemClassificationCleanupReport> {
+    return this.http.get<ItemClassificationCleanupReport>('/api/cleanup/item-classification');
   }
 
   fetchLocations(): Observable<LocationsResponse> {

@@ -53,6 +53,13 @@
           <span matListItemLine>Stock y mínimos</span>
         }
       </a>
+      <a mat-list-item routerLink="/cleanup/classification" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>fact_check</mat-icon>
+        <span matListItemTitle>Limpieza</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Clases y tags temporales</span>
+        }
+      </a>
       <a mat-list-item routerLink="/inventory" [queryParams]="{ onlyOrphans: 'true', layout: 'grouped', view: 'grouped' }" [class.active]="isOrphansSection()" (click)="closeDrawer()">
         <mat-icon matListItemIcon>inbox</mat-icon>
         <span matListItemTitle>Sin clasificar</span>
@@ -89,6 +96,10 @@
           }
         </div>
         @if (!drawerCollapsed() || handset()) {
+          <a mat-list-item routerLink="/settings/classes" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+            <mat-icon matListItemIcon>category</mat-icon>
+            <span matListItemTitle>Clases</span>
+          </a>
           <a mat-list-item routerLink="/settings/tags" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
             <mat-icon matListItemIcon>sell</mat-icon>
             <span matListItemTitle>Tags</span>

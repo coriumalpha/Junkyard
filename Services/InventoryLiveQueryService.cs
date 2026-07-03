@@ -1457,10 +1457,15 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         return new InventoryOptionsDto(categories, tags, conditions, itemClasses, itemSubtypes, locations, boxes);
     }
 
-    public async Task<ItemClassesResponseDto> GetItemClassesAsync(CancellationToken cancellationToken)
+    public async Task<ItemClassesResponseDto> GetItemClassesAsync(CancellationToken cancellationToken, bool includeInactive = false)
     {
-        var classes = await db.ItemClasses.AsNoTracking()
-            .Where(itemClass => itemClass.IsActive)
+        var query = db.ItemClasses.AsNoTracking();
+        if (!includeInactive)
+        {
+            query = query.Where(itemClass => itemClass.IsActive);
+        }
+
+        var classes = await query
             .OrderBy(itemClass => itemClass.SortOrder ?? int.MaxValue)
             .ThenBy(itemClass => itemClass.Name)
             .Select(itemClass => new ItemClassDto(
@@ -1477,10 +1482,14 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         return new ItemClassesResponseDto(classes);
     }
 
-    public async Task<ItemSubtypesResponseDto> GetItemSubtypesAsync(int? itemClassId, CancellationToken cancellationToken)
+    public async Task<ItemSubtypesResponseDto> GetItemSubtypesAsync(int? itemClassId, CancellationToken cancellationToken, bool includeInactive = false)
     {
-        var query = db.ItemSubtypes.AsNoTracking()
-            .Where(subtype => subtype.IsActive && subtype.ItemClass.IsActive);
+        var query = db.ItemSubtypes.AsNoTracking();
+        if (!includeInactive)
+        {
+            query = query.Where(subtype => subtype.IsActive && subtype.ItemClass.IsActive);
+        }
+
         if (itemClassId is > 0)
         {
             query = query.Where(subtype => subtype.ItemClassId == itemClassId);
@@ -1810,6 +1819,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.ItemSubtypeId,
             item.ItemSubtype?.Name,
             item.ItemSubtype?.Unit,
+            item.ItemSubtype?.MinStock,
+            item.ItemSubtype?.TargetStock,
             ToTagDtos(item),
             item.Quantity,
             item.Unit ?? "",
@@ -2719,6 +2730,8 @@ public record InventoryItemDto(
     int? ItemSubtypeId,
     string? ItemSubtypeName,
     string? ItemSubtypeUnit,
+    decimal? ItemSubtypeMinStock,
+    decimal? ItemSubtypeTargetStock,
     List<TagDto> Tags,
     decimal Quantity,
     string Unit,

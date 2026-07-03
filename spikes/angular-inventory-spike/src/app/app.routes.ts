@@ -52,6 +52,16 @@ export const routes: Routes = [
     loadComponent: () => import('./actions-page.component').then((m) => m.ActionsPageComponent)
   },
   {
+    path: 'cleanup/classification',
+    title: 'Limpieza de clasificación · Junkyard',
+    loadComponent: () => import('./classification-cleanup-page.component').then((m) => m.ClassificationCleanupPageComponent)
+  },
+  {
+    path: 'settings/classes',
+    title: 'Clases y subtipos · Junkyard',
+    loadComponent: () => import('./settings-classes-page.component').then((m) => m.SettingsClassesPageComponent)
+  },
+  {
     path: 'settings/tags',
     title: 'Tags · Junkyard',
     loadComponent: () => import('./settings-tags-page.component').then((m) => m.SettingsTagsPageComponent)

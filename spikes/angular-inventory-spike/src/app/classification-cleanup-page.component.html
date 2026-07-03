@@ -1,0 +1,151 @@
+<main class="cleanup-shell">
+  <header class="cleanup-header app-page-header">
+    <div>
+      <p class="eyebrow">Inventario</p>
+      <h1>Limpieza de clasificación</h1>
+      <p>Informe operativo de clases, subtipos y tags temporales. Sin migración automática.</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button type="button" (click)="reload()" [disabled]="loading()">
+        <mat-icon>refresh</mat-icon>
+        Actualizar
+      </button>
+      <a mat-stroked-button routerLink="/settings/classes">
+        <mat-icon>category</mat-icon>
+        Clases
+      </a>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="44" />
+      <span>Cargando informe...</span>
+    </section>
+  } @else if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  } @else if (report()) {
+    <section class="metric-grid">
+      <mat-card>
+        <p class="eyebrow">Lote / Kit temporal</p>
+        <strong>{{ report()!.lotKitTemporaryCount }}</strong>
+        <span>{{ report()!.lotKitMigratedCount }} migrados · {{ report()!.lotKitPendingCount }} pendientes</span>
+      </mat-card>
+      <mat-card>
+        <p class="eyebrow">Consumibles sin tipo</p>
+        <strong>{{ report()!.untypedConsumableCount }}</strong>
+        <span>Necesitan clase fungible y subtipo</span>
+      </mat-card>
+      <mat-card>
+        <p class="eyebrow">Cuarentena</p>
+        <strong>{{ report()!.quarantineCount }}</strong>
+        <span>No migrar todavía</span>
+      </mat-card>
+    </section>
+
+    <section class="cleanup-section">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Lote / Kit (temporal)</p>
+          <h2>Pendientes</h2>
+        </div>
+        <span>{{ report()!.lotKitPendingCount }} ítems</span>
+      </div>
+      <div class="cleanup-table">
+        <div class="cleanup-row head">
+          <span>IT</span>
+          <span>Nombre</span>
+          <span>Tags</span>
+          <span>Clase actual</span>
+          <span>Sugerencia</span>
+        </div>
+        @for (item of report()!.lotKitPending; track item.id) {
+          <a class="cleanup-row" [routerLink]="['/item', item.id]">
+            <span>{{ item.code | inventoryCode }}</span>
+            <strong>{{ item.name }}</strong>
+            <mat-chip-set>
+              @for (tag of item.tags; track tag) {
+                <mat-chip>{{ tag }}</mat-chip>
+              }
+            </mat-chip-set>
+            <span>{{ classLabel(item) }}</span>
+            <small>{{ item.suggestion || '-' }}</small>
+          </a>
+        } @empty {
+          <div class="empty-row">Sin pendientes.</div>
+        }
+      </div>
+    </section>
+
+    <section class="cleanup-section">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Consumibles</p>
+          <h2>Sin tipo</h2>
+        </div>
+        <span>{{ report()!.untypedConsumableCount }} ítems</span>
+      </div>
+      <div class="cleanup-table consumables">
+        <div class="cleanup-row head">
+          <span>IT</span>
+          <span>Nombre</span>
+          <span>Cantidad</span>
+          <span>Contenedor</span>
+          <span>Tags</span>
+          <span>Sugerencia</span>
+        </div>
+        @for (item of report()!.untypedConsumables; track item.id) {
+          <a class="cleanup-row" [routerLink]="['/item', item.id]">
+            <span>{{ item.code | inventoryCode }}</span>
+            <strong>{{ item.name }}</strong>
+            <span>{{ item.quantityLabel }}</span>
+            <span>{{ item.boxPath || 'Sin caja' }}</span>
+            <mat-chip-set>
+              @for (tag of item.tags; track tag) {
+                <mat-chip>{{ tag }}</mat-chip>
+              }
+            </mat-chip-set>
+            <small>{{ item.suggestion || '-' }}</small>
+          </a>
+        } @empty {
+          <div class="empty-row">Sin consumibles pendientes.</div>
+        }
+      </div>
+    </section>
+
+    <section class="cleanup-section">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Cuarentena</p>
+          <h2>No migrar</h2>
+        </div>
+        <span>{{ report()!.quarantineCount }} ítems</span>
+      </div>
+      <div class="cleanup-table quarantine">
+        <div class="cleanup-row head">
+          <span>IT</span>
+          <span>Nombre</span>
+          <span>Tags</span>
+          <span>Clase actual</span>
+        </div>
+        @for (item of report()!.quarantineItems; track item.id) {
+          <a class="cleanup-row" [routerLink]="['/item', item.id]">
+            <span>{{ item.code | inventoryCode }}</span>
+            <strong>{{ item.name }}</strong>
+            <mat-chip-set>
+              @for (tag of item.tags; track tag) {
+                <mat-chip>{{ tag }}</mat-chip>
+              }
+            </mat-chip-set>
+            <span>{{ classLabel(item) }}</span>
+          </a>
+        } @empty {
+          <div class="empty-row">Sin cuarentena.</div>
+        }
+      </div>
+    </section>
+  }
+</main>
