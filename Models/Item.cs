@@ -20,6 +20,7 @@ public class Item
     public bool Sentimental { get; set; }
     public bool Obsolete { get; set; }
     public bool Consumable { get; set; }
+    public bool IsQuarantined { get; set; }
     public decimal? MinQuantity { get; set; }
     public string? Unit { get; set; }
     public string? Notes { get; set; }

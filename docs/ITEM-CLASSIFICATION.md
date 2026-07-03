@@ -10,7 +10,7 @@ Los tags siguen siendo atributos transversales múltiples. No sustituyen a `Item
 
 La categoría queda como clasificación/navegación heredada.
 
-Estados como `Cuarentena` no deben mezclarse con clase ni con `InventoryMode`; deben migrar a estado o booleano específico cuando se aborde esa fase.
+`Cuarentena` no es tag, clase ni subtipo. Es el flag booleano `Item.IsQuarantined`. Si aparecen ítems con tag legacy `Cuarentena`, el diagnóstico de clasificación debe tratarlos como deuda de migración, no como verdad operativa.
 
 No usar `Subcategoría` para este modelo. Usar `Subtipo`.
 
@@ -18,7 +18,9 @@ No usar `Subcategoría` para este modelo. Usar `Subtipo`.
 
 La SPA gestiona clases y subtipos en `/settings/classes`.
 
-El informe operativo de limpieza está visible en `/cleanup/classification` y consume `/api/cleanup/item-classification`.
+Las herramientas poco frecuentes viven en Configuración > Mantenimiento (`/settings/maintenance`).
+
+El diagnóstico operativo de clasificación está visible en `/cleanup/classification` y consume `/api/cleanup/item-classification`.
 
 Endpoints mínimos:
 

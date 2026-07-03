@@ -53,8 +53,13 @@ export const routes: Routes = [
   },
   {
     path: 'cleanup/classification',
-    title: 'Limpieza de clasificación · Junkyard',
+    title: 'Diagnóstico de clasificación · Junkyard',
     loadComponent: () => import('./classification-cleanup-page.component').then((m) => m.ClassificationCleanupPageComponent)
+  },
+  {
+    path: 'settings/maintenance',
+    title: 'Mantenimiento · Junkyard',
+    loadComponent: () => import('./settings-maintenance-page.component').then((m) => m.SettingsMaintenancePageComponent)
   },
   {
     path: 'settings/classes',

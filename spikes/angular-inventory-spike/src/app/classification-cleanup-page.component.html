@@ -2,8 +2,8 @@
   <header class="cleanup-header app-page-header">
     <div>
       <p class="eyebrow">Inventario</p>
-      <h1>Limpieza de clasificación</h1>
-      <p>Informe operativo de clases, subtipos y tags temporales. Sin migración automática.</p>
+      <h1>Diagnóstico de clasificación</h1>
+      <p>Informe operativo de clases, subtipos y datos legacy. Sin migración automática.</p>
     </div>
     <div class="header-actions">
       <button mat-stroked-button type="button" (click)="reload()" [disabled]="loading()">
@@ -42,10 +42,23 @@
       <mat-card>
         <p class="eyebrow">Cuarentena</p>
         <strong>{{ report()!.quarantineCount }}</strong>
-        <span>No migrar todavía</span>
+        <span>{{ report()!.quarantineCount ? 'Legacy pendiente de retirar' : 'Migrada a flag' }}</span>
       </mat-card>
     </section>
 
+    <section class="block-filter">
+      <button mat-stroked-button type="button" [class.active]="activeBlock() === 'lotKit'" (click)="setBlock('lotKit')">
+        Lote / Kit temporal
+      </button>
+      <button mat-stroked-button type="button" [class.active]="activeBlock() === 'untyped'" (click)="setBlock('untyped')">
+        Consumibles sin tipo
+      </button>
+      <button mat-stroked-button type="button" [class.active]="activeBlock() === 'quarantine'" (click)="setBlock('quarantine')">
+        Cuarentena legacy
+      </button>
+    </section>
+
+    @if (activeBlock() === 'lotKit') {
     <section class="cleanup-section">
       <div class="section-head">
         <div>
@@ -79,7 +92,9 @@
         }
       </div>
     </section>
+    }
 
+    @if (activeBlock() === 'untyped') {
     <section class="cleanup-section">
       <div class="section-head">
         <div>
@@ -108,19 +123,21 @@
                 <mat-chip>{{ tag }}</mat-chip>
               }
             </mat-chip-set>
-            <small>{{ item.suggestion || '-' }}</small>
+            <small [class.priority-suggestion]="isPriorityBatterySuggestion(item)">{{ item.suggestion || '-' }}</small>
           </a>
         } @empty {
           <div class="empty-row">Sin consumibles pendientes.</div>
         }
       </div>
     </section>
+    }
 
+    @if (activeBlock() === 'quarantine') {
     <section class="cleanup-section">
       <div class="section-head">
         <div>
           <p class="eyebrow">Cuarentena</p>
-          <h2>No migrar</h2>
+          <h2>Legacy pendiente</h2>
         </div>
         <span>{{ report()!.quarantineCount }} ítems</span>
       </div>
@@ -143,9 +160,10 @@
             <span>{{ classLabel(item) }}</span>
           </a>
         } @empty {
-          <div class="empty-row">Sin cuarentena.</div>
+          <div class="empty-row">Cuarentena migrada a flag. No quedan ítems dependiendo del tag legacy.</div>
         }
       </div>
     </section>
+    }
   }
 </main>

@@ -56,6 +56,8 @@ export class SettingsClassesPageComponent {
   protected readonly message = signal<string | null>(null);
   protected readonly classDraft = signal<ClassDraft>(this.emptyClassDraft());
   protected readonly subtypeDraft = signal<SubtypeDraft>(this.emptySubtypeDraft(null));
+  protected readonly colorEditorOpen = signal(false);
+  protected readonly subtypeEditorOpen = signal(false);
   protected readonly inventoryModes: InventoryMode[] = ['Individual', 'Fungible', 'Kit', 'Lot'];
 
   protected readonly selectedClass = computed(() =>
@@ -81,8 +83,12 @@ export class SettingsClassesPageComponent {
         this.classes.set(classes.itemClasses);
         this.subtypes.set(subtypes.itemSubtypes);
         const currentId = this.selectedClassId();
-        this.selectedClassId.set(classes.itemClasses.some((itemClass) => itemClass.id === currentId) ? currentId : classes.itemClasses[0]?.id ?? null);
-        this.subtypeDraft.set(this.emptySubtypeDraft(this.selectedClassId()));
+        const nextClass = classes.itemClasses.find((itemClass) => itemClass.id === currentId) ?? classes.itemClasses[0] ?? null;
+        if (nextClass) {
+          this.editClass(nextClass);
+        } else {
+          this.startCreateClass();
+        }
       }),
       catchError((error: unknown) => {
         this.error.set(this.describeError(error, 'No se pudieron cargar clases y subtipos.'));
@@ -94,19 +100,27 @@ export class SettingsClassesPageComponent {
   }
 
   protected selectClass(itemClass: ItemClass): void {
-    this.selectedClassId.set(itemClass.id);
-    this.editingSubtypeId.set(null);
-    this.subtypeDraft.set(this.emptySubtypeDraft(itemClass.id));
+    this.editClass(itemClass);
   }
 
   protected startCreateClass(): void {
+    this.selectedClassId.set(null);
     this.editingClassId.set(null);
+    this.editingSubtypeId.set(null);
+    this.subtypeEditorOpen.set(false);
+    this.colorEditorOpen.set(false);
     this.classDraft.set(this.emptyClassDraft());
+    this.subtypeDraft.set(this.emptySubtypeDraft(null));
+    this.error.set(null);
     this.message.set(null);
   }
 
   protected editClass(itemClass: ItemClass): void {
+    this.selectedClassId.set(itemClass.id);
     this.editingClassId.set(itemClass.id);
+    this.editingSubtypeId.set(null);
+    this.subtypeEditorOpen.set(false);
+    this.colorEditorOpen.set(false);
     this.classDraft.set({
       name: itemClass.name,
       inventoryMode: itemClass.inventoryMode,
@@ -150,14 +164,27 @@ export class SettingsClassesPageComponent {
   }
 
   protected startCreateSubtype(): void {
+    if (!this.selectedClassId()) {
+      this.error.set('Selecciona una clase antes de crear un subtipo.');
+      return;
+    }
     this.editingSubtypeId.set(null);
     this.subtypeDraft.set(this.emptySubtypeDraft(this.selectedClassId()));
+    this.subtypeEditorOpen.set(true);
     this.message.set(null);
+  }
+
+  protected cancelSubtypeEdit(): void {
+    this.editingSubtypeId.set(null);
+    this.subtypeDraft.set(this.emptySubtypeDraft(this.selectedClassId()));
+    this.subtypeEditorOpen.set(false);
+    this.error.set(null);
   }
 
   protected editSubtype(subtype: ItemSubtype): void {
     this.selectedClassId.set(subtype.itemClassId);
     this.editingSubtypeId.set(subtype.id);
+    this.subtypeEditorOpen.set(true);
     this.subtypeDraft.set({
       itemClassId: subtype.itemClassId,
       name: subtype.name,
@@ -213,9 +240,22 @@ export class SettingsClassesPageComponent {
     return mode === 'Lot' ? 'Lote' : mode;
   }
 
+  protected modeHelp(mode: InventoryMode): string {
+    switch (mode) {
+      case 'Individual':
+        return 'Ítem trazable uno a uno.';
+      case 'Fungible':
+        return 'Stock agregable por subtipo.';
+      case 'Kit':
+        return 'Conjunto funcional.';
+      case 'Lot':
+        return 'Lote agrupado.';
+    }
+  }
+
   protected classUsageHint(itemClass: ItemClass): string {
     const count = this.subtypes().filter((subtype) => subtype.itemClassId === itemClass.id).length;
-    return `${count} subtipos`;
+    return `${count} subtipos · ${itemClass.itemCount} ítems`;
   }
 
   protected patchClassDraft(patch: Partial<ClassDraft>): void {
@@ -234,6 +274,7 @@ export class SettingsClassesPageComponent {
         this.classes.update((current) => this.sortClasses([...current.filter((row) => row.id !== itemClass.id), itemClass]));
         this.selectedClassId.set(itemClass.id);
         this.editingClassId.set(itemClass.id);
+        this.colorEditorOpen.set(false);
         this.message.set(success);
       }),
       catchError((error: unknown) => {
@@ -254,6 +295,7 @@ export class SettingsClassesPageComponent {
         this.subtypes.update((current) => this.sortSubtypes([...current.filter((row) => row.id !== subtype.id), subtype]));
         this.selectedClassId.set(subtype.itemClassId);
         this.editingSubtypeId.set(subtype.id);
+        this.subtypeEditorOpen.set(false);
         this.message.set(success);
       }),
       catchError((error: unknown) => {

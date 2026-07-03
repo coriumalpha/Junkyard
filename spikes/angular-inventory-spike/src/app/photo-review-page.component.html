@@ -198,6 +198,9 @@
               <mat-label>Descripción</mat-label>
               <textarea matInput rows="4" [ngModel]="draftNotes()" (ngModelChange)="draftNotes.set($event)"></textarea>
             </mat-form-field>
+            <mat-slide-toggle [checked]="draftIsQuarantined()" (change)="draftIsQuarantined.set($event.checked)">
+              En cuarentena
+            </mat-slide-toggle>
             <button mat-flat-button type="button" (click)="createItem()" [disabled]="busy()">Crear y asignar</button>
           </mat-card>
         }

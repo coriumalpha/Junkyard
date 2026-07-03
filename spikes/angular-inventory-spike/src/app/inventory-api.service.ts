@@ -16,6 +16,7 @@ export interface InventoryQueryState {
   onlyConsumable: boolean;
   onlyOrphans: boolean;
   onlyUntagged: boolean;
+  onlyQuarantined: boolean;
   layout: InventoryLayoutMode;
   view: InventoryViewMode;
 }
@@ -32,6 +33,7 @@ export interface InventoryLiveResponse {
   onlyConsumable: boolean;
   onlyOrphans: boolean;
   onlyUntagged: boolean;
+  onlyQuarantined: boolean;
   viewMode: InventoryViewMode;
   selectedBoxes: InventorySelectedBox[];
   selectedBox: InventoryContext | null;
@@ -116,6 +118,7 @@ export interface ItemClass {
   icon: string | null;
   sortOrder: number | null;
   isActive: boolean;
+  itemCount: number;
 }
 
 export interface ItemClassUpdate {
@@ -138,6 +141,7 @@ export interface ItemSubtype {
   description: string | null;
   sortOrder: number | null;
   isActive: boolean;
+  itemCount: number;
 }
 
 export interface ItemSubtypeUpdate {
@@ -256,6 +260,7 @@ export interface InventoryItem {
   quantityLabel: string;
   generatedLabel: string | null;
   consumable: boolean;
+  isQuarantined: boolean;
   lowStock: boolean;
   sentimental: boolean;
   obsolete: boolean;
@@ -348,6 +353,7 @@ export interface InventoryItemDetail {
   retention: string | null;
   notes: string | null;
   consumable: boolean;
+  isQuarantined: boolean;
   lowStock: boolean;
   sentimental: boolean;
   obsolete: boolean;
@@ -374,6 +380,7 @@ export interface InventoryItemUpdate {
   condition: string;
   retention: string;
   consumable: boolean;
+  isQuarantined: boolean;
   sentimental: boolean;
   obsolete: boolean;
   notes: string;
@@ -552,6 +559,7 @@ export interface PhotoReviewCreateItem {
   notes: string;
   quantity: number;
   unit: string;
+  isQuarantined: boolean;
   tagIds: number[];
 }
 
@@ -625,8 +633,12 @@ export class InventoryApiService {
       params = params.set('onlyOrphans', 'true');
     }
 
-    if (state.onlyUntagged) {
+  if (state.onlyUntagged) {
       params = params.set('onlyUntagged', 'true');
+    }
+
+    if (state.onlyQuarantined) {
+      params = params.set('onlyQuarantined', 'true');
     }
 
     params = params.set('view', state.view);

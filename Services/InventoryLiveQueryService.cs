@@ -53,6 +53,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.Retention,
             item.Notes,
             item.Consumable,
+            item.IsQuarantined,
             item.MinQuantity != null && item.Quantity <= item.MinQuantity,
             item.Sentimental,
             item.Obsolete,
@@ -145,6 +146,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         item.Condition = string.IsNullOrWhiteSpace(condition) ? null : condition;
         item.Retention = string.IsNullOrWhiteSpace(input.Retention) ? null : input.Retention.Trim();
         item.Consumable = input.Consumable;
+        item.IsQuarantined = input.IsQuarantined;
         item.Sentimental = input.Sentimental;
         item.Obsolete = input.Obsolete;
         item.Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim();
@@ -487,7 +489,9 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         const string quarantineTagName = "Cuarentena";
 
         var lotKitItems = await ItemsWithTagAsync(lotKitTagName, cancellationToken);
-        var quarantineItems = await ItemsWithTagAsync(quarantineTagName, cancellationToken);
+        var quarantineLegacyItems = (await ItemsWithTagAsync(quarantineTagName, cancellationToken))
+            .Where(item => !item.IsQuarantined)
+            .ToList();
         var untypedConsumables = await db.Items.AsNoTracking()
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
             .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
@@ -512,8 +516,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             migrated.Count,
             pending.Count,
             pending,
-            quarantineItems.Count,
-            quarantineItems.Select(item => ToCleanupItemDto(item, "Migración futura: estado/booleano IsQuarantined, no ItemClass.")).ToList(),
+            quarantineLegacyItems.Count,
+            quarantineLegacyItems.Select(item => ToCleanupItemDto(item, "Legacy pendiente: activar flag IsQuarantined y retirar tag Cuarentena.")).ToList(),
             untypedConsumables.Count,
             untypedConsumables.Select(item => ToCleanupItemDto(item, SuggestConsumableClassification(item))).ToList());
     }
@@ -1061,6 +1065,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             Category = tags.OrderBy(tag => tag.Name).FirstOrDefault()?.Name ?? "",
             Quantity = input.Quantity <= 0 ? 1 : input.Quantity,
             Unit = string.IsNullOrWhiteSpace(input.Unit) ? "uds" : input.Unit.Trim(),
+            IsQuarantined = input.IsQuarantined,
             Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim()
         };
         foreach (var tag in tags.OrderBy(tag => tag.Name))
@@ -1405,7 +1410,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 itemClass.Color,
                 itemClass.Icon,
                 itemClass.SortOrder,
-                itemClass.IsActive))
+                itemClass.IsActive,
+                itemClass.Items.Count))
             .ToListAsync(cancellationToken);
         var itemSubtypes = await db.ItemSubtypes.AsNoTracking()
             .Where(subtype => subtype.IsActive && subtype.ItemClass.IsActive)
@@ -1422,7 +1428,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 subtype.TargetStock,
                 subtype.Description,
                 subtype.SortOrder,
-                subtype.IsActive))
+                subtype.IsActive,
+                subtype.Items.Count))
             .ToListAsync(cancellationToken);
 
         var locations = await db.Locations.AsNoTracking()
@@ -1476,7 +1483,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 itemClass.Color,
                 itemClass.Icon,
                 itemClass.SortOrder,
-                itemClass.IsActive))
+                itemClass.IsActive,
+                itemClass.Items.Count))
             .ToListAsync(cancellationToken);
 
         return new ItemClassesResponseDto(classes);
@@ -1509,7 +1517,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 subtype.TargetStock,
                 subtype.Description,
                 subtype.SortOrder,
-                subtype.IsActive))
+                subtype.IsActive,
+                subtype.Items.Count))
             .ToListAsync(cancellationToken);
 
         return new ItemSubtypesResponseDto(subtypes);
@@ -1527,6 +1536,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         bool onlyConsumable,
         bool onlyOrphans,
         bool onlyUntagged,
+        bool onlyQuarantined,
         string? view,
         CancellationToken cancellationToken)
     {
@@ -1657,6 +1667,11 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             query = query.Where(i => !i.ItemTags.Any());
         }
 
+        if (onlyQuarantined)
+        {
+            query = query.Where(i => i.IsQuarantined);
+        }
+
         if (!string.IsNullOrWhiteSpace(categoryValue))
         {
             query = query.Where(i => i.Category == categoryValue);
@@ -1764,6 +1779,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             onlyConsumable,
             onlyOrphans,
             onlyUntagged,
+            onlyQuarantined,
             viewMode,
             selectedBoxes.Select(boxSelection => new InventorySelectedBoxDto(
                 boxSelection.Id,
@@ -1827,6 +1843,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             $"{item.Quantity} {item.Unit}",
             string.IsNullOrWhiteSpace(item.CoverPhoto) ? item.Name[..Math.Min(1, item.Name.Length)] : null,
             item.Consumable,
+            item.IsQuarantined,
             item.MinQuantity != null && item.Quantity <= item.MinQuantity,
             item.Sentimental,
             item.Obsolete);
@@ -2396,6 +2413,7 @@ public record InventoryLiveResponseDto(
     bool OnlyConsumable,
     bool OnlyOrphans,
     bool OnlyUntagged,
+    bool OnlyQuarantined,
     string ViewMode,
     List<InventorySelectedBoxDto> SelectedBoxes,
     InventoryContextDto? SelectedBox,
@@ -2436,6 +2454,7 @@ public record InventoryItemDetailDto(
     string? Retention,
     string? Notes,
     bool Consumable,
+    bool IsQuarantined,
     bool LowStock,
     bool Sentimental,
     bool Obsolete,
@@ -2461,6 +2480,7 @@ public record InventoryItemUpdateDto(
     string? Condition,
     string? Retention,
     bool Consumable,
+    bool IsQuarantined,
     bool Sentimental,
     bool Obsolete,
     string? Notes,
@@ -2587,6 +2607,7 @@ public record PhotoReviewCreateItemDto(
     string? Notes,
     decimal Quantity,
     string? Unit,
+    bool IsQuarantined,
     List<int>? TagIds);
 
 public record PhotoReviewUndoDto(List<int>? Ids);
@@ -2738,6 +2759,7 @@ public record InventoryItemDto(
     string QuantityLabel,
     string? GeneratedLabel,
     bool Consumable,
+    bool IsQuarantined,
     bool LowStock,
     bool Sentimental,
     bool Obsolete);
@@ -2788,7 +2810,8 @@ public record ItemClassDto(
     string? Color,
     string? Icon,
     int? SortOrder,
-    bool IsActive);
+    bool IsActive,
+    int ItemCount);
 
 public record ItemSubtypeDto(
     int Id,
@@ -2799,7 +2822,8 @@ public record ItemSubtypeDto(
     decimal? TargetStock,
     string? Description,
     int? SortOrder,
-    bool IsActive);
+    bool IsActive,
+    int ItemCount);
 
 public record TagUpdateDto(string? Name, string? Color);
 

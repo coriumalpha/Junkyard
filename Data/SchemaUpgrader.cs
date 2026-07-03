@@ -27,8 +27,10 @@ public static class SchemaUpgrader
         EnsureInventoryActions(db);
         AddColumn(db, "Items", "ItemClassId", "INTEGER NULL");
         AddColumn(db, "Items", "ItemSubtypeId", "INTEGER NULL");
+        AddColumn(db, "Items", "IsQuarantined", "INTEGER NOT NULL DEFAULT 0");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_ItemClassId" ON "Items" ("ItemClassId");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_ItemSubtypeId" ON "Items" ("ItemSubtypeId");""");
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_IsQuarantined" ON "Items" ("IsQuarantined");""");
         AddColumn(db, "InventoryActions", "Kind", "TEXT NOT NULL DEFAULT 'Task'");
         EnsurePhotoInbox(db);
         AddColumn(db, "PhotoInboxes", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");
@@ -38,6 +40,8 @@ public static class SchemaUpgrader
         db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Items_Code_Active" ON "Items" ("Code") WHERE "ArchivedAt" IS NULL AND "Code" IS NOT NULL AND trim("Code") <> '';""");
         NormalizeContainerTypes(db);
         BackfillCategoryTags(db);
+        BackfillQuarantineFlag(db);
+        CleanupItemClassificationTestData(db);
         BackfillItemConditions(db);
         BackfillTimestamps(db);
         BackfillBoxCoverPhotos(db);
@@ -188,6 +192,78 @@ public static class SchemaUpgrader
             FROM "Items" i
             JOIN "Tags" t ON t."Name" = trim(i."Category")
             WHERE i."Category" IS NOT NULL AND trim(i."Category") <> '';
+            """);
+    }
+
+    private static void BackfillQuarantineFlag(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            UPDATE "Items"
+            SET "IsQuarantined" = 1
+            WHERE "Id" IN (
+                SELECT it."ItemId"
+                FROM "ItemTags" it
+                JOIN "Tags" t ON t."Id" = it."TagId"
+                WHERE t."Name" = 'Cuarentena'
+            )
+            OR "Code" IN ('IT-000-045', 'IT-000-154', 'IT-000-278');
+            """);
+
+        db.Database.ExecuteSqlRaw("""
+            DELETE FROM "ItemTags"
+            WHERE "TagId" IN (SELECT "Id" FROM "Tags" WHERE "Name" = 'Cuarentena')
+            AND "ItemId" IN (SELECT "Id" FROM "Items" WHERE "IsQuarantined" = 1);
+            """);
+    }
+
+    private static void CleanupItemClassificationTestData(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            UPDATE "Items"
+            SET "ItemSubtypeId" = NULL
+            WHERE "ItemSubtypeId" IN (
+                SELECT s."Id"
+                FROM "ItemSubtypes" s
+                JOIN "ItemClasses" c ON c."Id" = s."ItemClassId"
+                WHERE c."Name" = 'Prueba' OR s."Name" = 'Subtipo prueba'
+            );
+            """);
+
+        db.Database.ExecuteSqlRaw("""
+            UPDATE "Items"
+            SET "ItemClassId" = NULL
+            WHERE "ItemClassId" IN (SELECT "Id" FROM "ItemClasses" WHERE "Name" = 'Prueba');
+            """);
+
+        db.Database.ExecuteSqlRaw("""
+            DELETE FROM "ItemTags"
+            WHERE "ItemId" = (SELECT "Id" FROM "Items" WHERE "Code" = 'IT-000-190')
+            AND "TagId" = (SELECT "Id" FROM "Tags" WHERE "Name" = 'Lote / Kit (temporal)');
+            """);
+
+        db.Database.ExecuteSqlRaw("""
+            DELETE FROM "ItemSubtypes"
+            WHERE ("Name" = 'Subtipo prueba' OR "ItemClassId" IN (SELECT "Id" FROM "ItemClasses" WHERE "Name" = 'Prueba'))
+            AND "Id" NOT IN (SELECT DISTINCT "ItemSubtypeId" FROM "Items" WHERE "ItemSubtypeId" IS NOT NULL);
+            """);
+
+        db.Database.ExecuteSqlRaw("""
+            DELETE FROM "ItemClasses"
+            WHERE "Name" = 'Prueba'
+            AND "Id" NOT IN (SELECT DISTINCT "ItemClassId" FROM "Items" WHERE "ItemClassId" IS NOT NULL)
+            AND "Id" NOT IN (SELECT DISTINCT "ItemClassId" FROM "ItemSubtypes");
+            """);
+
+        db.Database.ExecuteSqlRaw("""
+            UPDATE "ItemClasses"
+            SET "IsActive" = 0
+            WHERE "Name" = 'Prueba';
+            """);
+
+        db.Database.ExecuteSqlRaw("""
+            UPDATE "ItemSubtypes"
+            SET "IsActive" = 0
+            WHERE "Name" = 'Subtipo prueba';
             """);
     }
 

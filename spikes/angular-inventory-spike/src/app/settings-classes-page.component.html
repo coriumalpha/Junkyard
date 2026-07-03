@@ -7,7 +7,7 @@
     </div>
     <a mat-stroked-button routerLink="/cleanup/classification">
       <mat-icon>fact_check</mat-icon>
-      Limpieza
+      Diagnóstico
     </a>
   </header>
 
@@ -34,7 +34,7 @@
       <mat-card class="class-list-card">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">ItemClass</p>
+            <p class="eyebrow">Clases</p>
             <h2>Clases</h2>
           </div>
           <button mat-flat-button type="button" (click)="startCreateClass()" [disabled]="saving()">
@@ -70,14 +70,12 @@
         <div class="panel-head">
           <div>
             <p class="eyebrow">Edición</p>
-            <h2>{{ editingClassId() ? 'Editar clase' : 'Nueva clase' }}</h2>
+            <h2>{{ editingClassId() ? 'Editar clase: ' + (selectedClass()?.name || classDraft().name) : 'Nueva clase' }}</h2>
           </div>
-          @if (selectedClass()) {
-            <button mat-stroked-button type="button" (click)="editClass(selectedClass()!)" [disabled]="saving()">
-              <mat-icon>edit</mat-icon>
-              Cargar seleccionada
-            </button>
-          }
+          <button mat-stroked-button type="button" (click)="startCreateClass()" [disabled]="saving()">
+            <mat-icon>add</mat-icon>
+            Nueva clase
+          </button>
         </div>
 
         <div class="form-grid">
@@ -92,16 +90,27 @@
                 <mat-option [value]="mode">{{ modeLabel(mode) }}</mat-option>
               }
             </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Icono</mat-label>
-            <input matInput [ngModel]="classDraft().icon" (ngModelChange)="patchClassDraft({ icon: $event })" />
+            <mat-hint>{{ modeHelp(classDraft().inventoryMode) }}</mat-hint>
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Orden</mat-label>
             <input matInput type="number" [ngModel]="classDraft().sortOrder" (ngModelChange)="patchClassDraft({ sortOrder: $event === '' ? null : +$event })" />
           </mat-form-field>
-          <app-color-picker label="Color" [value]="classDraft().color || '#48ffb0'" (valueChange)="patchClassDraft({ color: $event })" />
+          <div class="appearance-row wide">
+            <button mat-stroked-button type="button" class="color-summary" (click)="colorEditorOpen.set(!colorEditorOpen())">
+              <span class="class-swatch small" [style.background]="classDraft().color || '#48ffb0'">
+                <mat-icon>{{ classDraft().icon || 'category' }}</mat-icon>
+              </span>
+              Color e icono
+            </button>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Icono</mat-label>
+              <input matInput [ngModel]="classDraft().icon" (ngModelChange)="patchClassDraft({ icon: $event })" />
+            </mat-form-field>
+          </div>
+          @if (colorEditorOpen()) {
+            <app-color-picker label="Color" [value]="classDraft().color || '#48ffb0'" (valueChange)="patchClassDraft({ color: $event })" />
+          }
           <mat-slide-toggle [ngModel]="classDraft().isActive" (ngModelChange)="patchClassDraft({ isActive: $event })">Activa</mat-slide-toggle>
           <mat-form-field appearance="outline" class="wide">
             <mat-label>Descripción</mat-label>
@@ -110,7 +119,7 @@
         </div>
 
         <div class="edit-actions">
-          <button mat-stroked-button type="button" (click)="startCreateClass()" [disabled]="saving()">Limpiar</button>
+          <button mat-stroked-button type="button" (click)="editingClassId() && selectedClass() ? editClass(selectedClass()!) : startCreateClass()" [disabled]="saving()">Cancelar cambios</button>
           @if (editingClassId() && selectedClass()) {
             <button mat-stroked-button type="button" (click)="toggleClass(selectedClass()!)" [disabled]="saving()">
               <mat-icon>{{ selectedClass()!.isActive ? 'toggle_off' : 'toggle_on' }}</mat-icon>
@@ -124,8 +133,8 @@
       <mat-card class="subtype-card">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">ItemSubtype</p>
-            <h2>{{ selectedClass()?.name || 'Selecciona clase' }}</h2>
+            <p class="eyebrow">Subtipos</p>
+            <h2>{{ selectedClass()?.name || 'Selecciona una clase' }}</h2>
           </div>
           <button mat-flat-button type="button" (click)="startCreateSubtype()" [disabled]="!selectedClassId() || saving()">
             <mat-icon>add</mat-icon>
@@ -138,7 +147,7 @@
             <div class="subtype-row" [class.inactive]="!subtype.isActive">
               <div>
                 <strong>{{ subtype.name }}</strong>
-                <small>{{ subtype.unit || 'sin unidad' }} · min {{ subtype.minStock ?? '-' }} · objetivo {{ subtype.targetStock ?? '-' }}</small>
+                <small>{{ subtype.unit || 'sin unidad' }} · min {{ subtype.minStock ?? '-' }} · objetivo {{ subtype.targetStock ?? '-' }} · {{ subtype.itemCount }} ítems</small>
               </div>
               @if (!subtype.isActive) {
                 <span class="status-pill">Inactivo</span>
@@ -156,61 +165,63 @@
           } @empty {
             <section class="state-panel empty">
               <mat-icon>label</mat-icon>
-              <span>Sin subtipos para esta clase.</span>
+              <span>{{ selectedClassId() ? 'Sin subtipos para esta clase.' : 'Selecciona una clase para ver sus subtipos.' }}</span>
             </section>
           }
         </div>
       </mat-card>
 
-      <mat-card class="editor-card subtype-editor">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">Edición</p>
-            <h2>{{ editingSubtypeId() ? 'Editar subtipo' : 'Nuevo subtipo' }}</h2>
+      @if (subtypeEditorOpen()) {
+        <mat-card class="editor-card subtype-editor">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Subtipo</p>
+              <h2>{{ editingSubtypeId() ? 'Editar subtipo' : 'Nuevo subtipo' }}</h2>
+            </div>
           </div>
-        </div>
 
-        <div class="form-grid">
-          <mat-form-field appearance="outline">
-            <mat-label>Clase</mat-label>
-            <mat-select [ngModel]="subtypeDraft().itemClassId" (ngModelChange)="patchSubtypeDraft({ itemClassId: $event })">
-              @for (itemClass of classes(); track itemClass.id) {
-                <mat-option [value]="itemClass.id">{{ itemClass.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Nombre</mat-label>
-            <input matInput [ngModel]="subtypeDraft().name" (ngModelChange)="patchSubtypeDraft({ name: $event })" />
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Unidad</mat-label>
-            <input matInput [ngModel]="subtypeDraft().unit" (ngModelChange)="patchSubtypeDraft({ unit: $event })" />
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Orden</mat-label>
-            <input matInput type="number" [ngModel]="subtypeDraft().sortOrder" (ngModelChange)="patchSubtypeDraft({ sortOrder: $event === '' ? null : +$event })" />
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Stock mínimo</mat-label>
-            <input matInput type="number" [ngModel]="subtypeDraft().minStock" (ngModelChange)="patchSubtypeDraft({ minStock: $event === '' ? null : +$event })" />
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Stock objetivo</mat-label>
-            <input matInput type="number" [ngModel]="subtypeDraft().targetStock" (ngModelChange)="patchSubtypeDraft({ targetStock: $event === '' ? null : +$event })" />
-          </mat-form-field>
-          <mat-slide-toggle [ngModel]="subtypeDraft().isActive" (ngModelChange)="patchSubtypeDraft({ isActive: $event })">Activo</mat-slide-toggle>
-          <mat-form-field appearance="outline" class="wide">
-            <mat-label>Descripción</mat-label>
-            <textarea matInput rows="3" [ngModel]="subtypeDraft().description" (ngModelChange)="patchSubtypeDraft({ description: $event })"></textarea>
-          </mat-form-field>
-        </div>
+          <div class="form-grid subtype-form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Clase</mat-label>
+              <mat-select [ngModel]="subtypeDraft().itemClassId" (ngModelChange)="patchSubtypeDraft({ itemClassId: $event })">
+                @for (itemClass of classes(); track itemClass.id) {
+                  <mat-option [value]="itemClass.id">{{ itemClass.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre</mat-label>
+              <input matInput [ngModel]="subtypeDraft().name" (ngModelChange)="patchSubtypeDraft({ name: $event })" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Unidad</mat-label>
+              <input matInput [ngModel]="subtypeDraft().unit" (ngModelChange)="patchSubtypeDraft({ unit: $event })" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Orden</mat-label>
+              <input matInput type="number" [ngModel]="subtypeDraft().sortOrder" (ngModelChange)="patchSubtypeDraft({ sortOrder: $event === '' ? null : +$event })" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Stock mínimo</mat-label>
+              <input matInput type="number" [ngModel]="subtypeDraft().minStock" (ngModelChange)="patchSubtypeDraft({ minStock: $event === '' ? null : +$event })" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Stock objetivo</mat-label>
+              <input matInput type="number" [ngModel]="subtypeDraft().targetStock" (ngModelChange)="patchSubtypeDraft({ targetStock: $event === '' ? null : +$event })" />
+            </mat-form-field>
+            <mat-slide-toggle [ngModel]="subtypeDraft().isActive" (ngModelChange)="patchSubtypeDraft({ isActive: $event })">Activo</mat-slide-toggle>
+            <mat-form-field appearance="outline" class="wide">
+              <mat-label>Descripción</mat-label>
+              <textarea matInput rows="3" [ngModel]="subtypeDraft().description" (ngModelChange)="patchSubtypeDraft({ description: $event })"></textarea>
+            </mat-form-field>
+          </div>
 
-        <div class="edit-actions">
-          <button mat-stroked-button type="button" (click)="startCreateSubtype()" [disabled]="saving()">Limpiar</button>
-          <button mat-flat-button type="button" (click)="saveSubtype()" [disabled]="!subtypeDraft().itemClassId || !subtypeDraft().name.trim() || saving()">Guardar subtipo</button>
-        </div>
-      </mat-card>
+          <div class="edit-actions">
+            <button mat-stroked-button type="button" (click)="cancelSubtypeEdit()" [disabled]="saving()">Cancelar</button>
+            <button mat-flat-button type="button" (click)="saveSubtype()" [disabled]="!subtypeDraft().itemClassId || !subtypeDraft().name.trim() || saving()">Guardar subtipo</button>
+          </div>
+        </mat-card>
+      }
     </section>
   }
 </main>

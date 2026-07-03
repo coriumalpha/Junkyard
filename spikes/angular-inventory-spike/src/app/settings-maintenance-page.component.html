@@ -1,0 +1,47 @@
+<main class="maintenance-shell">
+  <header class="maintenance-header app-page-header">
+    <div>
+      <p class="eyebrow">Configuración</p>
+      <h1>Mantenimiento</h1>
+      <p>Herramientas operativas poco frecuentes para revisar datos y clasificación.</p>
+    </div>
+  </header>
+
+  <section class="tool-grid">
+    <mat-card class="tool-card">
+      <mat-icon>fact_check</mat-icon>
+      <div>
+        <h2>Diagnóstico de clasificación</h2>
+        <p>Lote / Kit temporal, consumibles sin tipo y Cuarentena legacy.</p>
+      </div>
+      <a mat-flat-button routerLink="/cleanup/classification">Abrir</a>
+    </mat-card>
+
+    <mat-card class="tool-card">
+      <mat-icon>category</mat-icon>
+      <div>
+        <h2>Clases y subtipos</h2>
+        <p>CRUD de clases, modos de inventario y subtipos fungibles.</p>
+      </div>
+      <a mat-stroked-button routerLink="/settings/classes">Abrir</a>
+    </mat-card>
+
+    <mat-card class="tool-card">
+      <mat-icon>sell</mat-icon>
+      <div>
+        <h2>Tags</h2>
+        <p>Atributos transversales y tags temporales heredados.</p>
+      </div>
+      <a mat-stroked-button routerLink="/settings/tags">Abrir</a>
+    </mat-card>
+
+    <mat-card class="tool-card">
+      <mat-icon fontSet="material-symbols-outlined">database</mat-icon>
+      <div>
+        <h2>Datos</h2>
+        <p>Importación, exportación y utilidades de datos.</p>
+      </div>
+      <a mat-stroked-button routerLink="/settings/data">Abrir</a>
+    </mat-card>
+  </section>
+</main>

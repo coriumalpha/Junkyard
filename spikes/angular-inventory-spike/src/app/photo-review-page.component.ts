@@ -10,6 +10,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { InventoryApiService, InventoryItem, InventoryMode, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse, ItemClass, ItemSubtype } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
@@ -21,7 +22,7 @@ type ReviewPanel = 'none' | 'create' | 'assignItem' | 'assignBox';
 @Component({
   selector: 'app-photo-review-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
   templateUrl: './photo-review-page.component.html',
   styleUrl: './photo-review-page.component.scss'
 })
@@ -45,6 +46,7 @@ export class PhotoReviewPageComponent {
   protected readonly draftTagIds = signal<number[]>([]);
   protected readonly draftItemClassId = signal<number | null>(null);
   protected readonly draftItemSubtypeId = signal<number | null>(null);
+  protected readonly draftIsQuarantined = signal(false);
   protected readonly draftBoxId = signal<number | null>(null);
   protected readonly itemClasses = signal<ItemClass[]>([]);
   protected readonly itemSubtypes = signal<ItemSubtype[]>([]);
@@ -118,6 +120,7 @@ export class PhotoReviewPageComponent {
       onlyConsumable: false,
       onlyOrphans: false,
       onlyUntagged: false,
+      onlyQuarantined: false,
       layout: 'flat',
       view: 'flat'
     }).pipe(
@@ -172,6 +175,7 @@ export class PhotoReviewPageComponent {
       this.draftTagIds.set([]);
       this.draftItemClassId.set(null);
       this.draftItemSubtypeId.set(null);
+      this.draftIsQuarantined.set(false);
       this.itemSubtypes.set([]);
     }
 
@@ -249,6 +253,7 @@ export class PhotoReviewPageComponent {
       unit: this.draftUnit().trim(),
       itemClassId: this.draftItemClassId(),
       itemSubtypeId: this.draftItemSubtypeId(),
+      isQuarantined: this.draftIsQuarantined(),
       tagIds: this.draftTagIds()
     }), 'Ítem creado desde foto.');
   }

@@ -46,6 +46,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.Property(x => x.Category).HasMaxLength(80).IsRequired();
             entity.Property(x => x.Quantity).HasPrecision(18, 3);
             entity.Property(x => x.MinQuantity).HasPrecision(18, 3);
+            entity.Property(x => x.IsQuarantined).HasDefaultValue(false);
             entity.HasQueryFilter(x => x.ArchivedAt == null);
             entity.HasOne(x => x.Box).WithMany(x => x.Items).HasForeignKey(x => x.BoxId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(x => x.ItemClass).WithMany(x => x.Items).HasForeignKey(x => x.ItemClassId).OnDelete(DeleteBehavior.SetNull);
@@ -57,6 +58,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.HasIndex(x => x.Category);
             entity.HasIndex(x => x.ItemClassId);
             entity.HasIndex(x => x.ItemSubtypeId);
+            entity.HasIndex(x => x.IsQuarantined);
         });
 
         modelBuilder.Entity<ItemClass>(entity =>

@@ -50,7 +50,8 @@
 }
 
 .header-actions,
-.section-head {
+.section-head,
+.block-filter {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -66,6 +67,17 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.block-filter {
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+}
+
+.block-filter button.active {
+  border-color: rgba(72, 255, 176, 0.7);
+  color: #48ffb0;
+  background: rgba(72, 255, 176, 0.08);
 }
 
 .metric-grid mat-card {
@@ -127,6 +139,15 @@
 
 .cleanup-row mat-chip-set {
   min-width: 0;
+}
+
+.priority-suggestion {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #09111f;
+  background: #48ffb0;
 }
 
 .empty-row {

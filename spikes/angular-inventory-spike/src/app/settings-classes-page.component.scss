@@ -122,6 +122,18 @@
   color: #09111f;
 }
 
+.class-swatch.small {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.class-swatch.small mat-icon {
+  font-size: 19px;
+  width: 19px;
+  height: 19px;
+}
+
 .class-copy,
 .subtype-row div {
   display: grid;
@@ -158,6 +170,18 @@
 .form-grid .wide,
 .form-grid app-color-picker {
   grid-column: 1 / -1;
+}
+
+.appearance-row {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.color-summary {
+  min-height: 56px;
+  justify-content: flex-start;
 }
 
 .edit-actions {
@@ -198,6 +222,7 @@
   .settings-header,
   .class-workspace,
   .form-grid,
+  .appearance-row,
   .subtype-row {
     grid-template-columns: 1fr;
   }

@@ -98,6 +98,7 @@ export class ActionsPageComponent {
       onlyConsumable: false,
       onlyOrphans: false,
       onlyUntagged: false,
+      onlyQuarantined: false,
       layout: 'flat',
       view: 'flat'
     }).pipe(

@@ -146,6 +146,7 @@ app.MapGet("/api/inventory/live", async (
         string.Equals(query["onlyConsumable"], "true", StringComparison.OrdinalIgnoreCase),
         string.Equals(query["onlyOrphans"], "true", StringComparison.OrdinalIgnoreCase),
         string.Equals(query["onlyUntagged"], "true", StringComparison.OrdinalIgnoreCase),
+        string.Equals(query["onlyQuarantined"], "true", StringComparison.OrdinalIgnoreCase),
         query["view"].ToString(),
         cancellationToken);
 
@@ -1212,7 +1213,8 @@ static ItemClassDto ToItemClassDto(ItemClass itemClass)
         itemClass.Color,
         itemClass.Icon,
         itemClass.SortOrder,
-        itemClass.IsActive);
+        itemClass.IsActive,
+        itemClass.Items.Count);
 }
 
 static ItemSubtypeDto ToItemSubtypeDto(ItemSubtype subtype)
@@ -1226,7 +1228,8 @@ static ItemSubtypeDto ToItemSubtypeDto(ItemSubtype subtype)
         subtype.TargetStock,
         subtype.Description,
         subtype.SortOrder,
-        subtype.IsActive);
+        subtype.IsActive,
+        subtype.Items.Count);
 }
 
 static async Task<(ItemSubtype? Subtype, string? Error)> ApplySubtypeUpdateAsync(

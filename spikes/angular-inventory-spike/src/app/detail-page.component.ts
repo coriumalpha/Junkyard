@@ -305,6 +305,7 @@ export class DetailPageComponent {
       condition: item.condition ?? '',
       retention: item.retention ?? '',
       consumable: item.consumable,
+      isQuarantined: item.isQuarantined,
       sentimental: item.sentimental,
       obsolete: item.obsolete,
       notes: item.notes ?? '',
@@ -416,6 +417,7 @@ export class DetailPageComponent {
           condition: updated.condition ?? '',
           retention: updated.retention ?? '',
           consumable: updated.consumable,
+          isQuarantined: updated.isQuarantined,
           sentimental: updated.sentimental,
           obsolete: updated.obsolete,
           notes: updated.notes ?? '',
@@ -679,6 +681,9 @@ export class DetailPageComponent {
     const flags: string[] = [];
     if (item.consumable) {
       flags.push('Consumible');
+    }
+    if (item.isQuarantined) {
+      flags.push('Cuarentena');
     }
     if (item.lowStock) {
       flags.push('Bajo stock');
@@ -1168,6 +1173,7 @@ export class DetailPageComponent {
       condition: '',
       retention: '',
       consumable: false,
+      isQuarantined: false,
       sentimental: false,
       obsolete: false,
       notes: '',

@@ -66,6 +66,7 @@ const DEFAULT_STATE: InventoryQueryState = {
   onlyConsumable: false,
   onlyOrphans: false,
   onlyUntagged: false,
+  onlyQuarantined: false,
   layout: 'grouped',
   view: 'grouped'
 };
@@ -184,7 +185,7 @@ export class InventoryPageComponent {
   protected readonly shouldAutoExpandGroups = computed(() => {
     const state = this.state();
     return state.layout === 'grouped'
-      && Boolean(state.q.trim() || state.category.trim() || state.tagIds.length || state.boxIds.length || state.locationId !== null || state.onlyConsumable || state.onlyOrphans || state.onlyUntagged);
+      && Boolean(state.q.trim() || state.category.trim() || state.tagIds.length || state.boxIds.length || state.locationId !== null || state.onlyConsumable || state.onlyOrphans || state.onlyUntagged || state.onlyQuarantined);
   });
   protected readonly filteredContainers = computed(() => {
     const state = this.state();
@@ -332,6 +333,10 @@ export class InventoryPageComponent {
 
   protected setOnlyUntagged(value: boolean): void {
     this.navigate({ onlyUntagged: value });
+  }
+
+  protected setOnlyQuarantined(value: boolean): void {
+    this.navigate({ onlyQuarantined: value });
   }
 
   protected toggleEditMode(): void {
@@ -503,11 +508,19 @@ export class InventoryPageComponent {
       params.set('onlyUntagged', 'true');
     }
 
+    if (state.onlyQuarantined) {
+      params.set('onlyQuarantined', 'true');
+    }
+
     params.set('view', state.view);
     return this.backendUrl(`/items?${params.toString()}`);
   }
 
   protected badgeClass(item: InventoryItem): string {
+    if (item.isQuarantined) {
+      return 'badge warm';
+    }
+
     if (item.lowStock) {
       return 'badge low';
     }
@@ -582,6 +595,10 @@ export class InventoryPageComponent {
 
     if (state.onlyUntagged) {
       summary.push('sin tags');
+    }
+
+    if (state.onlyQuarantined) {
+      summary.push('en cuarentena');
     }
 
     summary.push(this.layoutLabel(state.layout));
@@ -769,6 +786,7 @@ export class InventoryPageComponent {
       next.onlyConsumable = false;
       next.onlyOrphans = false;
       next.onlyUntagged = false;
+      next.onlyQuarantined = false;
       next.layout = 'containers';
       next.view = 'grouped';
     }
@@ -839,6 +857,10 @@ export class InventoryPageComponent {
       params['onlyUntagged'] = 'true';
     }
 
+    if (state.onlyQuarantined) {
+      params['onlyQuarantined'] = 'true';
+    }
+
     return params;
   }
 
@@ -868,6 +890,7 @@ export class InventoryPageComponent {
       onlyConsumable: params.get('onlyConsumable') === 'true',
       onlyOrphans: params.get('onlyOrphans') === 'true',
       onlyUntagged: params.get('onlyUntagged') === 'true',
+      onlyQuarantined: params.get('onlyQuarantined') === 'true',
       layout,
       view: this.deriveBackendView(layout)
     };

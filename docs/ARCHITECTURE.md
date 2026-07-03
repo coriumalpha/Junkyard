@@ -25,6 +25,7 @@ Junkyard is a compact ASP.NET Core Razor Pages application.
 - `Location` has many top-level `Box` records.
 - `Box` can contain `Item` records and child `Box` records through `ParentBoxId`.
 - `Item` may be assigned to one box or left unboxed as an orphan.
+- `Item.IsQuarantined` marks quarantine as a boolean state, separate from tags, class and subtype.
 - `Photo` belongs to either a box or an item and stores logical rotation in `RotationDegrees`.
 - `PhotoInbox` stores uploaded photos before assignment and preserves rotation while being reviewed.
 - `ItemClass`, `InventoryMode` and `ItemSubtype` describe specialized item behavior and stock grouping. See `docs/ITEM-CLASSIFICATION.md`.
