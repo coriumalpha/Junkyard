@@ -646,6 +646,52 @@ export interface PhotoReviewCreateItem {
   tagIds: number[];
 }
 
+export interface AiStatus {
+  enabled: boolean;
+  provider: string;
+  model: string;
+  cheapModel: string;
+  hasApiKey: boolean;
+  maxImagesPerRequest: number;
+}
+
+export interface AiSuggestItemRequest {
+  photoIds: number[];
+  mode: 'cheap' | 'normal';
+  detail: 'low' | 'high';
+  userHint?: string;
+}
+
+export interface AiSuggestItemResponse {
+  suggestionId: number | null;
+  proposedName: string;
+  proposedDescription: string;
+  proposedQuantity: number | null;
+  quantityConfidence: number;
+  suggestedTags: AiSuggestedTag[];
+  suggestedNewTags: string[];
+  suggestedCategory: string | null;
+  suggestedClass: AiSuggestedChoice | null;
+  suggestedSubtype: AiSuggestedChoice | null;
+  warnings: string[];
+  model: string | null;
+  imageDetail: string | null;
+  estimatedCostInfo: string | null;
+}
+
+export interface AiSuggestedTag {
+  tagId: number | null;
+  tagName: string;
+  confidence: number;
+  reason: string;
+}
+
+export interface AiSuggestedChoice {
+  id: number;
+  name: string;
+  confidence: number;
+}
+
 export interface CsvInventoryRow {
   location: string;
   boxCode: string;
@@ -1015,6 +1061,22 @@ export class InventoryApiService {
     }
 
     return this.http.get<PhotoReviewResponse>('/api/photos/review', { params });
+  }
+
+  fetchAiStatus(): Observable<AiStatus> {
+    return this.http.get<AiStatus>('/api/ai/settings/status');
+  }
+
+  suggestReviewItem(input: AiSuggestItemRequest): Observable<AiSuggestItemResponse> {
+    return this.http.post<AiSuggestItemResponse>('/api/ai/photo-review/suggest-item', input);
+  }
+
+  acceptAiSuggestion(id: number): Observable<void> {
+    return this.http.post<void>(`/api/ai/photo-review/suggestions/${id}/accept`, {});
+  }
+
+  rejectAiSuggestion(id: number): Observable<void> {
+    return this.http.post<void>(`/api/ai/photo-review/suggestions/${id}/reject`, {});
   }
 
   rotateReviewPhotos(id: number, ids: number[], delta: number): Observable<PhotoReviewMutationResponse> {

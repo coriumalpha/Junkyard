@@ -40,6 +40,10 @@ builder.Services.AddDbContext<InventoryDbContext>(options =>
 builder.Services.AddScoped<PhotoStorage>();
 builder.Services.AddScoped<CsvInventoryService>();
 builder.Services.AddScoped<InventoryLiveQueryService>();
+builder.Services.Configure<AiOptions>(builder.Configuration.GetSection("AI"));
+builder.Services.AddScoped<AiConfiguredOptions>();
+builder.Services.AddScoped<AiItemSuggestionService>();
+builder.Services.AddHttpClient("openai");
 builder.Services.AddSingleton<QrCodeService>();
 
 var app = builder.Build();
@@ -87,6 +91,32 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", app = "Inventario" }));
+app.MapGet("/api/ai/settings/status", (AiItemSuggestionService aiService) =>
+    Results.Json(aiService.GetStatus()));
+app.MapPost("/api/ai/photo-review/suggest-item", async (
+    AiSuggestItemRequest input,
+    AiItemSuggestionService aiService,
+    CancellationToken cancellationToken) =>
+{
+    var (response, error) = await aiService.SuggestItemAsync(input, cancellationToken);
+    return error is null ? Results.Json(response) : Results.BadRequest(new { error });
+});
+app.MapPost("/api/ai/photo-review/suggestions/{id:int}/accept", async (
+    int id,
+    AiItemSuggestionService aiService,
+    CancellationToken cancellationToken) =>
+{
+    var updated = await aiService.MarkSuggestionAsync(id, true, cancellationToken);
+    return updated ? Results.NoContent() : Results.NotFound();
+});
+app.MapPost("/api/ai/photo-review/suggestions/{id:int}/reject", async (
+    int id,
+    AiItemSuggestionService aiService,
+    CancellationToken cancellationToken) =>
+{
+    var updated = await aiService.MarkSuggestionAsync(id, false, cancellationToken);
+    return updated ? Results.NoContent() : Results.NotFound();
+});
 app.MapGet("/photo-derivatives/{variant}/{**filename}", async (
     string variant,
     string filename,

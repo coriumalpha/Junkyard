@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -12,7 +13,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
-import { InventoryApiService, InventoryItem, InventoryMode, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse, ItemClass, ItemSubtype } from './inventory-api.service';
+import { AiStatus, AiSuggestItemResponse, AiSuggestedTag, InventoryApiService, InventoryItem, InventoryMode, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse, ItemClass, ItemSubtype } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
@@ -33,8 +34,12 @@ export class PhotoReviewPageComponent {
   protected readonly selectedIds = signal<number[]>([]);
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
+  protected readonly aiBusy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly message = signal<string | null>(null);
+  protected readonly aiStatus = signal<AiStatus | null>(null);
+  protected readonly aiSuggestion = signal<AiSuggestItemResponse | null>(null);
+  protected readonly aiHint = signal('');
   protected readonly panel = signal<ReviewPanel>('none');
   protected readonly lastAffectedIds = signal<number[]>([]);
   protected readonly assignBoxId = signal<number | null>(null);
@@ -87,6 +92,19 @@ export class PhotoReviewPageComponent {
       placeholder: formatInventoryCode(item.code)
     })));
   protected readonly actionSelectionSize = computed(() => this.selectedIds().length || (this.current() ? 1 : 0));
+  protected readonly aiUnavailableReason = computed(() => {
+    const status = this.aiStatus();
+    if (!status) {
+      return 'Comprobando IA...';
+    }
+    if (!status.enabled) {
+      return 'IA deshabilitada en backend.';
+    }
+    if (!status.hasApiKey) {
+      return 'Falta OPENAI_API_KEY en backend.';
+    }
+    return null;
+  });
 
   private readonly api = inject(InventoryApiService);
   private readonly route = inject(ActivatedRoute);
@@ -102,6 +120,14 @@ export class PhotoReviewPageComponent {
     this.api.fetchOptions().pipe(
       tap((options) => this.options.set(options)),
       catchError(() => EMPTY),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+    this.api.fetchAiStatus().pipe(
+      tap((status) => this.aiStatus.set(status)),
+      catchError(() => {
+        this.aiStatus.set({ enabled: false, provider: 'OpenAI', model: '', cheapModel: '', hasApiKey: false, maxImagesPerRequest: 4 });
+        return EMPTY;
+      }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
     this.api.fetchItemClasses().pipe(
@@ -177,6 +203,8 @@ export class PhotoReviewPageComponent {
       this.draftItemSubtypeId.set(null);
       this.draftIsQuarantined.set(false);
       this.itemSubtypes.set([]);
+      this.aiSuggestion.set(null);
+      this.aiHint.set('');
     }
 
     if (panel === 'assignBox') {
@@ -256,6 +284,123 @@ export class PhotoReviewPageComponent {
       isQuarantined: this.draftIsQuarantined(),
       tagIds: this.draftTagIds()
     }), 'Ítem creado desde foto.');
+  }
+
+  protected suggestWithAi(mode: 'cheap' | 'normal' = 'normal'): void {
+    const current = this.current();
+    const status = this.aiStatus();
+    if (!current || this.aiBusy()) {
+      return;
+    }
+
+    const unavailable = this.aiUnavailableReason();
+    if (unavailable) {
+      this.error.set(unavailable);
+      return;
+    }
+
+    const ids = this.selection(current.id);
+    if (status && ids.length > status.maxImagesPerRequest) {
+      this.error.set(`Máximo ${status.maxImagesPerRequest} fotos por petición IA.`);
+      return;
+    }
+
+    this.aiBusy.set(true);
+    this.error.set(null);
+    this.message.set(null);
+    this.api.suggestReviewItem({
+      photoIds: ids,
+      mode,
+      detail: 'low',
+      userHint: this.aiHint().trim() || undefined
+    }).pipe(
+      tap((suggestion) => this.aiSuggestion.set(suggestion)),
+      catchError((error: unknown) => {
+        this.error.set(this.errorMessage(error, 'No se pudo generar la sugerencia IA.'));
+        return EMPTY;
+      }),
+      finalize(() => this.aiBusy.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected applyAiName(): void {
+    const suggestion = this.aiSuggestion();
+    if (suggestion?.proposedName) {
+      this.draftName.set(suggestion.proposedName);
+    }
+  }
+
+  protected applyAiDescription(): void {
+    const suggestion = this.aiSuggestion();
+    if (suggestion?.proposedDescription) {
+      this.draftNotes.set(suggestion.proposedDescription);
+    }
+  }
+
+  protected applyAiQuantity(): void {
+    const suggestion = this.aiSuggestion();
+    if (suggestion?.proposedQuantity !== null && suggestion?.proposedQuantity !== undefined) {
+      this.draftQuantity.set(suggestion.proposedQuantity);
+    }
+  }
+
+  protected applyAiTag(tag: AiSuggestedTag): void {
+    if (!tag.tagId) {
+      return;
+    }
+
+    this.draftTagIds.update((current) => current.includes(tag.tagId!) ? current : [...current, tag.tagId!]);
+  }
+
+  protected applyAllAiTags(): void {
+    for (const tag of this.aiSuggestion()?.suggestedTags ?? []) {
+      this.applyAiTag(tag);
+    }
+  }
+
+  protected applyAiClass(): void {
+    const suggestion = this.aiSuggestion();
+    if (!suggestion?.suggestedClass) {
+      return;
+    }
+
+    this.setDraftItemClassId(suggestion.suggestedClass.id);
+    if (suggestion.suggestedSubtype) {
+      this.draftItemSubtypeId.set(suggestion.suggestedSubtype.id);
+    }
+  }
+
+  protected applyAllAi(): void {
+    this.applyAiName();
+    this.applyAiDescription();
+    this.applyAiQuantity();
+    this.applyAllAiTags();
+    this.applyAiClass();
+    this.markAiAccepted();
+  }
+
+  protected discardAiSuggestion(markRejected = true): void {
+    const id = this.aiSuggestion()?.suggestionId;
+    this.aiSuggestion.set(null);
+    if (markRejected && id) {
+      this.api.rejectAiSuggestion(id).pipe(catchError(() => EMPTY), takeUntilDestroyed(this.destroyRef)).subscribe();
+    }
+  }
+
+  protected markAiAccepted(): void {
+    const id = this.aiSuggestion()?.suggestionId;
+    if (id) {
+      this.api.acceptAiSuggestion(id).pipe(catchError(() => EMPTY), takeUntilDestroyed(this.destroyRef)).subscribe();
+    }
+  }
+
+  protected confidenceLabel(value: number | null | undefined): string {
+    if (value === null || value === undefined) {
+      return 'sin confianza';
+    }
+
+    return `${Math.round(value * 100)}%`;
   }
 
   protected setDraftItemClassId(value: number | string | null | (number | string | null)[]): void {
@@ -454,5 +599,19 @@ export class PhotoReviewPageComponent {
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
+  }
+
+  private errorMessage(error: unknown, fallback: string): string {
+    if (error instanceof HttpErrorResponse) {
+      const body = error.error as { error?: string } | string | null;
+      if (typeof body === 'string' && body.trim()) {
+        return body;
+      }
+      if (body && typeof body === 'object' && typeof body.error === 'string' && body.error.trim()) {
+        return body.error;
+      }
+    }
+
+    return error instanceof Error ? error.message : fallback;
   }
 }

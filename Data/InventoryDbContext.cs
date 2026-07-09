@@ -16,6 +16,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
     public DbSet<InventoryAction> InventoryActions => Set<InventoryAction>();
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<PhotoInbox> PhotoInboxes => Set<PhotoInbox>();
+    public DbSet<AiItemSuggestion> AiItemSuggestions => Set<AiItemSuggestion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -143,6 +144,15 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.Property(x => x.RotationDegrees).HasDefaultValue(0);
             entity.HasIndex(x => x.Status);
             entity.HasOne(x => x.SourceBox).WithMany().HasForeignKey(x => x.SourceBoxId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<AiItemSuggestion>(entity =>
+        {
+            entity.Property(x => x.PhotoIdsJson).IsRequired();
+            entity.Property(x => x.Model).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.ImageDetail).HasMaxLength(16).IsRequired();
+            entity.Property(x => x.PromptVersion).HasMaxLength(80).IsRequired();
+            entity.HasIndex(x => x.CreatedAt);
         });
     }
 

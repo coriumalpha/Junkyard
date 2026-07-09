@@ -36,6 +36,7 @@ public static class SchemaUpgrader
         AddColumn(db, "PhotoInboxes", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");
         AddColumn(db, "PhotoInboxes", "UpdatedAt", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'");
         AddColumn(db, "PhotoInboxes", "ProcessedAt", "TEXT NULL");
+        EnsureAiItemSuggestions(db);
         BackfillItemCodes(db);
         db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Items_Code_Active" ON "Items" ("Code") WHERE "ArchivedAt" IS NULL AND "Code" IS NOT NULL AND trim("Code") <> '';""");
         NormalizeContainerTypes(db);
@@ -100,6 +101,26 @@ public static class SchemaUpgrader
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_Kind" ON "InventoryActions" ("Kind");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_LinkedEntityType_LinkedEntityId" ON "InventoryActions" ("LinkedEntityType", "LinkedEntityId");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_Priority_CreatedAt" ON "InventoryActions" ("Priority", "CreatedAt");""");
+    }
+
+    private static void EnsureAiItemSuggestions(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AiItemSuggestions" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_AiItemSuggestions" PRIMARY KEY AUTOINCREMENT,
+                "CreatedAt" TEXT NOT NULL,
+                "PhotoIdsJson" TEXT NOT NULL,
+                "Model" TEXT NOT NULL,
+                "ImageDetail" TEXT NOT NULL,
+                "PromptVersion" TEXT NOT NULL,
+                "RawResponseJson" TEXT NULL,
+                "ParsedResponseJson" TEXT NULL,
+                "AcceptedAt" TEXT NULL,
+                "RejectedAt" TEXT NULL,
+                "Error" TEXT NULL
+            );
+            """);
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_AiItemSuggestions_CreatedAt" ON "AiItemSuggestions" ("CreatedAt");""");
     }
 
     private static void EnsureTags(InventoryDbContext db)

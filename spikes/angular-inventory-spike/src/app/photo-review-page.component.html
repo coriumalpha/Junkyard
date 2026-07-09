@@ -145,6 +145,117 @@
               <strong>Nuevo ítem</strong>
               <span>Ctrl+Enter crea · Esc cierra</span>
             </div>
+            <div class="ai-tool">
+              <div>
+                <strong>Varita IA</strong>
+                <span>{{ aiUnavailableReason() ?? 'Lista para analizar las fotos seleccionadas.' }}</span>
+              </div>
+              <button mat-stroked-button type="button" (click)="suggestWithAi('normal')" [disabled]="busy() || aiBusy() || !!aiUnavailableReason()">
+                @if (aiBusy()) {
+                  <mat-progress-spinner mode="indeterminate" diameter="18" />
+                } @else {
+                  <mat-icon>auto_fix_high</mat-icon>
+                }
+                Sugerir con IA
+              </button>
+            </div>
+            @if (aiBusy()) {
+              <div class="ai-loading">
+                <mat-progress-spinner mode="indeterminate" diameter="24" />
+                <span>Analizando fotos...</span>
+              </div>
+            }
+            @if (aiSuggestion()) {
+              <section class="ai-suggestion-panel">
+                <div class="panel-title-row">
+                  <strong>Propuesta IA</strong>
+                  <span>{{ aiSuggestion()!.model }} · {{ aiSuggestion()!.imageDetail }}</span>
+                </div>
+
+                <div class="ai-suggestion-field">
+                  <div>
+                    <span>Nombre</span>
+                    <strong>{{ aiSuggestion()!.proposedName || 'Sin propuesta' }}</strong>
+                  </div>
+                  <button mat-button type="button" (click)="applyAiName()" [disabled]="!aiSuggestion()!.proposedName">Usar</button>
+                </div>
+
+                <div class="ai-suggestion-field">
+                  <div>
+                    <span>Descripción</span>
+                    <p>{{ aiSuggestion()!.proposedDescription || 'Sin propuesta' }}</p>
+                  </div>
+                  <button mat-button type="button" (click)="applyAiDescription()" [disabled]="!aiSuggestion()!.proposedDescription">Usar</button>
+                </div>
+
+                <div class="ai-suggestion-field">
+                  <div>
+                    <span>Cantidad · {{ confidenceLabel(aiSuggestion()!.quantityConfidence) }}</span>
+                    <strong>{{ aiSuggestion()!.proposedQuantity ?? 'No inferida' }}</strong>
+                  </div>
+                  <button mat-button type="button" (click)="applyAiQuantity()" [disabled]="aiSuggestion()!.proposedQuantity === null">Usar</button>
+                </div>
+
+                @if (aiSuggestion()!.suggestedTags.length) {
+                  <div class="ai-tags">
+                    <div class="ai-section-title">
+                      <span>Tags existentes</span>
+                      <button mat-button type="button" (click)="applyAllAiTags()">Añadir todas</button>
+                    </div>
+                    @for (tag of aiSuggestion()!.suggestedTags; track tag.tagId ?? tag.tagName) {
+                      <div class="ai-tag-row">
+                        <div>
+                          <strong>{{ tag.tagName }}</strong>
+                          <span>{{ confidenceLabel(tag.confidence) }} · {{ tag.reason }}</span>
+                        </div>
+                        <button mat-button type="button" (click)="applyAiTag(tag)" [disabled]="!tag.tagId || draftTagIds().includes(tag.tagId)">Añadir</button>
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (aiSuggestion()!.suggestedNewTags.length) {
+                  <div class="ai-new-tags">
+                    <span>Nuevos sugeridos, no aplicados:</span>
+                    <p>{{ aiSuggestion()!.suggestedNewTags.join(', ') }}</p>
+                  </div>
+                }
+
+                @if (aiSuggestion()!.suggestedClass) {
+                  <div class="ai-suggestion-field">
+                    <div>
+                      <span>Clase/Subtipo</span>
+                      <strong>
+                        {{ aiSuggestion()!.suggestedClass!.name }}
+                        @if (aiSuggestion()!.suggestedSubtype) {
+                          · {{ aiSuggestion()!.suggestedSubtype!.name }}
+                        }
+                      </strong>
+                    </div>
+                    <button mat-button type="button" (click)="applyAiClass()">Usar</button>
+                  </div>
+                }
+
+                @if (aiSuggestion()!.warnings.length) {
+                  <ul class="ai-warnings">
+                    @for (warning of aiSuggestion()!.warnings; track warning) {
+                      <li>{{ warning }}</li>
+                    }
+                  </ul>
+                }
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Pista para reintentar</mat-label>
+                  <input matInput [ngModel]="aiHint()" (ngModelChange)="aiHint.set($event)" />
+                </mat-form-field>
+                <div class="ai-actions">
+                  <button mat-flat-button type="button" (click)="applyAllAi()">Aplicar todo</button>
+                  <button mat-stroked-button type="button" (click)="suggestWithAi('normal')" [disabled]="aiBusy()">Reintentar</button>
+                  <button mat-stroked-button type="button" (click)="suggestWithAi('cheap')" [disabled]="aiBusy()">Reintentar barato</button>
+                  <button mat-button type="button" (click)="discardAiSuggestion()">Descartar</button>
+                </div>
+              </section>
+            }
             <mat-form-field appearance="outline">
               <mat-label>Nombre</mat-label>
               <input #createNameInput matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" autocomplete="off" />
