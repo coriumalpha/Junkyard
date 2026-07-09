@@ -69,6 +69,29 @@ if (args.Contains("--generate-photo-derivatives", StringComparer.OrdinalIgnoreCa
     return;
 }
 
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex) when (context.Request.Path.StartsWithSegments("/api"))
+    {
+        app.Logger.LogError(ex, "Unhandled API exception at {Path}", context.Request.Path);
+        if (!context.Response.HasStarted)
+        {
+            context.Response.Clear();
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new ApiErrorDto(
+                false,
+                "internal_error",
+                "No se pudo completar la operación.",
+                "Revisa los logs del servidor para el detalle."));
+        }
+    }
+});
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -115,7 +138,7 @@ app.MapPost("/api/ai/settings/api-key", async (
     }
     catch (InvalidOperationException ex)
     {
-        return Results.BadRequest(new { error = ex.Message });
+        return AiError("invalid_api_key", ex.Message);
     }
 });
 app.MapDelete("/api/ai/settings/api-key", async (
@@ -139,7 +162,9 @@ app.MapPost("/api/ai/photo-review/suggest-item", async (
     CancellationToken cancellationToken) =>
 {
     var (response, error) = await aiService.SuggestItemAsync(input, cancellationToken);
-    return error is null ? Results.Json(response) : Results.BadRequest(new { error });
+    return error is null
+        ? Results.Json(response)
+        : AiError(error.Code, error.Message, error.Details, error.SuggestionId);
 });
 app.MapPost("/api/ai/photo-review/suggestions/{id:int}/accept", async (
     int id,
@@ -147,7 +172,7 @@ app.MapPost("/api/ai/photo-review/suggestions/{id:int}/accept", async (
     CancellationToken cancellationToken) =>
 {
     var updated = await aiService.MarkSuggestionAsync(id, true, cancellationToken);
-    return updated ? Results.NoContent() : Results.NotFound();
+    return updated ? Results.NoContent() : AiError("suggestion_not_found", "No se encontró la sugerencia IA.", statusCode: StatusCodes.Status404NotFound);
 });
 app.MapPost("/api/ai/photo-review/suggestions/{id:int}/reject", async (
     int id,
@@ -155,7 +180,7 @@ app.MapPost("/api/ai/photo-review/suggestions/{id:int}/reject", async (
     CancellationToken cancellationToken) =>
 {
     var updated = await aiService.MarkSuggestionAsync(id, false, cancellationToken);
-    return updated ? Results.NoContent() : Results.NotFound();
+    return updated ? Results.NoContent() : AiError("suggestion_not_found", "No se encontró la sugerencia IA.", statusCode: StatusCodes.Status404NotFound);
 });
 app.MapGet("/photo-derivatives/{variant}/{**filename}", async (
     string variant,
@@ -1485,6 +1510,15 @@ static async Task GeneratePhotoDerivativesAsync(IServiceProvider services)
     Console.WriteLine($"generated derivatives for {generated} photo files");
 }
 
+static IResult AiError(
+    string code,
+    string message,
+    string? details = null,
+    int? suggestionId = null,
+    int statusCode = StatusCodes.Status400BadRequest)
+    => Results.Json(new ApiErrorDto(false, code, message, details, suggestionId), statusCode: statusCode);
+
+public record ApiErrorDto(bool Ok, string Code, string Message, string? Details = null, int? SuggestionId = null);
 public record PhotoRotateDto(int Delta);
 public record PhotoReturnToInboxDto<TDetail>(TDetail Detail, int? InboxId);
 public record CsvImportConfirmDto(string Key);

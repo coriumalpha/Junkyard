@@ -21,22 +21,23 @@ public sealed class AiItemSuggestionService(
         WriteIndented = false
     };
 
-    public async Task<(AiSuggestItemResponse? Response, string? Error)> SuggestItemAsync(AiSuggestItemRequest request, CancellationToken cancellationToken)
+    public async Task<(AiSuggestItemResponse? Response, AiServiceError? Error)> SuggestItemAsync(AiSuggestItemRequest request, CancellationToken cancellationToken)
     {
         var settings = await aiSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        AiItemSuggestion? suggestion = null;
         if (!settings.Enabled)
         {
-            return (null, "La IA está deshabilitada en la configuración.");
+            return (null, new AiServiceError("ai_disabled", "La IA está deshabilitada en la configuración."));
         }
 
         if (!string.Equals(settings.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
         {
-            return (null, "Proveedor de IA no soportado en esta versión.");
+            return (null, new AiServiceError("provider_not_supported", "Proveedor de IA no soportado en esta versión."));
         }
 
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
         {
-            return (null, "No hay API key configurada para IA.");
+            return (null, new AiServiceError("missing_api_key", "No hay API key configurada para IA."));
         }
 
         var photoIds = request.PhotoIds?
@@ -46,22 +47,12 @@ public sealed class AiItemSuggestionService(
             .ToList() ?? [];
         if (photoIds.Count == 0)
         {
-            return (null, "Selecciona al menos una foto.");
+            return (null, new AiServiceError("invalid_request", "Selecciona al menos una foto."));
         }
 
         if (photoIds.Count > settings.MaxImagesPerRequest)
         {
-            return (null, $"Máximo {settings.MaxImagesPerRequest} fotos por petición IA.");
-        }
-
-        var photos = await db.PhotoInboxes
-            .AsNoTracking()
-            .Where(photo => photoIds.Contains(photo.Id) && photo.Status == PhotoInboxStatus.Pending)
-            .OrderBy(photo => photoIds.IndexOf(photo.Id))
-            .ToListAsync(cancellationToken);
-        if (photos.Count != photoIds.Count)
-        {
-            return (null, "Alguna foto no existe o ya no está pendiente.");
+            return (null, new AiServiceError("too_many_photos", $"Máximo {settings.MaxImagesPerRequest} fotos por petición IA."));
         }
 
         var mode = string.IsNullOrWhiteSpace(request.Mode)
@@ -72,23 +63,8 @@ public sealed class AiItemSuggestionService(
             ? settings.ImageDetail
             : AiSettingsService.NormalizeDetail(request.Detail);
 
-        var imageInputs = new List<object>();
-        foreach (var photo in photos)
-        {
-            var path = await ResolveAiImagePathAsync(photo.Filename, cancellationToken);
-            var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
-            imageInputs.Add(new
-            {
-                type = "input_image",
-                image_url = $"data:image/jpeg;base64,{Convert.ToBase64String(bytes)}",
-                detail
-            });
-        }
-
-        var catalogs = await LoadCatalogContextAsync(cancellationToken);
-        var prompt = BuildPrompt(catalogs, request.UserHint);
         var photoIdsJson = JsonSerializer.Serialize(photoIds, JsonOptions);
-        var suggestion = new AiItemSuggestion
+        suggestion = new AiItemSuggestion
         {
             PhotoIdsJson = photoIdsJson,
             Provider = settings.Provider,
@@ -101,6 +77,33 @@ public sealed class AiItemSuggestionService(
 
         try
         {
+            var photos = await db.PhotoInboxes
+                .AsNoTracking()
+                .Where(photo => photoIds.Contains(photo.Id) && photo.Status == PhotoInboxStatus.Pending)
+                .ToListAsync(cancellationToken);
+            photos = photos.OrderBy(photo => photoIds.IndexOf(photo.Id)).ToList();
+            if (photos.Count != photoIds.Count)
+            {
+                suggestion.Error = "Alguna foto no existe o ya no está pendiente.";
+                await db.SaveChangesAsync(cancellationToken);
+                return (null, new AiServiceError("photo_not_found", "Alguna foto no existe o ya no está pendiente.", null, suggestion.Id));
+            }
+
+            var imageInputs = new List<object>();
+            foreach (var photo in photos)
+            {
+                var path = await ResolveAiImagePathAsync(photo.Filename, cancellationToken);
+                var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+                imageInputs.Add(new
+                {
+                    type = "input_image",
+                    image_url = $"data:image/jpeg;base64,{Convert.ToBase64String(bytes)}",
+                    detail
+                });
+            }
+
+            var catalogs = await LoadCatalogContextAsync(cancellationToken);
+            var prompt = BuildPrompt(catalogs, request.UserHint);
             var raw = await CallOpenAiAsync(settings.ApiKey!, model, prompt, imageInputs, cancellationToken);
             suggestion.RawResponseJson = settings.StoreRawResponse ? raw.RawJson : null;
             var parsed = ValidateAndNormalize(raw.OutputText, catalogs, suggestion.Id, settings, model, detail);
@@ -108,11 +111,29 @@ public sealed class AiItemSuggestionService(
             await db.SaveChangesAsync(cancellationToken);
             return (parsed, null);
         }
-        catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidOperationException)
+        catch (HttpRequestException ex)
         {
             suggestion.Error = ex.Message;
             await db.SaveChangesAsync(cancellationToken);
-            return (null, $"No se pudo generar la sugerencia IA: {ex.Message}");
+            return (null, new AiServiceError("openai_request_failed", "No se pudo generar la sugerencia IA.", ex.Message, suggestion.Id));
+        }
+        catch (JsonException ex)
+        {
+            suggestion.Error = ex.Message;
+            await db.SaveChangesAsync(cancellationToken);
+            return (null, new AiServiceError("openai_response_invalid", "OpenAI devolvió una respuesta no válida.", ex.Message, suggestion.Id));
+        }
+        catch (InvalidOperationException ex)
+        {
+            suggestion.Error = ex.Message;
+            await db.SaveChangesAsync(cancellationToken);
+            return (null, new AiServiceError("ai_suggestion_failed", "No se pudo generar la sugerencia IA.", ex.Message, suggestion.Id));
+        }
+        catch (TaskCanceledException ex)
+        {
+            suggestion.Error = ex.Message;
+            await db.SaveChangesAsync(cancellationToken);
+            return (null, new AiServiceError("ai_timeout", "No se pudo generar la sugerencia IA: tiempo de espera agotado.", null, suggestion.Id));
         }
     }
 
@@ -430,6 +451,8 @@ public sealed class AiItemSuggestionService(
 }
 
 public record AiSuggestItemRequest(List<int>? PhotoIds, string? Mode, string? Detail, string? UserHint);
+
+public record AiServiceError(string Code, string Message, string? Details = null, int? SuggestionId = null);
 
 public record AiSuggestItemResponse(
     int? SuggestionId,

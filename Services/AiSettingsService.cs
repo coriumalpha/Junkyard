@@ -321,7 +321,7 @@ public sealed class AiSettingsService(
         {
             model,
             input = "Responde solo OK.",
-            max_output_tokens = 8
+            max_output_tokens = 16
         };
         request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
         using var response = await client.SendAsync(request, cancellationToken);

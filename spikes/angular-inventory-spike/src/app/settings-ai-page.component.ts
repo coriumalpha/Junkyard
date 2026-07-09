@@ -218,12 +218,25 @@ export class SettingsAiPageComponent {
 
   private errorMessage(error: unknown, fallback: string): string {
     if (error instanceof HttpErrorResponse) {
-      const body = error.error as { error?: string } | string | null;
-      if (typeof body === 'string' && body.trim()) {
-        return body;
+      const body = error.error as { error?: string; message?: string; details?: string } | string | null;
+      if (typeof body === 'string') {
+        const trimmed = body.trim();
+        if (trimmed.startsWith('<!DOCTYPE html') || trimmed.startsWith('<html')) {
+          return fallback;
+        }
+        if (trimmed) {
+          return trimmed;
+        }
       }
-      if (body && typeof body === 'object' && typeof body.error === 'string' && body.error.trim()) {
-        return body.error;
+      if (body && typeof body === 'object') {
+        const main = body.message || body.error;
+        const details = body.details;
+        if (main?.trim() && details?.trim()) {
+          return `${main} ${details}`;
+        }
+        if (main?.trim()) {
+          return main;
+        }
       }
     }
 
