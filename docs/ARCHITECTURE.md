@@ -16,6 +16,7 @@ Junkyard is a compact ASP.NET Core Razor Pages application.
 - `Data/SchemaUpgrader.cs`: idempotent SQLite schema updates for deployed instances without formal migrations.
 - `Pages/`: Razor Pages UI and page handlers.
 - `Services/PhotoStorage.cs`: upload storage, public paths and rotation normalization.
+- `Services/AiSettingsService.cs` and `Services/AiItemSuggestionService.cs`: optional OpenAI-backed item suggestions for photo review, with backend-only API key handling.
 - `Services/CsvInventoryService.cs`: CSV import/export behavior.
 - `wwwroot/`: CSS, JavaScript, favicon and safe static branding assets.
 - `docs/architecture/frontend.md`: Angular SPA conventions for the future frontend migration.
@@ -29,6 +30,8 @@ Junkyard is a compact ASP.NET Core Razor Pages application.
 - `Photo` belongs to either a box or an item and stores logical rotation in `RotationDegrees`.
 - `PhotoInbox` stores uploaded photos before assignment and preserves rotation while being reviewed.
 - `ItemClass`, `InventoryMode` and `ItemSubtype` describe specialized item behavior and stock grouping. See `docs/ITEM-CLASSIFICATION.md`.
+- `AiSettings` stores non-secret AI configuration plus an encrypted optional API key.
+- `AiItemSuggestion` stores AI suggestion attempts for debugging and accept/reject traceability. See `docs/AI-ITEM-SUGGESTIONS.md`.
 
 ## Runtime Storage
 

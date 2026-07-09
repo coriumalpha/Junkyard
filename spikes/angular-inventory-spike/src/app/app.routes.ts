@@ -67,6 +67,11 @@ export const routes: Routes = [
     loadComponent: () => import('./settings-maintenance-page.component').then((m) => m.SettingsMaintenancePageComponent)
   },
   {
+    path: 'settings/ai',
+    title: 'IA · Junkyard',
+    loadComponent: () => import('./settings-ai-page.component').then((m) => m.SettingsAiPageComponent)
+  },
+  {
     path: 'settings/classes',
     title: 'Clases y subtipos · Junkyard',
     loadComponent: () => import('./settings-classes-page.component').then((m) => m.SettingsClassesPageComponent)

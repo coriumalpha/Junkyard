@@ -17,6 +17,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<PhotoInbox> PhotoInboxes => Set<PhotoInbox>();
     public DbSet<AiItemSuggestion> AiItemSuggestions => Set<AiItemSuggestion>();
+    public DbSet<AiSettings> AiSettings => Set<AiSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -149,10 +150,20 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
         modelBuilder.Entity<AiItemSuggestion>(entity =>
         {
             entity.Property(x => x.PhotoIdsJson).IsRequired();
+            entity.Property(x => x.Provider).HasMaxLength(40).IsRequired();
             entity.Property(x => x.Model).HasMaxLength(80).IsRequired();
             entity.Property(x => x.ImageDetail).HasMaxLength(16).IsRequired();
             entity.Property(x => x.PromptVersion).HasMaxLength(80).IsRequired();
             entity.HasIndex(x => x.CreatedAt);
+        });
+
+        modelBuilder.Entity<AiSettings>(entity =>
+        {
+            entity.Property(x => x.Provider).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.Model).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.CheapModel).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.ImageDetail).HasMaxLength(16).IsRequired();
+            entity.Property(x => x.DefaultMode).HasMaxLength(16).IsRequired();
         });
     }
 

@@ -559,6 +559,7 @@ Available documentation:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Item classification](docs/ITEM-CLASSIFICATION.md)
+- [AI item suggestions](docs/AI-ITEM-SUGGESTIONS.md)
 - [Privacy and Data Handling](docs/PRIVACY.md)
 
 The documentation is evolving alongside the SPA and data model. Some older notes may still refer to the classic Razor interface where the SPA has already become the primary workflow.

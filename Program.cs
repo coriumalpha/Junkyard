@@ -41,7 +41,7 @@ builder.Services.AddScoped<PhotoStorage>();
 builder.Services.AddScoped<CsvInventoryService>();
 builder.Services.AddScoped<InventoryLiveQueryService>();
 builder.Services.Configure<AiOptions>(builder.Configuration.GetSection("AI"));
-builder.Services.AddScoped<AiConfiguredOptions>();
+builder.Services.AddScoped<AiSettingsService>();
 builder.Services.AddScoped<AiItemSuggestionService>();
 builder.Services.AddHttpClient("openai");
 builder.Services.AddSingleton<QrCodeService>();
@@ -91,8 +91,48 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", app = "Inventario" }));
-app.MapGet("/api/ai/settings/status", (AiItemSuggestionService aiService) =>
-    Results.Json(aiService.GetStatus()));
+app.MapGet("/api/ai/settings/status", async (
+    AiSettingsService aiSettingsService,
+    CancellationToken cancellationToken) =>
+    Results.Json(await aiSettingsService.GetStatusAsync(cancellationToken)));
+app.MapPut("/api/ai/settings", async (
+    AiSettingsUpdateDto input,
+    AiSettingsService aiSettingsService,
+    CancellationToken cancellationToken) =>
+{
+    var status = await aiSettingsService.UpdateSettingsAsync(input, cancellationToken);
+    return Results.Json(status);
+});
+app.MapPost("/api/ai/settings/api-key", async (
+    AiApiKeyUpdateDto input,
+    AiSettingsService aiSettingsService,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var status = await aiSettingsService.SaveApiKeyAsync(input, cancellationToken);
+        return Results.Json(status);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+app.MapDelete("/api/ai/settings/api-key", async (
+    AiSettingsService aiSettingsService,
+    CancellationToken cancellationToken) =>
+{
+    var status = await aiSettingsService.DeleteStoredApiKeyAsync(cancellationToken);
+    return Results.Json(status);
+});
+app.MapPost("/api/ai/settings/test", async (
+    AiConnectionTestRequest input,
+    AiSettingsService aiSettingsService,
+    CancellationToken cancellationToken) =>
+{
+    var result = await aiSettingsService.TestConnectionAsync(input, cancellationToken);
+    return Results.Json(result);
+});
 app.MapPost("/api/ai/photo-review/suggest-item", async (
     AiSuggestItemRequest input,
     AiItemSuggestionService aiService,

@@ -1,0 +1,210 @@
+<main class="ai-settings-shell">
+  <header class="ai-header app-page-header">
+    <div>
+      <p class="eyebrow">Configuración</p>
+      <h1>IA</h1>
+      <p>Sugerencias asistidas para crear ítems desde fotos pendientes.</p>
+    </div>
+    <button mat-flat-button type="button" (click)="testConnection()" [disabled]="testing() || loading()">
+      @if (testing()) {
+        <mat-progress-spinner mode="indeterminate" diameter="18" />
+      } @else {
+        <mat-icon>network_check</mat-icon>
+      }
+      Probar conexión
+    </button>
+  </header>
+
+  @if (message()) {
+    <section class="state-panel success">
+      <mat-icon>check_circle</mat-icon>
+      <span>{{ message() }}</span>
+    </section>
+  }
+
+  @if (error()) {
+    <section class="state-panel error">
+      <mat-icon>warning</mat-icon>
+      <span>{{ error() }}</span>
+    </section>
+  }
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="42" />
+      <span>Cargando configuración IA...</span>
+    </section>
+  } @else {
+    <section class="settings-grid">
+      <mat-card class="status-card">
+        <div class="card-title-row">
+          <div>
+            <p class="eyebrow">Estado</p>
+            <h2>IA de sugerencia de ítems</h2>
+          </div>
+          <span class="status-pill" [class.ready]="status()?.isUsable" [class.off]="!status()?.enabled">
+            {{ effectiveState() }}
+          </span>
+        </div>
+        <dl class="status-list">
+          <div>
+            <dt>Proveedor</dt>
+            <dd>{{ status()?.provider }}</dd>
+          </div>
+          <div>
+            <dt>Modelo normal</dt>
+            <dd>{{ status()?.model }}</dd>
+          </div>
+          <div>
+            <dt>Modelo barato</dt>
+            <dd>{{ status()?.cheapModel }}</dd>
+          </div>
+          <div>
+            <dt>Detalle imagen</dt>
+            <dd>{{ status()?.imageDetail }}</dd>
+          </div>
+          <div>
+            <dt>Máximo fotos</dt>
+            <dd>{{ status()?.maxImagesPerRequest }}</dd>
+          </div>
+          <div>
+            <dt>API key</dt>
+            <dd>{{ keySourceLabel(status()) }}</dd>
+          </div>
+        </dl>
+        @if (status()?.reason) {
+          <p class="status-reason">{{ status()!.reason }}</p>
+        }
+        @if (testResult()) {
+          <div class="test-result" [class.ok]="testResult()!.ok">
+            <mat-icon>{{ testResult()!.ok ? 'check_circle' : 'error' }}</mat-icon>
+            <span>{{ testResult()!.message || testResult()!.error }}</span>
+          </div>
+        }
+      </mat-card>
+
+      <mat-card class="config-card">
+        <div class="card-title-row">
+          <div>
+            <p class="eyebrow">Configuración</p>
+            <h2>Parámetros</h2>
+          </div>
+        </div>
+
+        <mat-slide-toggle [checked]="enabled()" (change)="enabled.set($event.checked)">
+          Activar IA
+        </mat-slide-toggle>
+
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Proveedor</mat-label>
+            <mat-select [ngModel]="provider()" (ngModelChange)="provider.set($event)">
+              <mat-option value="OpenAI">OpenAI</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Modo por defecto</mat-label>
+            <mat-select [ngModel]="defaultMode()" (ngModelChange)="defaultMode.set($event)">
+              <mat-option value="normal">Normal</mat-option>
+              <mat-option value="cheap">Barato</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Modelo normal</mat-label>
+            <input matInput [ngModel]="model()" (ngModelChange)="model.set($event)" list="ai-model-presets" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Modelo barato</mat-label>
+            <input matInput [ngModel]="cheapModel()" (ngModelChange)="cheapModel.set($event)" list="ai-model-presets" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Detalle imagen</mat-label>
+            <mat-select [ngModel]="imageDetail()" (ngModelChange)="imageDetail.set($event)">
+              <mat-option value="low">low</mat-option>
+              <mat-option value="high">high</mat-option>
+              <mat-option value="auto">auto</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Máximo fotos</mat-label>
+            <input matInput type="number" min="1" max="8" [ngModel]="maxImagesPerRequest()" (ngModelChange)="maxImagesPerRequest.set(+$event)" />
+          </mat-form-field>
+        </div>
+
+        <datalist id="ai-model-presets">
+          <option value="gpt-5.4-mini"></option>
+          <option value="gpt-5.4-nano"></option>
+        </datalist>
+
+        <div class="settings-actions">
+          <button mat-flat-button type="button" (click)="saveSettings()" [disabled]="saving()">
+            <mat-icon>save</mat-icon>
+            Guardar cambios
+          </button>
+          <button mat-stroked-button type="button" (click)="restoreDefaults()">Restaurar defaults</button>
+        </div>
+      </mat-card>
+
+      <mat-card class="key-card">
+        <div class="card-title-row">
+          <div>
+            <p class="eyebrow">API key</p>
+            <h2>Secreto backend</h2>
+          </div>
+          <span class="key-source">{{ keySourceLabel(status()) }}</span>
+        </div>
+
+        @if (status()?.maskedApiKey) {
+          <p class="masked-key">{{ status()!.maskedApiKey }}</p>
+        }
+
+        @if (status()?.keySource === 'Environment' || status()?.keySource === 'EnvironmentOverridesStored') {
+          <p class="security-note">OPENAI_API_KEY está configurada por entorno y tiene prioridad. No se muestra ni se edita desde Angular.</p>
+          <pre>OPENAI_API_KEY=...</pre>
+        }
+
+        @if (canEditStoredKey(status()) || replacingKey()) {
+          @if (!status()?.hasApiKey || replacingKey()) {
+            <mat-form-field appearance="outline">
+              <mat-label>API key</mat-label>
+              <input matInput type="password" [ngModel]="apiKeyDraft()" (ngModelChange)="apiKeyDraft.set($event)" autocomplete="off" />
+            </mat-form-field>
+            <button mat-flat-button type="button" (click)="saveApiKey()" [disabled]="keySaving()">
+              <mat-icon>vpn_key</mat-icon>
+              Guardar API key
+            </button>
+          }
+        }
+
+        <div class="settings-actions">
+          @if (status()?.keySource === 'Stored') {
+            <button mat-stroked-button type="button" (click)="replacingKey.set(true)">Sustituir</button>
+            <button mat-button type="button" (click)="deleteApiKey()" [disabled]="keySaving()">Borrar</button>
+          }
+          @if (status()?.keySource === 'EnvironmentOverridesStored') {
+            <button mat-button type="button" (click)="deleteApiKey()" [disabled]="keySaving()">Borrar key guardada</button>
+          }
+        </div>
+
+        <p class="security-note">La clave se usa solo en backend. No se envía a Angular ni se muestra después de guardarla.</p>
+      </mat-card>
+
+      <mat-card class="help-card">
+        <p class="eyebrow">Uso</p>
+        <h2>Coste y seguridad</h2>
+        <ul>
+          <li>La IA solo se ejecuta al pulsar “Sugerir con IA”.</li>
+          <li>No analiza fotos automáticamente ni procesa la bandeja en lote.</li>
+          <li>Se envían derivados reducidos de las fotos seleccionadas.</li>
+          <li><strong>low</strong> reduce coste y es el valor recomendado.</li>
+          <li>El usuario valida la propuesta antes de guardar el ítem.</li>
+        </ul>
+      </mat-card>
+    </section>
+  }
+</main>

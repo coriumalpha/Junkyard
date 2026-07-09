@@ -104,6 +104,10 @@
             <mat-icon matListItemIcon>build</mat-icon>
             <span matListItemTitle>Mantenimiento</span>
           </a>
+          <a mat-list-item routerLink="/settings/ai" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+            <mat-icon matListItemIcon>auto_fix_high</mat-icon>
+            <span matListItemTitle>IA</span>
+          </a>
           <a mat-list-item routerLink="/settings/tags" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
             <mat-icon matListItemIcon>sell</mat-icon>
             <span matListItemTitle>Tags</span>

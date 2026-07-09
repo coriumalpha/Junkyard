@@ -150,7 +150,7 @@
                 <strong>Varita IA</strong>
                 <span>{{ aiUnavailableReason() ?? 'Lista para analizar las fotos seleccionadas.' }}</span>
               </div>
-              <button mat-stroked-button type="button" (click)="suggestWithAi('normal')" [disabled]="busy() || aiBusy() || !!aiUnavailableReason()">
+              <button mat-stroked-button type="button" (click)="suggestWithAi()" [disabled]="busy() || aiBusy() || !!aiUnavailableReason()" [matTooltip]="aiUnavailableReason() ?? ''">
                 @if (aiBusy()) {
                   <mat-progress-spinner mode="indeterminate" diameter="18" />
                 } @else {
@@ -158,6 +158,10 @@
                 }
                 Sugerir con IA
               </button>
+            </div>
+            <div class="ai-config-row">
+              <span>El análisis consume API externa. Revisa la configuración antes de usarlo masivamente.</span>
+              <a routerLink="/settings/ai">Configurar IA</a>
             </div>
             @if (aiBusy()) {
               <div class="ai-loading">

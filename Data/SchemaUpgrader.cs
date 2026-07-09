@@ -37,6 +37,8 @@ public static class SchemaUpgrader
         AddColumn(db, "PhotoInboxes", "UpdatedAt", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'");
         AddColumn(db, "PhotoInboxes", "ProcessedAt", "TEXT NULL");
         EnsureAiItemSuggestions(db);
+        AddColumn(db, "AiItemSuggestions", "Provider", "TEXT NOT NULL DEFAULT 'OpenAI'");
+        EnsureAiSettings(db);
         BackfillItemCodes(db);
         db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Items_Code_Active" ON "Items" ("Code") WHERE "ArchivedAt" IS NULL AND "Code" IS NOT NULL AND trim("Code") <> '';""");
         NormalizeContainerTypes(db);
@@ -110,6 +112,7 @@ public static class SchemaUpgrader
                 "Id" INTEGER NOT NULL CONSTRAINT "PK_AiItemSuggestions" PRIMARY KEY AUTOINCREMENT,
                 "CreatedAt" TEXT NOT NULL,
                 "PhotoIdsJson" TEXT NOT NULL,
+                "Provider" TEXT NOT NULL DEFAULT 'OpenAI',
                 "Model" TEXT NOT NULL,
                 "ImageDetail" TEXT NOT NULL,
                 "PromptVersion" TEXT NOT NULL,
@@ -121,6 +124,28 @@ public static class SchemaUpgrader
             );
             """);
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_AiItemSuggestions_CreatedAt" ON "AiItemSuggestions" ("CreatedAt");""");
+    }
+
+    private static void EnsureAiSettings(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AiSettings" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_AiSettings" PRIMARY KEY AUTOINCREMENT,
+                "Enabled" INTEGER NOT NULL DEFAULT 0,
+                "Provider" TEXT NOT NULL DEFAULT 'OpenAI',
+                "Model" TEXT NOT NULL DEFAULT 'gpt-5.4-mini',
+                "CheapModel" TEXT NOT NULL DEFAULT 'gpt-5.4-nano',
+                "ImageDetail" TEXT NOT NULL DEFAULT 'low',
+                "MaxImagesPerRequest" INTEGER NOT NULL DEFAULT 4,
+                "DefaultMode" TEXT NOT NULL DEFAULT 'normal',
+                "MaxDescriptionLength" INTEGER NOT NULL DEFAULT 1200,
+                "StoreRawResponse" INTEGER NOT NULL DEFAULT 1,
+                "AllowSuggestedNewTags" INTEGER NOT NULL DEFAULT 1,
+                "EncryptedApiKey" TEXT NULL,
+                "CreatedAt" TEXT NOT NULL,
+                "UpdatedAt" TEXT NOT NULL
+            );
+            """);
     }
 
     private static void EnsureTags(InventoryDbContext db)

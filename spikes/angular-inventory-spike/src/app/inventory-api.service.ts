@@ -651,14 +651,41 @@ export interface AiStatus {
   provider: string;
   model: string;
   cheapModel: string;
-  hasApiKey: boolean;
+  imageDetail: 'low' | 'high' | 'auto';
   maxImagesPerRequest: number;
+  defaultMode: 'normal' | 'cheap';
+  hasApiKey: boolean;
+  keySource: 'None' | 'Environment' | 'Stored' | 'EnvironmentOverridesStored';
+  maskedApiKey: string | null;
+  isUsable: boolean;
+  reason: string | null;
+  maxDescriptionLength: number;
+  storeRawResponse: boolean;
+  allowSuggestedNewTags: boolean;
+}
+
+export interface AiSettingsUpdate {
+  enabled: boolean;
+  provider: string;
+  model: string;
+  cheapModel: string;
+  imageDetail: 'low' | 'high' | 'auto';
+  maxImagesPerRequest: number;
+  defaultMode: 'normal' | 'cheap';
+}
+
+export interface AiConnectionTestResponse {
+  ok: boolean;
+  provider: string;
+  model: string;
+  message: string | null;
+  error: string | null;
 }
 
 export interface AiSuggestItemRequest {
   photoIds: number[];
   mode: 'cheap' | 'normal';
-  detail: 'low' | 'high';
+  detail: 'low' | 'high' | 'auto';
   userHint?: string;
 }
 
@@ -1065,6 +1092,22 @@ export class InventoryApiService {
 
   fetchAiStatus(): Observable<AiStatus> {
     return this.http.get<AiStatus>('/api/ai/settings/status');
+  }
+
+  updateAiSettings(input: AiSettingsUpdate): Observable<AiStatus> {
+    return this.http.put<AiStatus>('/api/ai/settings', input);
+  }
+
+  saveAiApiKey(apiKey: string): Observable<AiStatus> {
+    return this.http.post<AiStatus>('/api/ai/settings/api-key', { apiKey });
+  }
+
+  deleteAiApiKey(): Observable<AiStatus> {
+    return this.http.delete<AiStatus>('/api/ai/settings/api-key');
+  }
+
+  testAiConnection(mode: 'normal' | 'cheap'): Observable<AiConnectionTestResponse> {
+    return this.http.post<AiConnectionTestResponse>('/api/ai/settings/test', { mode });
   }
 
   suggestReviewItem(input: AiSuggestItemRequest): Observable<AiSuggestItemResponse> {

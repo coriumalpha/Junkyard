@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, EMPTY, finalize, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -12,6 +12,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { AiStatus, AiSuggestItemResponse, AiSuggestedTag, InventoryApiService, InventoryItem, InventoryMode, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse, ItemClass, ItemSubtype } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
@@ -23,7 +24,7 @@ type ReviewPanel = 'none' | 'create' | 'assignItem' | 'assignBox';
 @Component({
   selector: 'app-photo-review-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
+  imports: [CommonModule, FormsModule, RouterLink, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
   templateUrl: './photo-review-page.component.html',
   styleUrl: './photo-review-page.component.scss'
 })
@@ -97,11 +98,14 @@ export class PhotoReviewPageComponent {
     if (!status) {
       return 'Comprobando IA...';
     }
-    if (!status.enabled) {
-      return 'IA deshabilitada en backend.';
-    }
-    if (!status.hasApiKey) {
-      return 'Falta OPENAI_API_KEY en backend.';
+    if (!status.isUsable) {
+      if (!status.enabled) {
+        return 'Activa la IA en Configuración → IA.';
+      }
+      if (!status.hasApiKey) {
+        return 'Configura una API key en Configuración → IA.';
+      }
+      return status.reason ?? 'Revisa Configuración → IA.';
     }
     return null;
   });
@@ -125,7 +129,23 @@ export class PhotoReviewPageComponent {
     this.api.fetchAiStatus().pipe(
       tap((status) => this.aiStatus.set(status)),
       catchError(() => {
-        this.aiStatus.set({ enabled: false, provider: 'OpenAI', model: '', cheapModel: '', hasApiKey: false, maxImagesPerRequest: 4 });
+        this.aiStatus.set({
+          enabled: false,
+          provider: 'OpenAI',
+          model: '',
+          cheapModel: '',
+          imageDetail: 'low',
+          maxImagesPerRequest: 4,
+          defaultMode: 'normal',
+          hasApiKey: false,
+          keySource: 'None',
+          maskedApiKey: null,
+          isUsable: false,
+          reason: 'No se pudo leer Configuración → IA.',
+          maxDescriptionLength: 1200,
+          storeRawResponse: true,
+          allowSuggestedNewTags: true
+        });
         return EMPTY;
       }),
       takeUntilDestroyed(this.destroyRef)
@@ -286,7 +306,7 @@ export class PhotoReviewPageComponent {
     }), 'Ítem creado desde foto.');
   }
 
-  protected suggestWithAi(mode: 'cheap' | 'normal' = 'normal'): void {
+  protected suggestWithAi(mode?: 'cheap' | 'normal'): void {
     const current = this.current();
     const status = this.aiStatus();
     if (!current || this.aiBusy()) {
@@ -310,8 +330,8 @@ export class PhotoReviewPageComponent {
     this.message.set(null);
     this.api.suggestReviewItem({
       photoIds: ids,
-      mode,
-      detail: 'low',
+      mode: mode ?? status?.defaultMode ?? 'normal',
+      detail: status?.imageDetail ?? 'low',
       userHint: this.aiHint().trim() || undefined
     }).pipe(
       tap((suggestion) => this.aiSuggestion.set(suggestion)),

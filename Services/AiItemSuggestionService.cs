@@ -5,47 +5,14 @@ using System.Text.Json.Serialization;
 using Inventario.Data;
 using Inventario.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace Inventario.Services;
-
-public sealed class AiOptions
-{
-    public bool Enabled { get; set; }
-    public string Provider { get; set; } = "OpenAI";
-    public string Model { get; set; } = "gpt-5.4-mini";
-    public string CheapModel { get; set; } = "gpt-5.4-nano";
-    public string ImageDetail { get; set; } = "low";
-    public int MaxImagesPerRequest { get; set; } = 4;
-    public string? ApiKey { get; set; }
-}
-
-public sealed class AiConfiguredOptions(IOptions<AiOptions> options, IConfiguration configuration)
-{
-    public AiOptions Current
-    {
-        get
-        {
-            var current = options.Value;
-            current.ApiKey = configuration["OPENAI_API_KEY"] ?? configuration["AI:ApiKey"] ?? current.ApiKey;
-            current.Provider = string.IsNullOrWhiteSpace(current.Provider) ? "OpenAI" : current.Provider.Trim();
-            current.Model = string.IsNullOrWhiteSpace(current.Model) ? "gpt-5.4-mini" : current.Model.Trim();
-            current.CheapModel = string.IsNullOrWhiteSpace(current.CheapModel) ? "gpt-5.4-nano" : current.CheapModel.Trim();
-            current.ImageDetail = NormalizeDetail(current.ImageDetail);
-            current.MaxImagesPerRequest = current.MaxImagesPerRequest <= 0 ? 4 : Math.Min(current.MaxImagesPerRequest, 8);
-            return current;
-        }
-    }
-
-    public static string NormalizeDetail(string? value)
-        => string.Equals(value, "high", StringComparison.OrdinalIgnoreCase) ? "high" : "low";
-}
 
 public sealed class AiItemSuggestionService(
     InventoryDbContext db,
     PhotoStorage photoStorage,
     IHttpClientFactory httpClientFactory,
-    AiConfiguredOptions configuredOptions)
+    AiSettingsService aiSettingsService)
 {
     private const string PromptVersion = "photo-review-item-v1";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -54,49 +21,37 @@ public sealed class AiItemSuggestionService(
         WriteIndented = false
     };
 
-    public AiStatusDto GetStatus()
-    {
-        var options = configuredOptions.Current;
-        return new AiStatusDto(
-            options.Enabled,
-            options.Provider,
-            options.Model,
-            options.CheapModel,
-            !string.IsNullOrWhiteSpace(options.ApiKey),
-            options.MaxImagesPerRequest);
-    }
-
     public async Task<(AiSuggestItemResponse? Response, string? Error)> SuggestItemAsync(AiSuggestItemRequest request, CancellationToken cancellationToken)
     {
-        var options = configuredOptions.Current;
-        if (!options.Enabled)
+        var settings = await aiSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        if (!settings.Enabled)
         {
             return (null, "La IA está deshabilitada en la configuración.");
         }
 
-        if (!string.Equals(options.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(settings.Provider, "OpenAI", StringComparison.OrdinalIgnoreCase))
         {
             return (null, "Proveedor de IA no soportado en esta versión.");
         }
 
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
         {
-            return (null, "OPENAI_API_KEY no está configurada en el backend.");
+            return (null, "No hay API key configurada para IA.");
         }
 
         var photoIds = request.PhotoIds?
             .Where(id => id > 0)
             .Distinct()
-            .Take(options.MaxImagesPerRequest + 1)
+            .Take(settings.MaxImagesPerRequest + 1)
             .ToList() ?? [];
         if (photoIds.Count == 0)
         {
             return (null, "Selecciona al menos una foto.");
         }
 
-        if (photoIds.Count > options.MaxImagesPerRequest)
+        if (photoIds.Count > settings.MaxImagesPerRequest)
         {
-            return (null, $"Máximo {options.MaxImagesPerRequest} fotos por petición IA.");
+            return (null, $"Máximo {settings.MaxImagesPerRequest} fotos por petición IA.");
         }
 
         var photos = await db.PhotoInboxes
@@ -109,12 +64,13 @@ public sealed class AiItemSuggestionService(
             return (null, "Alguna foto no existe o ya no está pendiente.");
         }
 
-        var model = string.Equals(request.Mode, "cheap", StringComparison.OrdinalIgnoreCase)
-            ? options.CheapModel
-            : options.Model;
+        var mode = string.IsNullOrWhiteSpace(request.Mode)
+            ? settings.DefaultMode
+            : AiSettingsService.NormalizeMode(request.Mode);
+        var model = mode == "cheap" ? settings.CheapModel : settings.Model;
         var detail = string.IsNullOrWhiteSpace(request.Detail)
-            ? options.ImageDetail
-            : AiConfiguredOptions.NormalizeDetail(request.Detail);
+            ? settings.ImageDetail
+            : AiSettingsService.NormalizeDetail(request.Detail);
 
         var imageInputs = new List<object>();
         foreach (var photo in photos)
@@ -135,6 +91,7 @@ public sealed class AiItemSuggestionService(
         var suggestion = new AiItemSuggestion
         {
             PhotoIdsJson = photoIdsJson,
+            Provider = settings.Provider,
             Model = model,
             ImageDetail = detail,
             PromptVersion = PromptVersion
@@ -144,9 +101,9 @@ public sealed class AiItemSuggestionService(
 
         try
         {
-            var raw = await CallOpenAiAsync(options.ApiKey!, model, prompt, imageInputs, cancellationToken);
-            suggestion.RawResponseJson = raw.RawJson;
-            var parsed = ValidateAndNormalize(raw.OutputText, catalogs, suggestion.Id, model, detail);
+            var raw = await CallOpenAiAsync(settings.ApiKey!, model, prompt, imageInputs, cancellationToken);
+            suggestion.RawResponseJson = settings.StoreRawResponse ? raw.RawJson : null;
+            var parsed = ValidateAndNormalize(raw.OutputText, catalogs, suggestion.Id, settings, model, detail);
             suggestion.ParsedResponseJson = JsonSerializer.Serialize(parsed, JsonOptions);
             await db.SaveChangesAsync(cancellationToken);
             return (parsed, null);
@@ -312,6 +269,7 @@ public sealed class AiItemSuggestionService(
         string outputText,
         CatalogContext catalogs,
         int suggestionId,
+        AiEffectiveSettings settings,
         string model,
         string detail)
     {
@@ -355,10 +313,12 @@ public sealed class AiItemSuggestionService(
         {
             SuggestionId = suggestionId,
             ProposedName = Trim(parsed.ProposedName, 180),
-            ProposedDescription = Trim(parsed.ProposedDescription, 1200),
+            ProposedDescription = Trim(parsed.ProposedDescription, settings.MaxDescriptionLength),
             QuantityConfidence = ClampConfidence(parsed.QuantityConfidence),
             SuggestedTags = existingTags,
-            SuggestedNewTags = parsed.SuggestedNewTags.Select(tag => Trim(tag, 80)).Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList(),
+            SuggestedNewTags = settings.AllowSuggestedNewTags
+                ? parsed.SuggestedNewTags.Select(tag => Trim(tag, 80)).Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList()
+                : [],
             SuggestedClass = suggestedClass,
             SuggestedSubtype = suggestedSubtype,
             Warnings = parsed.Warnings.Select(warning => Trim(warning, 180)).Where(warning => warning.Length > 0).Take(8).ToList(),
@@ -468,8 +428,6 @@ public sealed class AiItemSuggestionService(
         }
     };
 }
-
-public record AiStatusDto(bool Enabled, string Provider, string Model, string CheapModel, bool HasApiKey, int MaxImagesPerRequest);
 
 public record AiSuggestItemRequest(List<int>? PhotoIds, string? Mode, string? Detail, string? UserHint);
 
