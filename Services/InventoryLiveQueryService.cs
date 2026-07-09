@@ -142,6 +142,82 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 photoStates.TryGetValue(photo.Filename, out var state) ? state.RotationDegrees : photo.RotationDegrees)).ToList());
     }
 
+    public async Task<(InventoryItemDetailDto? Item, string? Error)> CreateItemAsync(
+        InventoryItemUpdateDto input,
+        CancellationToken cancellationToken)
+    {
+        var name = (input.Name ?? "").Trim();
+        var tagIds = input.TagIds?.Where(tagId => tagId > 0).Distinct().ToList() ?? [];
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return (null, "El nombre es obligatorio.");
+        }
+
+        var tags = tagIds.Count == 0
+            ? []
+            : await db.Tags.Where(tag => tagIds.Contains(tag.Id)).ToListAsync(cancellationToken);
+        if (tags.Count != tagIds.Count)
+        {
+            return (null, "Algún tag seleccionado no existe.");
+        }
+
+        var classValidationError = await ValidateItemClassSelectionAsync(input.ItemClassId, input.ItemSubtypeId, cancellationToken);
+        if (classValidationError is not null)
+        {
+            return (null, classValidationError);
+        }
+
+        if (input.BoxId is int boxId && boxId > 0 && !await db.Boxes.AnyAsync(box => box.Id == boxId, cancellationToken))
+        {
+            return (null, "El contenedor seleccionado no existe.");
+        }
+
+        var condition = (input.Condition ?? "").Trim();
+        if (!string.IsNullOrWhiteSpace(condition)
+            && !await db.ItemConditions.AnyAsync(itemCondition => itemCondition.Name == condition, cancellationToken))
+        {
+            return (null, "Selecciona un estado válido de la lista maestra.");
+        }
+
+        var normalizedCode = string.IsNullOrWhiteSpace(input.Code) ? "" : Item.NormalizePublicCode(input.Code);
+        if (!string.IsNullOrWhiteSpace(normalizedCode)
+            && await db.Items.IgnoreQueryFilters().AnyAsync(existing => existing.ArchivedAt == null && existing.Code == normalizedCode, cancellationToken))
+        {
+            return (null, "Ese IT ya existe.");
+        }
+
+        var category = tags.OrderBy(tag => tag.Name).FirstOrDefault()?.Name
+            ?? (string.IsNullOrWhiteSpace(input.Category) ? "Otros" : input.Category.Trim());
+        var item = new Item
+        {
+            Code = normalizedCode,
+            BoxId = input.BoxId is > 0 ? input.BoxId : null,
+            Name = name,
+            Category = category,
+            ItemClassId = input.ItemClassId is > 0 ? input.ItemClassId : null,
+            ItemSubtypeId = input.ItemSubtypeId is > 0 ? input.ItemSubtypeId : null,
+            Quantity = input.Quantity,
+            Unit = string.IsNullOrWhiteSpace(input.Unit) ? null : input.Unit.Trim(),
+            MinQuantity = input.MinQuantity,
+            Condition = string.IsNullOrWhiteSpace(condition) ? null : condition,
+            Retention = string.IsNullOrWhiteSpace(input.Retention) ? null : input.Retention.Trim(),
+            Consumable = input.Consumable,
+            IsQuarantined = input.IsQuarantined,
+            Sentimental = input.Sentimental,
+            Obsolete = input.Obsolete,
+            Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim()
+        };
+
+        foreach (var tag in tags.OrderBy(tag => tag.Name))
+        {
+            item.ItemTags.Add(new ItemTag { Item = item, TagId = tag.Id });
+        }
+
+        db.Items.Add(item);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await GetItemDetailAsync(item.Id, cancellationToken), null);
+    }
+
     public async Task<(InventoryItemDetailDto? Item, string? Error)> UpdateItemAsync(
         int id,
         InventoryItemUpdateDto input,

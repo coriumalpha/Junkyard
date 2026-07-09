@@ -14,7 +14,6 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 
 import { InventoryApiService, InventoryGroup, InventoryItem } from './inventory-api.service';
 import { InventoryCodePipe } from './inventory-code.pipe';
-import { legacyUrl } from './legacy-url';
 
 @Component({
   selector: 'app-root',
@@ -47,7 +46,6 @@ export class App {
   protected readonly quickOpen = signal(false);
   protected readonly searchExpanded = signal(false);
   protected readonly hasQuickResults = computed(() => Boolean(this.quickItems().length || this.quickBoxes().length));
-  protected readonly legacyHomeUrl = legacyUrl('/');
 
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject(ElementRef<HTMLElement>);

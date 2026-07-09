@@ -114,9 +114,9 @@
                 </small>
               </div>
               <div class="row-actions">
-                <a mat-button [href]="legacyUrl(box.legacyUrl)" target="_blank" rel="noreferrer">
+                <a mat-button [routerLink]="['/boxes', box.code]">
                   <mat-icon>open_in_new</mat-icon>
-                  Legacy
+                  Abrir
                 </a>
                 <button mat-flat-button type="button" (click)="restoreBox(box)" [disabled]="savingId() === 'box-' + box.id">
                   <mat-icon>unarchive</mat-icon>

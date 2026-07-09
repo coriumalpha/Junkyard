@@ -15,7 +15,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { InventoryApiService, InventoryOptionsResponse, PhotoInboxItem, PhotoInboxResponse, PhotoInboxStatus } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
-import { legacyUrl } from './legacy-url';
 import { AppPaginatorComponent } from './app-paginator.component';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
@@ -207,10 +206,6 @@ export class PhotoInboxPageComponent {
     }
 
     return path.startsWith('/') ? path : `/${path}`;
-  }
-
-  protected legacyUrl(path: string | null | undefined): string {
-    return legacyUrl(path);
   }
 
   protected statusClass(photo: PhotoInboxItem): string {

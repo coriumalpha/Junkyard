@@ -14,7 +14,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { InventoryAction, InventoryActionsResponse, InventoryApiService, InventoryItem, InventoryOptionsResponse } from './inventory-api.service';
 import { formatInventoryCode } from './inventory-code.pipe';
-import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 
 type LinkMode = 'none' | 'box' | 'item';
@@ -75,7 +74,6 @@ export class ActionsPageComponent {
       rotationDegrees: item.rotationDegrees,
       placeholder: formatInventoryCode(item.code)
     })));
-  protected readonly legacyActionsUrl = legacyUrl('/Pendientes');
 
   private readonly api = inject(InventoryApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -233,10 +231,6 @@ export class ActionsPageComponent {
       finalize(() => this.busyId.set(null)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
-  }
-
-  protected legacyUrl(path: string | null | undefined): string {
-    return legacyUrl(path);
   }
 
   private load(): void {

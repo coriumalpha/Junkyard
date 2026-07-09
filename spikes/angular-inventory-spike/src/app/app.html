@@ -39,6 +39,13 @@
           <span matListItemLine>Filtros y resultados</span>
         }
       </a>
+      <a mat-list-item routerLink="/item/new" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawer()">
+        <mat-icon matListItemIcon>add_box</mat-icon>
+        <span matListItemTitle>Nuevo ítem</span>
+        @if (!drawerCollapsed() || handset()) {
+          <span matListItemLine>Alta directa</span>
+        }
+      </a>
       <a mat-list-item routerLink="/containers" [class.active]="isContainersSection()" (click)="closeDrawer()">
         <mat-icon matListItemIcon>warehouse</mat-icon>
         <span matListItemTitle>Contenedores</span>
@@ -122,13 +129,6 @@
           </a>
         }
       </div>
-      <a mat-list-item [href]="legacyHomeUrl" target="_blank" rel="noreferrer">
-        <mat-icon matListItemIcon>open_in_new</mat-icon>
-        <span matListItemTitle>Razor</span>
-        @if (!drawerCollapsed() || handset()) {
-          <span matListItemLine>Backend clásico</span>
-        }
-      </a>
     </mat-nav-list>
 
   </mat-sidenav>

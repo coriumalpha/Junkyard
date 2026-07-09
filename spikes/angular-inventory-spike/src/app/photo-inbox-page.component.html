@@ -129,8 +129,8 @@
                 Pendiente
               </button>
             }
-            <a mat-button [href]="legacyUrl(photo.legacyReviewUrl)" target="_blank" rel="noreferrer">
-              <mat-icon>open_in_new</mat-icon>
+            <a mat-button routerLink="/photos/review" [queryParams]="{ id: photo.id }">
+              <mat-icon>rate_review</mat-icon>
               Revisar
             </a>
           </mat-card-actions>

@@ -18,7 +18,6 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 
 import { InventoryApiService, InventoryBoxOption, InventoryBoxUpdate, InventoryBulkUpdate, InventoryGroup, InventoryItem, InventoryLayoutMode, InventoryLiveResponse, InventoryMode, InventoryOptionsResponse, InventoryQueryState, InventoryViewMode } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
-import { legacyUrl } from './legacy-url';
 import { AppPaginatorComponent } from './app-paginator.component';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
@@ -444,10 +443,6 @@ export class InventoryPageComponent {
     ).subscribe();
   }
 
-  protected backendUrl(path: string | null | undefined): string {
-    return legacyUrl(path);
-  }
-
   protected assetUrl(path: string | null | undefined): string | null {
     if (!path) {
       return null;
@@ -458,62 +453,6 @@ export class InventoryPageComponent {
     }
 
     return path.startsWith('/') ? path : `/${path}`;
-  }
-
-  protected currentScopeBackendUrl(): string {
-    if (this.isContainersPage()) {
-      return this.backendUrl('/Boxes');
-    }
-
-    const state = this.state();
-    const params = new URLSearchParams();
-
-    if (state.q.trim()) {
-      params.set('q', state.q.trim());
-    }
-
-    if (state.box.trim()) {
-      params.set('box', state.box.trim());
-    }
-
-    for (const boxId of state.boxIds) {
-      params.append('boxIds', String(boxId));
-    }
-
-    if (state.category.trim()) {
-      params.set('category', state.category.trim());
-    }
-
-    for (const tagId of state.tagIds) {
-      params.append('tagIds', String(tagId));
-    }
-
-    if (state.locationId !== null) {
-      params.set('locationId', String(state.locationId));
-    }
-
-    if (state.includeChildren) {
-      params.set('includeChildren', 'true');
-    }
-
-    if (state.onlyConsumable) {
-      params.set('onlyConsumable', 'true');
-    }
-
-    if (state.onlyOrphans) {
-      params.set('onlyOrphans', 'true');
-    }
-
-    if (state.onlyUntagged) {
-      params.set('onlyUntagged', 'true');
-    }
-
-    if (state.onlyQuarantined) {
-      params.set('onlyQuarantined', 'true');
-    }
-
-    params.set('view', state.view);
-    return this.backendUrl(`/items?${params.toString()}`);
   }
 
   protected badgeClass(item: InventoryItem): string {

@@ -16,15 +16,15 @@
             {{ showCreateBoxForm() ? 'Cerrar alta' : 'Nuevo contenedor' }}
           </button>
         } @else {
-        <button mat-flat-button type="button" (click)="toggleEditMode()" [class.active-action]="editMode()">
-          <mat-icon>{{ editMode() ? 'close' : 'edit' }}</mat-icon>
-          {{ editMode() ? 'Cerrar edición' : 'Editar' }}
-        </button>
+          <a mat-flat-button routerLink="/item/new">
+            <mat-icon>add_box</mat-icon>
+            Nuevo ítem
+          </a>
+          <button mat-stroked-button type="button" (click)="toggleEditMode()" [class.active-action]="editMode()">
+            <mat-icon>{{ editMode() ? 'close' : 'edit' }}</mat-icon>
+            {{ editMode() ? 'Cerrar edición' : 'Editar' }}
+          </button>
         }
-        <a mat-stroked-button class="ghost-link" [href]="currentScopeBackendUrl()" target="_blank" rel="noreferrer">
-          <mat-icon>open_in_new</mat-icon>
-          Abrir Razor
-        </a>
       </div>
     </header>
 
@@ -291,9 +291,9 @@
                 {{ data()?.selectedBox?.path || (data()?.selectedBoxes?.[0]?.path ?? 'Sin caja seleccionada') }}
               </p>
             </div>
-            <a mat-button [href]="currentScopeBackendUrl()" target="_blank" rel="noreferrer">
-              <mat-icon>launch</mat-icon>
-              Abrir en Razor
+            <a mat-button routerLink="/item/new" [queryParams]="{ boxId: data()?.selectedBoxes?.[0]?.id }">
+              <mat-icon>add</mat-icon>
+              Nuevo ítem aquí
             </a>
           </div>
 

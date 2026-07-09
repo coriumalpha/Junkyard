@@ -22,6 +22,11 @@ export const routes: Routes = [
     loadComponent: () => import('./inventory-page.component').then((m) => m.InventoryPageComponent)
   },
   {
+    path: 'item/new',
+    title: 'Nuevo ítem · Junkyard',
+    loadComponent: () => import('./item-create-page.component').then((m) => m.ItemCreatePageComponent)
+  },
+  {
     path: 'item/:id',
     title: 'Ítem · Junkyard',
     loadComponent: () => import('./detail-page.component').then((m) => m.DetailPageComponent)

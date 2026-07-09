@@ -23,10 +23,6 @@
             Archivar
           </button>
         }
-        <a mat-stroked-button [href]="itemLegacyUrl()" target="_blank" rel="noreferrer">
-          <mat-icon>open_in_new</mat-icon>
-          Legacy
-        </a>
         <a mat-stroked-button [href]="itemPhotosDownloadUrl()" target="_blank" rel="noreferrer" [class.disabled-link]="!item()!.photos.length">
           <mat-icon>download</mat-icon>
           Fotos ZIP
@@ -48,9 +44,9 @@
             Archivar
           </button>
         }
-        <a mat-stroked-button [href]="boxLegacyUrl()" target="_blank" rel="noreferrer">
-          <mat-icon>open_in_new</mat-icon>
-          Legacy
+        <a mat-stroked-button routerLink="/item/new" [queryParams]="{ boxId: box()!.id }">
+          <mat-icon>add</mat-icon>
+          Nuevo ítem aquí
         </a>
       }
     </nav>

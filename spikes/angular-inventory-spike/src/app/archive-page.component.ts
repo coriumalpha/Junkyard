@@ -11,7 +11,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { ArchiveBox, ArchiveItem, ArchivePhoto, InventoryApiService } from './inventory-api.service';
 import { InventoryCodePipe } from './inventory-code.pipe';
-import { legacyUrl } from './legacy-url';
 
 @Component({
   selector: 'app-archive-page',
@@ -74,10 +73,6 @@ export class ArchivePageComponent {
 
   protected assetUrl(path: string | null | undefined): string | null {
     return path ? (path.startsWith('/') ? path : `/${path}`) : null;
-  }
-
-  protected legacyUrl(path: string): string {
-    return legacyUrl(path);
   }
 
   private load(): void {

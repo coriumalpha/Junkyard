@@ -21,7 +21,6 @@ import { ColorPickerComponent } from './color-picker.component';
 import { HierarchyTrailComponent, HierarchyTrailNode } from './hierarchy-trail.component';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { InventoryAction, InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryMode, InventoryOptionsResponse, InventoryPhoto, ItemClass, ItemSubtype } from './inventory-api.service';
-import { legacyUrl } from './legacy-url';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
 
@@ -762,10 +761,6 @@ export class DetailPageComponent {
     ).subscribe();
   }
 
-  protected legacyUrl(path: string | null | undefined): string {
-    return legacyUrl(path);
-  }
-
   protected assetUrl(path: string | null | undefined): string | null {
     if (!path) {
       return null;
@@ -822,14 +817,6 @@ export class DetailPageComponent {
     }
 
     return item.itemSubtypeName ? `${item.itemClassName} / ${item.itemSubtypeName}` : item.itemClassName;
-  }
-
-  protected boxLegacyUrl(): string {
-    return this.legacyUrl(this.box()?.legacyUrl);
-  }
-
-  protected itemLegacyUrl(): string {
-    return this.legacyUrl(this.item()?.legacyUrl);
   }
 
   protected itemPhotosDownloadUrl(): string {

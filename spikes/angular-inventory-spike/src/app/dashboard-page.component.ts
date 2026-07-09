@@ -11,7 +11,6 @@ import { RouterLink } from '@angular/router';
 
 import { DashboardConsumableGroup, DashboardMetric, DashboardResponse, InventoryApiService } from './inventory-api.service';
 import { InventoryCodePipe } from './inventory-code.pipe';
-import { legacyUrl } from './legacy-url';
 
 @Component({
   selector: 'app-dashboard-page',
@@ -51,10 +50,6 @@ export class DashboardPageComponent {
       finalize(() => this.loading.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
-  }
-
-  protected backendUrl(path: string): string {
-    return legacyUrl(path);
   }
 
   protected assetUrl(path: string | null | undefined): string | null {

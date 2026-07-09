@@ -1,0 +1,136 @@
+<main class="item-create-shell">
+  <header class="item-create-header">
+    <div>
+      <p class="eyebrow">Inventario</p>
+      <h1>Nuevo ítem</h1>
+      <p>Alta directa en la aplicación actual. El guardado crea la ficha, no usa el inventario legacy.</p>
+    </div>
+    <a mat-stroked-button routerLink="/inventory">
+      <mat-icon>arrow_back</mat-icon>
+      Inventario
+    </a>
+  </header>
+
+  @if (loading()) {
+    <section class="state-panel">
+      <mat-progress-spinner mode="indeterminate" diameter="44" />
+      <span>Cargando formulario...</span>
+    </section>
+  } @else {
+    @if (error()) {
+      <section class="state-panel error">
+        <mat-icon>warning</mat-icon>
+        <span>{{ error() }}</span>
+      </section>
+    }
+
+    <mat-card class="create-card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Ficha</p>
+          <h2>Datos del ítem</h2>
+        </div>
+        <button mat-flat-button type="button" (click)="createItem()" [disabled]="saving()">
+          <mat-icon>save</mat-icon>
+          {{ saving() ? 'Creando...' : 'Crear ítem' }}
+        </button>
+      </div>
+
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>IT público</mat-label>
+          <input matInput [ngModel]="form().code" (ngModelChange)="patchForm({ code: $event })" placeholder="Vacío = automático" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre</mat-label>
+          <input matInput [ngModel]="form().name" (ngModelChange)="patchForm({ name: $event })" />
+        </mat-form-field>
+
+        <app-tag-picker
+          label="Tags"
+          [value]="form().tagIds"
+          [tags]="options().tags"
+          (valueChange)="patchForm({ tagIds: $any($event) })" />
+
+        <app-searchable-select
+          label="Clase"
+          [value]="form().itemClassId"
+          [options]="itemClassOptions()"
+          noneLabel="Sin clase"
+          placeholder="Buscar clase..."
+          (valueChange)="setItemClassId($event)" />
+
+        @if (form().itemClassId && itemSubtypeOptions().length) {
+          <app-searchable-select
+            label="Subtipo"
+            [value]="form().itemSubtypeId"
+            [options]="itemSubtypeOptions()"
+            noneLabel="Sin subtipo"
+            placeholder="Buscar subtipo..."
+            (valueChange)="setItemSubtypeId($event)" />
+        } @else {
+          <div class="classification-note">
+            <span>{{ selectedItemClass() ? inventoryModeLabel(selectedItemClass()!.inventoryMode) : 'Sin clase' }}</span>
+          </div>
+        }
+
+        <app-searchable-select
+          label="Contenedor"
+          [value]="form().boxId"
+          [options]="boxOptions()"
+          noneLabel="Sin caja"
+          placeholder="Buscar contenedor..."
+          (valueChange)="patchForm({ boxId: $any($event) })" />
+
+        <mat-form-field appearance="outline">
+          <mat-label>Cantidad</mat-label>
+          <input matInput type="number" [ngModel]="form().quantity" (ngModelChange)="patchForm({ quantity: +$event })" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Unidad</mat-label>
+          <input matInput [ngModel]="form().unit" (ngModelChange)="patchForm({ unit: $event })" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Mínimo</mat-label>
+          <input matInput type="number" [ngModel]="form().minQuantity" (ngModelChange)="patchForm({ minQuantity: $event === '' ? null : +$event })" />
+        </mat-form-field>
+
+        <app-searchable-select
+          label="Estado"
+          [value]="form().condition"
+          [options]="conditionOptions()"
+          noneLabel="Sin estado"
+          placeholder="Buscar estado..."
+          (valueChange)="patchForm({ condition: $any($event) ?? '' })" />
+
+        <mat-form-field appearance="outline">
+          <mat-label>Retención</mat-label>
+          <input matInput [ngModel]="form().retention" (ngModelChange)="patchForm({ retention: $event })" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="wide">
+          <mat-label>Descripción</mat-label>
+          <textarea matInput rows="4" [ngModel]="form().notes" (ngModelChange)="patchForm({ notes: $event })"></textarea>
+        </mat-form-field>
+
+        <div class="toggle-row wide">
+          <mat-slide-toggle [checked]="form().consumable" (change)="patchForm({ consumable: $event.checked })">Consumible</mat-slide-toggle>
+          <mat-slide-toggle [checked]="form().isQuarantined" (change)="patchForm({ isQuarantined: $event.checked })">En cuarentena</mat-slide-toggle>
+          <mat-slide-toggle [checked]="form().sentimental" (change)="patchForm({ sentimental: $event.checked })">Sentimental</mat-slide-toggle>
+          <mat-slide-toggle [checked]="form().obsolete" (change)="patchForm({ obsolete: $event.checked })">Obsoleto</mat-slide-toggle>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <a mat-stroked-button routerLink="/inventory">Cancelar</a>
+        <button mat-flat-button type="button" (click)="createItem()" [disabled]="saving()">
+          <mat-icon>save</mat-icon>
+          {{ saving() ? 'Creando...' : 'Crear ítem' }}
+        </button>
+      </div>
+    </mat-card>
+  }
+</main>

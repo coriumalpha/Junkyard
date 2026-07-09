@@ -6,10 +6,6 @@
       <p>Tareas operativas vinculadas a contenedores o ítems.</p>
     </div>
 
-    <a mat-stroked-button [href]="legacyActionsUrl" target="_blank" rel="noreferrer">
-      <mat-icon>add_task</mat-icon>
-      Crear en legacy
-    </a>
   </header>
 
   <mat-card class="create-panel">
@@ -120,11 +116,6 @@
                 <div class="action-buttons">
                   @if (action.spaUrl) {
                     <a mat-button [routerLink]="action.spaUrl">
-                      <mat-icon>open_in_new</mat-icon>
-                      Abrir
-                    </a>
-                  } @else if (action.legacyUrl) {
-                    <a mat-button [href]="legacyUrl(action.legacyUrl)" target="_blank" rel="noreferrer">
                       <mat-icon>open_in_new</mat-icon>
                       Abrir
                     </a>

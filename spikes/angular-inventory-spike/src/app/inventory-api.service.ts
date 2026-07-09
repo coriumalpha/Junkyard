@@ -952,6 +952,10 @@ export class InventoryApiService {
     return this.http.get<InventoryItemDetail>(`/api/items/${id}`);
   }
 
+  createItem(input: InventoryItemUpdate): Observable<InventoryItemDetail> {
+    return this.http.post<InventoryItemDetail>('/api/items', input);
+  }
+
   updateItem(id: number, input: InventoryItemUpdate): Observable<InventoryItemDetail> {
     return this.http.put<InventoryItemDetail>(`/api/items/${id}`, input);
   }

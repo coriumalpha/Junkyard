@@ -676,6 +676,19 @@ app.MapGet("/api/items/{id:int}", async (
     var response = await queryService.GetItemDetailAsync(id, cancellationToken);
     return response is null ? Results.NotFound() : Results.Json(response);
 });
+app.MapPost("/api/items", async (
+    InventoryItemUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (item, error) = await queryService.CreateItemAsync(input, cancellationToken);
+    if (error is not null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return Results.Json(item);
+});
 app.MapPut("/api/items/{id:int}", async (
     int id,
     InventoryItemUpdateDto input,
