@@ -15,6 +15,7 @@ public sealed class AiItemSuggestionService(
     AiSettingsService aiSettingsService)
 {
     private const string PromptVersion = "photo-review-item-v1";
+    private const int MaxUserHintLength = 500;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -55,6 +56,12 @@ public sealed class AiItemSuggestionService(
             return (null, new AiServiceError("too_many_photos", $"Máximo {settings.MaxImagesPerRequest} fotos por petición IA."));
         }
 
+        var userHint = (request.UserHint ?? "").Trim();
+        if (userHint.Length > MaxUserHintLength)
+        {
+            return (null, new AiServiceError("user_hint_too_long", $"La pista para IA no puede superar {MaxUserHintLength} caracteres."));
+        }
+
         var mode = string.IsNullOrWhiteSpace(request.Mode)
             ? settings.DefaultMode
             : AiSettingsService.NormalizeMode(request.Mode);
@@ -67,6 +74,7 @@ public sealed class AiItemSuggestionService(
         suggestion = new AiItemSuggestion
         {
             PhotoIdsJson = photoIdsJson,
+            UserHint = string.IsNullOrWhiteSpace(userHint) ? null : userHint,
             Provider = settings.Provider,
             Model = model,
             ImageDetail = detail,
@@ -103,10 +111,10 @@ public sealed class AiItemSuggestionService(
             }
 
             var catalogs = await LoadCatalogContextAsync(cancellationToken);
-            var prompt = BuildPrompt(catalogs, request.UserHint);
+            var prompt = BuildPrompt(catalogs, userHint);
             var raw = await CallOpenAiAsync(settings.ApiKey!, model, prompt, imageInputs, cancellationToken);
             suggestion.RawResponseJson = settings.StoreRawResponse ? raw.RawJson : null;
-            var parsed = ValidateAndNormalize(raw.OutputText, catalogs, suggestion.Id, settings, model, detail);
+            var parsed = ValidateAndNormalize(raw.OutputText, catalogs, suggestion.Id, settings, model, detail, suggestion.UserHint);
             suggestion.ParsedResponseJson = JsonSerializer.Serialize(parsed, JsonOptions);
             await db.SaveChangesAsync(cancellationToken);
             return (parsed, null);
@@ -215,7 +223,12 @@ public sealed class AiItemSuggestionService(
     private static string BuildPrompt(CatalogContext catalogs, string? userHint)
     {
         var contextJson = JsonSerializer.Serialize(catalogs, JsonOptions);
-        var hint = string.IsNullOrWhiteSpace(userHint) ? "Sin pista del usuario." : userHint.Trim();
+        var hintBlock = string.IsNullOrWhiteSpace(userHint)
+            ? "El usuario no ha proporcionado pista opcional."
+            : $"""
+            The user provided this optional hint/context. Use it to disambiguate the image, but do not invent facts that are not visible or reasonably inferable. If the hint conflicts with the image, add a warning:
+            <userHint>{userHint.Trim()}</userHint>
+            """;
         return $"""
             Eres un asistente de inventario privado. Cataloga el objeto visible en las fotos.
             Reglas estrictas:
@@ -227,13 +240,15 @@ public sealed class AiItemSuggestionService(
             - Los tags nuevos van separados en suggestedNewTags y nunca se aplican automáticamente.
             - Sugiere clase/subtipo solo si encaja con confianza razonable y existe en el catálogo.
             - Añade warnings cuando haya incertidumbre, varias posibilidades o baja confianza.
+            - La pista del usuario puede ayudar a desambiguar, pero la evidencia visual manda.
+            - Si la pista y la imagen no encajan claramente, no inventes: devuelve warning.
             - No devuelvas texto fuera del JSON.
 
             Contexto de catálogos actuales JSON:
             {contextJson}
 
-            Pista del usuario:
-            {hint}
+            Pista/contexto opcional:
+            {hintBlock}
             """;
     }
 
@@ -292,7 +307,8 @@ public sealed class AiItemSuggestionService(
         int suggestionId,
         AiEffectiveSettings settings,
         string model,
-        string detail)
+        string detail,
+        string? userHint)
     {
         var parsed = JsonSerializer.Deserialize<AiSuggestItemResponse>(outputText, JsonOptions)
             ?? throw new JsonException("JSON vacío.");
@@ -344,7 +360,8 @@ public sealed class AiItemSuggestionService(
             SuggestedSubtype = suggestedSubtype,
             Warnings = parsed.Warnings.Select(warning => Trim(warning, 180)).Where(warning => warning.Length > 0).Take(8).ToList(),
             Model = model,
-            ImageDetail = detail
+            ImageDetail = detail,
+            UserHint = userHint
         };
     }
 
@@ -468,6 +485,7 @@ public record AiSuggestItemResponse(
     List<string> Warnings,
     string? Model,
     string? ImageDetail,
+    string? UserHint,
     string? EstimatedCostInfo);
 
 public record SuggestedTag(int? TagId, string TagName, decimal Confidence, string Reason);

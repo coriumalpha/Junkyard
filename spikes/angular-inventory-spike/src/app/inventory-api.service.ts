@@ -703,6 +703,7 @@ export interface AiSuggestItemResponse {
   warnings: string[];
   model: string | null;
   imageDetail: string | null;
+  userHint: string | null;
   estimatedCostInfo: string | null;
 }
 

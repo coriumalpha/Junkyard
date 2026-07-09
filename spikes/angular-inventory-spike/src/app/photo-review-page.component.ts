@@ -41,6 +41,7 @@ export class PhotoReviewPageComponent {
   protected readonly aiStatus = signal<AiStatus | null>(null);
   protected readonly aiSuggestion = signal<AiSuggestItemResponse | null>(null);
   protected readonly aiHint = signal('');
+  protected readonly aiHintLength = computed(() => this.aiHint().length);
   protected readonly panel = signal<ReviewPanel>('none');
   protected readonly lastAffectedIds = signal<number[]>([]);
   protected readonly assignBoxId = signal<number | null>(null);
@@ -421,6 +422,10 @@ export class PhotoReviewPageComponent {
     }
 
     return `${Math.round(value * 100)}%`;
+  }
+
+  protected setAiHint(value: string): void {
+    this.aiHint.set(value.slice(0, 500));
   }
 
   protected setDraftItemClassId(value: number | string | null | (number | string | null)[]): void {

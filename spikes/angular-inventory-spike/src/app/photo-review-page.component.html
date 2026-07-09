@@ -145,6 +145,17 @@
               <strong>Nuevo ítem</strong>
               <span>Ctrl+Enter crea · Esc cierra</span>
             </div>
+            <mat-form-field appearance="outline" class="ai-hint-field">
+              <mat-label>Pista para IA</mat-label>
+              <textarea
+                matInput
+                rows="2"
+                maxlength="500"
+                placeholder="Ej.: es un repuesto, una placa, un lote, ignora el fondo…"
+                [ngModel]="aiHint()"
+                (ngModelChange)="setAiHint($event)"></textarea>
+              <mat-hint align="end">{{ aiHintLength() }}/500</mat-hint>
+            </mat-form-field>
             <div class="ai-tool">
               <div>
                 <strong>Varita IA</strong>
@@ -175,6 +186,12 @@
                   <strong>Propuesta IA</strong>
                   <span>{{ aiSuggestion()!.model }} · {{ aiSuggestion()!.imageDetail }}</span>
                 </div>
+                @if (aiSuggestion()!.userHint) {
+                  <details class="ai-used-hint">
+                    <summary>Pista usada</summary>
+                    <p>{{ aiSuggestion()!.userHint }}</p>
+                  </details>
+                }
 
                 <div class="ai-suggestion-field">
                   <div>
@@ -248,10 +265,6 @@
                   </ul>
                 }
 
-                <mat-form-field appearance="outline">
-                  <mat-label>Pista para reintentar</mat-label>
-                  <input matInput [ngModel]="aiHint()" (ngModelChange)="aiHint.set($event)" />
-                </mat-form-field>
                 <div class="ai-actions">
                   <button mat-flat-button type="button" (click)="applyAllAi()">Aplicar todo</button>
                   <button mat-stroked-button type="button" (click)="suggestWithAi('normal')" [disabled]="aiBusy()">Reintentar</button>

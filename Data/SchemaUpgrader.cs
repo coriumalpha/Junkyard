@@ -38,6 +38,7 @@ public static class SchemaUpgrader
         AddColumn(db, "PhotoInboxes", "ProcessedAt", "TEXT NULL");
         EnsureAiItemSuggestions(db);
         AddColumn(db, "AiItemSuggestions", "Provider", "TEXT NOT NULL DEFAULT 'OpenAI'");
+        AddColumn(db, "AiItemSuggestions", "UserHint", "TEXT NULL");
         EnsureAiSettings(db);
         BackfillItemCodes(db);
         db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Items_Code_Active" ON "Items" ("Code") WHERE "ArchivedAt" IS NULL AND "Code" IS NOT NULL AND trim("Code") <> '';""");
@@ -112,6 +113,7 @@ public static class SchemaUpgrader
                 "Id" INTEGER NOT NULL CONSTRAINT "PK_AiItemSuggestions" PRIMARY KEY AUTOINCREMENT,
                 "CreatedAt" TEXT NOT NULL,
                 "PhotoIdsJson" TEXT NOT NULL,
+                "UserHint" TEXT NULL,
                 "Provider" TEXT NOT NULL DEFAULT 'OpenAI',
                 "Model" TEXT NOT NULL,
                 "ImageDetail" TEXT NOT NULL,
