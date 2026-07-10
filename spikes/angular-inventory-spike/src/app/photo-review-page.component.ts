@@ -251,6 +251,14 @@ export class PhotoReviewPageComponent {
     this.navigateTo(photo.id);
   }
 
+  protected selectAllPending(): void {
+    this.selectedIds.set(this.review()?.pending.map((photo) => photo.id) ?? []);
+  }
+
+  protected clearSelection(): void {
+    this.selectedIds.set([]);
+  }
+
   protected openPanel(panel: ReviewPanel): void {
     const current = this.current();
     if (!current) {

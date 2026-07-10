@@ -91,6 +91,16 @@
           <p class="selection-summary">
             {{ selectionSummary() }}
           </p>
+          <div class="split-actions">
+            <button mat-button type="button" (click)="selectAllPending()" [disabled]="busy() || !review()?.pending?.length">
+              <mat-icon>select_all</mat-icon>
+              Todas
+            </button>
+            <button mat-button type="button" (click)="clearSelection()" [disabled]="busy() || !selectedIds().length">
+              <mat-icon>close</mat-icon>
+              Limpiar
+            </button>
+          </div>
           <button mat-flat-button type="button" (click)="openPanel('create')" [disabled]="busy()">
             <mat-icon>add_box</mat-icon>
             <span class="keycap">N</span>
