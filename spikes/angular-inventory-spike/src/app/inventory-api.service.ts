@@ -17,6 +17,7 @@ export interface InventoryQueryState {
   onlyOrphans: boolean;
   onlyUntagged: boolean;
   onlyQuarantined: boolean;
+  onlyNeedsReview: boolean;
   layout: InventoryLayoutMode;
   view: InventoryViewMode;
 }
@@ -34,6 +35,7 @@ export interface InventoryLiveResponse {
   onlyOrphans: boolean;
   onlyUntagged: boolean;
   onlyQuarantined: boolean;
+  onlyNeedsReview: boolean;
   viewMode: InventoryViewMode;
   selectedBoxes: InventorySelectedBox[];
   selectedBox: InventoryContext | null;
@@ -261,6 +263,7 @@ export interface InventoryItem {
   generatedLabel: string | null;
   consumable: boolean;
   isQuarantined: boolean;
+  needsReview: boolean;
   lowStock: boolean;
   sentimental: boolean;
   obsolete: boolean;
@@ -437,6 +440,7 @@ export interface InventoryItemDetail {
   notes: string | null;
   consumable: boolean;
   isQuarantined: boolean;
+  needsReview: boolean;
   lowStock: boolean;
   sentimental: boolean;
   obsolete: boolean;
@@ -464,6 +468,7 @@ export interface InventoryItemUpdate {
   retention: string;
   consumable: boolean;
   isQuarantined: boolean;
+  needsReview: boolean;
   sentimental: boolean;
   obsolete: boolean;
   notes: string;
@@ -643,6 +648,7 @@ export interface PhotoReviewCreateItem {
   quantity: number;
   unit: string;
   isQuarantined: boolean;
+  needsReview: boolean;
   tagIds: number[];
 }
 
@@ -827,6 +833,10 @@ export class InventoryApiService {
 
     if (state.onlyQuarantined) {
       params = params.set('onlyQuarantined', 'true');
+    }
+
+    if (state.onlyNeedsReview) {
+      params = params.set('onlyNeedsReview', 'true');
     }
 
     params = params.set('view', state.view);

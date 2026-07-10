@@ -54,6 +54,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.Notes,
             item.Consumable,
             item.IsQuarantined,
+            item.NeedsReview,
             item.MinQuantity != null && item.Quantity <= item.MinQuantity,
             item.Sentimental,
             item.Obsolete,
@@ -203,6 +204,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             Retention = string.IsNullOrWhiteSpace(input.Retention) ? null : input.Retention.Trim(),
             Consumable = input.Consumable,
             IsQuarantined = input.IsQuarantined,
+            NeedsReview = input.NeedsReview,
             Sentimental = input.Sentimental,
             Obsolete = input.Obsolete,
             Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim()
@@ -290,6 +292,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         item.Retention = string.IsNullOrWhiteSpace(input.Retention) ? null : input.Retention.Trim();
         item.Consumable = input.Consumable;
         item.IsQuarantined = input.IsQuarantined;
+        item.NeedsReview = input.NeedsReview;
         item.Sentimental = input.Sentimental;
         item.Obsolete = input.Obsolete;
         item.Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim();
@@ -1355,6 +1358,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             Quantity = input.Quantity <= 0 ? 1 : input.Quantity,
             Unit = string.IsNullOrWhiteSpace(input.Unit) ? "uds" : input.Unit.Trim(),
             IsQuarantined = input.IsQuarantined,
+            NeedsReview = input.NeedsReview,
             Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim()
         };
         foreach (var tag in tags.OrderBy(tag => tag.Name))
@@ -1947,6 +1951,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         bool onlyOrphans,
         bool onlyUntagged,
         bool onlyQuarantined,
+        bool onlyNeedsReview,
         string? view,
         CancellationToken cancellationToken)
     {
@@ -2082,6 +2087,11 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             query = query.Where(i => i.IsQuarantined);
         }
 
+        if (onlyNeedsReview)
+        {
+            query = query.Where(i => i.NeedsReview);
+        }
+
         if (!string.IsNullOrWhiteSpace(categoryValue))
         {
             query = query.Where(i => i.Category == categoryValue);
@@ -2190,6 +2200,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             onlyOrphans,
             onlyUntagged,
             onlyQuarantined,
+            onlyNeedsReview,
             viewMode,
             selectedBoxes.Select(boxSelection => new InventorySelectedBoxDto(
                 boxSelection.Id,
@@ -2254,6 +2265,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             string.IsNullOrWhiteSpace(item.CoverPhoto) ? item.Name[..Math.Min(1, item.Name.Length)] : null,
             item.Consumable,
             item.IsQuarantined,
+            item.NeedsReview,
             item.MinQuantity != null && item.Quantity <= item.MinQuantity,
             item.Sentimental,
             item.Obsolete);
@@ -2824,6 +2836,7 @@ public record InventoryLiveResponseDto(
     bool OnlyOrphans,
     bool OnlyUntagged,
     bool OnlyQuarantined,
+    bool OnlyNeedsReview,
     string ViewMode,
     List<InventorySelectedBoxDto> SelectedBoxes,
     InventoryContextDto? SelectedBox,
@@ -2922,6 +2935,7 @@ public record InventoryItemDetailDto(
     string? Notes,
     bool Consumable,
     bool IsQuarantined,
+    bool NeedsReview,
     bool LowStock,
     bool Sentimental,
     bool Obsolete,
@@ -2948,6 +2962,7 @@ public record InventoryItemUpdateDto(
     string? Retention,
     bool Consumable,
     bool IsQuarantined,
+    bool NeedsReview,
     bool Sentimental,
     bool Obsolete,
     string? Notes,
@@ -3075,6 +3090,7 @@ public record PhotoReviewCreateItemDto(
     decimal Quantity,
     string? Unit,
     bool IsQuarantined,
+    bool NeedsReview,
     List<int>? TagIds);
 
 public record PhotoReviewUndoDto(List<int>? Ids);
@@ -3244,6 +3260,7 @@ public record InventoryItemDto(
     string? GeneratedLabel,
     bool Consumable,
     bool IsQuarantined,
+    bool NeedsReview,
     bool LowStock,
     bool Sentimental,
     bool Obsolete);

@@ -66,6 +66,7 @@ const DEFAULT_STATE: InventoryQueryState = {
   onlyOrphans: false,
   onlyUntagged: false,
   onlyQuarantined: false,
+  onlyNeedsReview: false,
   layout: 'grouped',
   view: 'grouped'
 };
@@ -184,7 +185,7 @@ export class InventoryPageComponent {
   protected readonly shouldAutoExpandGroups = computed(() => {
     const state = this.state();
     return state.layout === 'grouped'
-      && Boolean(state.q.trim() || state.category.trim() || state.tagIds.length || state.boxIds.length || state.locationId !== null || state.onlyConsumable || state.onlyOrphans || state.onlyUntagged || state.onlyQuarantined);
+      && Boolean(state.q.trim() || state.category.trim() || state.tagIds.length || state.boxIds.length || state.locationId !== null || state.onlyConsumable || state.onlyOrphans || state.onlyUntagged || state.onlyQuarantined || state.onlyNeedsReview);
   });
   protected readonly filteredContainers = computed(() => {
     const state = this.state();
@@ -338,6 +339,10 @@ export class InventoryPageComponent {
     this.navigate({ onlyQuarantined: value });
   }
 
+  protected setOnlyNeedsReview(value: boolean): void {
+    this.navigate({ onlyNeedsReview: value });
+  }
+
   protected toggleEditMode(): void {
     this.editMode.update((value) => !value);
     this.bulkMessage.set(null);
@@ -460,6 +465,10 @@ export class InventoryPageComponent {
       return 'badge warm';
     }
 
+    if (item.needsReview) {
+      return 'badge cool';
+    }
+
     if (item.lowStock) {
       return 'badge low';
     }
@@ -538,6 +547,10 @@ export class InventoryPageComponent {
 
     if (state.onlyQuarantined) {
       summary.push('en cuarentena');
+    }
+
+    if (state.onlyNeedsReview) {
+      summary.push('pendiente de completar');
     }
 
     summary.push(this.layoutLabel(state.layout));
@@ -800,6 +813,10 @@ export class InventoryPageComponent {
       params['onlyQuarantined'] = 'true';
     }
 
+    if (state.onlyNeedsReview) {
+      params['onlyNeedsReview'] = 'true';
+    }
+
     return params;
   }
 
@@ -830,6 +847,7 @@ export class InventoryPageComponent {
       onlyOrphans: params.get('onlyOrphans') === 'true',
       onlyUntagged: params.get('onlyUntagged') === 'true',
       onlyQuarantined: params.get('onlyQuarantined') === 'true',
+      onlyNeedsReview: params.get('onlyNeedsReview') === 'true',
       layout,
       view: this.deriveBackendView(layout)
     };

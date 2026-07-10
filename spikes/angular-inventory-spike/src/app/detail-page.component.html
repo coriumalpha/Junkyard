@@ -309,6 +309,7 @@
             <div class="toggle-row wide">
               <mat-slide-toggle [checked]="itemForm().consumable" (change)="patchItemForm({ consumable: $event.checked })">Consumible</mat-slide-toggle>
               <mat-slide-toggle [checked]="itemForm().isQuarantined" (change)="patchItemForm({ isQuarantined: $event.checked })">En cuarentena</mat-slide-toggle>
+              <mat-slide-toggle [checked]="itemForm().needsReview" (change)="patchItemForm({ needsReview: $event.checked })">Pendiente de completar</mat-slide-toggle>
               <mat-slide-toggle [checked]="itemForm().sentimental" (change)="patchItemForm({ sentimental: $event.checked })">Sentimental</mat-slide-toggle>
               <mat-slide-toggle [checked]="itemForm().obsolete" (change)="patchItemForm({ obsolete: $event.checked })">Obsoleto</mat-slide-toggle>
             </div>

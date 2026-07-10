@@ -271,6 +271,7 @@ export class App {
       onlyOrphans: false,
       onlyUntagged: false,
       onlyQuarantined: false,
+      onlyNeedsReview: false,
       layout: 'flat',
       view: 'flat'
     }).pipe(

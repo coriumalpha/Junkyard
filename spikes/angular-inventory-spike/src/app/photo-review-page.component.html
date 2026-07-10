@@ -446,6 +446,9 @@
             <mat-slide-toggle [checked]="draftIsQuarantined()" (change)="draftIsQuarantined.set($event.checked)">
               En cuarentena
             </mat-slide-toggle>
+            <mat-slide-toggle [checked]="draftNeedsReview()" (change)="draftNeedsReview.set($event.checked)">
+              Requiere revisión detallada
+            </mat-slide-toggle>
             <button mat-flat-button type="button" (click)="createItem()" [disabled]="busy()">Crear y asignar</button>
           </mat-card>
         }

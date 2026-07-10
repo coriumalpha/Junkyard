@@ -242,6 +242,7 @@ app.MapGet("/api/inventory/live", async (
         string.Equals(query["onlyOrphans"], "true", StringComparison.OrdinalIgnoreCase),
         string.Equals(query["onlyUntagged"], "true", StringComparison.OrdinalIgnoreCase),
         string.Equals(query["onlyQuarantined"], "true", StringComparison.OrdinalIgnoreCase),
+        string.Equals(query["onlyNeedsReview"], "true", StringComparison.OrdinalIgnoreCase),
         query["view"].ToString(),
         cancellationToken);
 

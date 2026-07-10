@@ -204,6 +204,10 @@
           <mat-slide-toggle [checked]="state().onlyQuarantined" (change)="setOnlyQuarantined($event.checked)">
             En cuarentena
           </mat-slide-toggle>
+
+          <mat-slide-toggle [checked]="state().onlyNeedsReview" (change)="setOnlyNeedsReview($event.checked)">
+            Pendiente de completar
+          </mat-slide-toggle>
         </div>
       </mat-expansion-panel>
       } @else if (state().locationId !== null) {
@@ -499,6 +503,9 @@
                             @if (item.isQuarantined) {
                               <span class="badge warm">Cuarentena</span>
                             }
+                            @if (item.needsReview) {
+                              <span class="badge cool">Pendiente</span>
+                            }
                             @if (item.lowStock) {
                               <span class="badge low">Bajo stock</span>
                             }
@@ -596,7 +603,7 @@
                   </div>
 
                   <div class="item-badges">
-                    <span [class]="badgeClass(item)">{{ item.consumable ? 'Consumible' : 'No consumible' }}</span>
+                    <span [class]="badgeClass(item)">{{ item.needsReview ? 'Pendiente' : (item.consumable ? 'Consumible' : 'No consumible') }}</span>
                     @if (item.isQuarantined) {
                       <span class="badge warm">Cuarentena</span>
                     }
@@ -660,6 +667,9 @@
                       }
                       @if (item.isQuarantined) {
                         <span class="badge warm">Cuarentena</span>
+                      }
+                      @if (item.needsReview) {
+                        <span class="badge cool">Pendiente</span>
                       }
                       @if (itemClassificationLabel(item)) {
                         <span class="badge info">{{ itemClassificationLabel(item) }}</span>
@@ -732,7 +742,7 @@
                   </div>
 
                   <div class="table-cell">
-                    <span [class]="badgeClass(item)">{{ item.isQuarantined ? 'Cuarentena' : (item.consumable ? 'Consumible' : 'No consumible') }}</span>
+                    <span [class]="badgeClass(item)">{{ item.isQuarantined ? 'Cuarentena' : (item.needsReview ? 'Pendiente' : (item.consumable ? 'Consumible' : 'No consumible')) }}</span>
                   </div>
 
                   <div class="table-actions">

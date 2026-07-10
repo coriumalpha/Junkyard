@@ -28,9 +28,11 @@ public static class SchemaUpgrader
         AddColumn(db, "Items", "ItemClassId", "INTEGER NULL");
         AddColumn(db, "Items", "ItemSubtypeId", "INTEGER NULL");
         AddColumn(db, "Items", "IsQuarantined", "INTEGER NOT NULL DEFAULT 0");
+        AddColumn(db, "Items", "NeedsReview", "INTEGER NOT NULL DEFAULT 0");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_ItemClassId" ON "Items" ("ItemClassId");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_ItemSubtypeId" ON "Items" ("ItemSubtypeId");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_IsQuarantined" ON "Items" ("IsQuarantined");""");
+        db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_NeedsReview" ON "Items" ("NeedsReview");""");
         AddColumn(db, "InventoryActions", "Kind", "TEXT NOT NULL DEFAULT 'Task'");
         EnsurePhotoInbox(db);
         AddColumn(db, "PhotoInboxes", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");

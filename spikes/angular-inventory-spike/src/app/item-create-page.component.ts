@@ -214,6 +214,7 @@ export class ItemCreatePageComponent {
       retention: '',
       consumable: false,
       isQuarantined: false,
+      needsReview: false,
       sentimental: false,
       obsolete: false,
       notes: '',

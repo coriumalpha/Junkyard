@@ -305,6 +305,7 @@ export class DetailPageComponent {
       retention: item.retention ?? '',
       consumable: item.consumable,
       isQuarantined: item.isQuarantined,
+      needsReview: item.needsReview,
       sentimental: item.sentimental,
       obsolete: item.obsolete,
       notes: item.notes ?? '',
@@ -417,6 +418,7 @@ export class DetailPageComponent {
           retention: updated.retention ?? '',
           consumable: updated.consumable,
           isQuarantined: updated.isQuarantined,
+          needsReview: updated.needsReview,
           sentimental: updated.sentimental,
           obsolete: updated.obsolete,
           notes: updated.notes ?? '',
@@ -783,6 +785,9 @@ export class DetailPageComponent {
     }
     if (item.isQuarantined) {
       flags.push('Cuarentena');
+    }
+    if (item.needsReview) {
+      flags.push('Pendiente de completar');
     }
     if (item.lowStock) {
       flags.push('Bajo stock');
@@ -1265,6 +1270,7 @@ export class DetailPageComponent {
       retention: '',
       consumable: false,
       isQuarantined: false,
+      needsReview: false,
       sentimental: false,
       obsolete: false,
       notes: '',

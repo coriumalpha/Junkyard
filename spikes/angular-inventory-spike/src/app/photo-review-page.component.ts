@@ -93,6 +93,7 @@ export class PhotoReviewPageComponent {
   protected readonly draftItemClassId = signal<number | null>(null);
   protected readonly draftItemSubtypeId = signal<number | null>(null);
   protected readonly draftIsQuarantined = signal(false);
+  protected readonly draftNeedsReview = signal(false);
   protected readonly draftBoxId = signal<number | null>(null);
   protected readonly itemClasses = signal<ItemClass[]>([]);
   protected readonly itemSubtypes = signal<ItemSubtype[]>([]);
@@ -207,6 +208,7 @@ export class PhotoReviewPageComponent {
       onlyOrphans: false,
       onlyUntagged: false,
       onlyQuarantined: false,
+      onlyNeedsReview: false,
       layout: 'flat',
       view: 'flat'
     }).pipe(
@@ -262,6 +264,7 @@ export class PhotoReviewPageComponent {
       this.draftItemClassId.set(null);
       this.draftItemSubtypeId.set(null);
       this.draftIsQuarantined.set(false);
+      this.draftNeedsReview.set(false);
       this.itemSubtypes.set([]);
       this.clearAiSuggestion(false);
       this.aiHint.set('');
@@ -342,6 +345,7 @@ export class PhotoReviewPageComponent {
       itemClassId: this.draftItemClassId(),
       itemSubtypeId: this.draftItemSubtypeId(),
       isQuarantined: this.draftIsQuarantined(),
+      needsReview: this.draftNeedsReview(),
       tagIds: this.draftTagIds()
     }), 'Ítem creado desde foto.');
   }
