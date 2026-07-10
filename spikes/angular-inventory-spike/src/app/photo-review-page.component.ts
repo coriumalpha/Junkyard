@@ -54,8 +54,11 @@ export class PhotoReviewPageComponent {
   protected readonly aiPreviewQuantity = signal<number | null>(null);
   protected readonly aiHint = signal('');
   protected readonly aiMode = signal<AiAnalysisMode>('fast');
+  protected readonly aiModeManuallySelected = signal(false);
+  protected readonly aiModeAutoNotice = signal(false);
   protected readonly dismissedTechnicalFactKeys = signal<string[]>([]);
   protected readonly aiHintLength = computed(() => this.aiHint().length);
+  protected readonly aiDetailedRecommended = computed(() => this.looksLikeDetailedHint(this.aiHint()));
   protected readonly aiModeHint = computed(() =>
     this.aiMode() === 'detailed'
       ? 'Detallado: usa derivado grande y detail=high. Más coste, mejor para placas, etiquetas y texto pequeño.'
@@ -567,12 +570,18 @@ export class PhotoReviewPageComponent {
   protected setAiHint(value: string): void {
     const next = value.slice(0, 500);
     this.aiHint.set(next);
-    if (this.looksLikeDetailedHint(next)) {
+    if (this.looksLikeDetailedHint(next) && !this.aiModeManuallySelected() && this.aiMode() !== 'detailed') {
       this.aiMode.set('detailed');
+      this.aiModeAutoNotice.set(true);
+      return;
     }
+
+    this.aiModeAutoNotice.set(this.aiModeAutoNotice() && this.looksLikeDetailedHint(next));
   }
 
   protected setAiMode(value: string): void {
+    this.aiModeManuallySelected.set(true);
+    this.aiModeAutoNotice.set(false);
     this.aiMode.set(value === 'detailed' ? 'detailed' : 'fast');
   }
 

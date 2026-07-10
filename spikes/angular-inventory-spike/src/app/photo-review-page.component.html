@@ -196,6 +196,11 @@
                 <mat-button-toggle value="detailed">Detallado</mat-button-toggle>
               </mat-button-toggle-group>
               <span>{{ aiModeHint() }}</span>
+              @if (aiModeAutoNotice()) {
+                <span class="ai-mode-notice">Modo detallado seleccionado por la pista técnica. Implica más coste que rápido.</span>
+              } @else if (aiDetailedRecommended() && aiMode() === 'fast') {
+                <span class="ai-mode-notice">Pista técnica detectada: detallado suele leer mejor placas, etiquetas y texto pequeño.</span>
+              }
             </div>
             <div class="ai-config-row">
               <span>El análisis consume API externa. Revisa la configuración antes de usarlo masivamente.</span>
