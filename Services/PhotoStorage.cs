@@ -12,8 +12,10 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
     private const string DerivedFolder = "_derived";
     private const string ThumbVariant = "thumb";
     private const string PreviewVariant = "preview";
+    private const string AiDetailVariant = "ai-detail";
     private const int ThumbMaxSize = 360;
     private const int PreviewMaxSize = 1400;
+    private const int AiDetailMaxSize = 2048;
     private static readonly JpegEncoder DerivativeEncoder = new() { Quality = 78 };
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -173,6 +175,7 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
         {
             ThumbVariant => ThumbMaxSize,
             PreviewVariant => PreviewMaxSize,
+            AiDetailVariant => AiDetailMaxSize,
             _ => throw new InvalidOperationException("Variante de fotografía no válida.")
         };
 
@@ -321,7 +324,7 @@ public class PhotoStorage(IWebHostEnvironment env, IConfiguration config)
 
     private void DeleteDerivatives(string filename)
     {
-        foreach (var variant in new[] { ThumbVariant, PreviewVariant })
+        foreach (var variant in new[] { ThumbVariant, PreviewVariant, AiDetailVariant })
         {
             var path = DerivativeFullPath(variant, filename);
             if (File.Exists(path))

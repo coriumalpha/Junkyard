@@ -170,6 +170,13 @@
                 Sugerir con IA
               </button>
             </div>
+            <div class="ai-mode-row">
+              <mat-button-toggle-group [ngModel]="aiMode()" (ngModelChange)="setAiMode($event)" aria-label="Modo de análisis IA">
+                <mat-button-toggle value="fast">Rápido</mat-button-toggle>
+                <mat-button-toggle value="detailed">Detallado</mat-button-toggle>
+              </mat-button-toggle-group>
+              <span>{{ aiModeHint() }}</span>
+            </div>
             <div class="ai-config-row">
               <span>El análisis consume API externa. Revisa la configuración antes de usarlo masivamente.</span>
               <a routerLink="/settings/ai">Configurar IA</a>
@@ -184,13 +191,42 @@
               <section class="ai-suggestion-panel">
                 <div class="panel-title-row">
                   <strong>Propuesta IA</strong>
-                  <span>{{ aiSuggestion()!.model }} · {{ aiSuggestion()!.imageDetail }}</span>
+                  <span>{{ aiSuggestion()!.model }} · {{ aiSuggestion()!.analysisMode }} · detail={{ aiSuggestion()!.imageDetail }}</span>
                 </div>
+                @if (aiSuggestion()!.inputTokens || aiSuggestion()!.outputTokens) {
+                  <p class="ai-token-line">Tokens: entrada {{ aiSuggestion()!.inputTokens ?? '?' }} · salida {{ aiSuggestion()!.outputTokens ?? '?' }}</p>
+                }
                 @if (aiSuggestion()!.userHint) {
                   <details class="ai-used-hint">
                     <summary>Pista usada</summary>
                     <p>{{ aiSuggestion()!.userHint }}</p>
                   </details>
+                }
+
+                @if (aiSuggestion()!.identification) {
+                  <div class="ai-identification">
+                    <span>Identificación · {{ confidenceLabel(aiSuggestion()!.identification.confidence) }}</span>
+                    <strong>{{ aiSuggestion()!.identification.genericName }}</strong>
+                    <p>
+                      @if (aiSuggestion()!.identification.manufacturer) {
+                        Fabricante probable: {{ aiSuggestion()!.identification.manufacturer }}.
+                      }
+                      @if (aiSuggestion()!.identification.model) {
+                        Modelo probable: {{ aiSuggestion()!.identification.model }}.
+                      }
+                      @if (aiSuggestion()!.identification.family) {
+                        Familia: {{ aiSuggestion()!.identification.family }}.
+                      }
+                    </p>
+                    @if (aiSuggestion()!.identification.alternatives.length) {
+                      <div class="ai-alternatives">
+                        <span>Alternativas</span>
+                        @for (alternative of aiSuggestion()!.identification.alternatives; track alternative.name) {
+                          <p>{{ alternative.name }} · {{ confidenceLabel(alternative.confidence) }} · {{ alternative.reason }}</p>
+                        }
+                      </div>
+                    }
+                  </div>
                 }
 
                 <div class="ai-suggestion-field">
@@ -245,7 +281,12 @@
                 @if (aiSuggestion()!.suggestedClass) {
                   <div class="ai-suggestion-field">
                     <div>
-                      <span>Clase/Subtipo</span>
+                      <span>
+                        Clase/Subtipo · {{ confidenceLabel(aiSuggestion()!.suggestedClass!.confidence) }}
+                        @if (aiSuggestion()!.suggestedSubtype) {
+                          / {{ confidenceLabel(aiSuggestion()!.suggestedSubtype!.confidence) }}
+                        }
+                      </span>
                       <strong>
                         {{ aiSuggestion()!.suggestedClass!.name }}
                         @if (aiSuggestion()!.suggestedSubtype) {
@@ -254,6 +295,31 @@
                       </strong>
                     </div>
                     <button mat-button type="button" (click)="applyAiClass()">Usar</button>
+                  </div>
+                }
+
+                @if (aiSuggestion()!.technicalFacts.length) {
+                  <div class="ai-facts">
+                    <div class="ai-section-title">
+                      <span>Datos técnicos</span>
+                      <span>{{ acceptedTechnicalFacts().length }} aceptados para Aplicar todo</span>
+                    </div>
+                    @for (fact of aiSuggestion()!.technicalFacts; track technicalFactKey(fact)) {
+                      <div class="ai-fact-row" [class.dismissed]="isTechnicalFactDismissed(fact)">
+                        <div>
+                          <strong>{{ fact.label }}: {{ fact.value }}</strong>
+                          <span>{{ confidenceLabel(fact.confidence) }} · {{ technicalFactSourceLabel(fact.source) }}</span>
+                          @if (fact.warning) {
+                            <small>{{ fact.warning }}</small>
+                          }
+                        </div>
+                        <div class="ai-fact-actions">
+                          <button mat-button type="button" (click)="applyTechnicalFact(fact)" [disabled]="isTechnicalFactDismissed(fact)">Incluir</button>
+                          <button mat-button type="button" (click)="discardTechnicalFact(fact)" [disabled]="isTechnicalFactDismissed(fact)">Descartar</button>
+                          <button mat-button type="button" disabled>Verificar</button>
+                        </div>
+                      </div>
+                    }
                   </div>
                 }
 
@@ -267,8 +333,8 @@
 
                 <div class="ai-actions">
                   <button mat-flat-button type="button" (click)="applyAllAi()">Aplicar todo</button>
-                  <button mat-stroked-button type="button" (click)="suggestWithAi('normal')" [disabled]="aiBusy()">Reintentar</button>
-                  <button mat-stroked-button type="button" (click)="suggestWithAi('cheap')" [disabled]="aiBusy()">Reintentar barato</button>
+                  <button mat-stroked-button type="button" (click)="suggestWithAi('detailed')" [disabled]="aiBusy()">Reintentar detallado</button>
+                  <button mat-stroked-button type="button" (click)="suggestWithAi('fast')" [disabled]="aiBusy()">Reintentar rápido</button>
                   <button mat-button type="button" (click)="discardAiSuggestion()">Descartar</button>
                 </div>
               </section>

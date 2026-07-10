@@ -39,6 +39,10 @@ public static class SchemaUpgrader
         EnsureAiItemSuggestions(db);
         AddColumn(db, "AiItemSuggestions", "Provider", "TEXT NOT NULL DEFAULT 'OpenAI'");
         AddColumn(db, "AiItemSuggestions", "UserHint", "TEXT NULL");
+        AddColumn(db, "AiItemSuggestions", "AnalysisMode", "TEXT NOT NULL DEFAULT 'fast'");
+        AddColumn(db, "AiItemSuggestions", "ImageVariant", "TEXT NOT NULL DEFAULT 'preview'");
+        AddColumn(db, "AiItemSuggestions", "InputTokens", "INTEGER NULL");
+        AddColumn(db, "AiItemSuggestions", "OutputTokens", "INTEGER NULL");
         EnsureAiSettings(db);
         BackfillItemCodes(db);
         db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Items_Code_Active" ON "Items" ("Code") WHERE "ArchivedAt" IS NULL AND "Code" IS NOT NULL AND trim("Code") <> '';""");
@@ -116,8 +120,12 @@ public static class SchemaUpgrader
                 "UserHint" TEXT NULL,
                 "Provider" TEXT NOT NULL DEFAULT 'OpenAI',
                 "Model" TEXT NOT NULL,
+                "AnalysisMode" TEXT NOT NULL DEFAULT 'fast',
                 "ImageDetail" TEXT NOT NULL,
+                "ImageVariant" TEXT NOT NULL DEFAULT 'preview',
                 "PromptVersion" TEXT NOT NULL,
+                "InputTokens" INTEGER NULL,
+                "OutputTokens" INTEGER NULL,
                 "RawResponseJson" TEXT NULL,
                 "ParsedResponseJson" TEXT NULL,
                 "AcceptedAt" TEXT NULL,

@@ -153,7 +153,9 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.Property(x => x.UserHint).HasMaxLength(500);
             entity.Property(x => x.Provider).HasMaxLength(40).IsRequired();
             entity.Property(x => x.Model).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.AnalysisMode).HasMaxLength(24).IsRequired();
             entity.Property(x => x.ImageDetail).HasMaxLength(16).IsRequired();
+            entity.Property(x => x.ImageVariant).HasMaxLength(24).IsRequired();
             entity.Property(x => x.PromptVersion).HasMaxLength(80).IsRequired();
             entity.HasIndex(x => x.CreatedAt);
         });

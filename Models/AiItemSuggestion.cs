@@ -8,8 +8,12 @@ public class AiItemSuggestion
     public string? UserHint { get; set; }
     public string Provider { get; set; } = "OpenAI";
     public string Model { get; set; } = "";
+    public string AnalysisMode { get; set; } = "fast";
     public string ImageDetail { get; set; } = "low";
+    public string ImageVariant { get; set; } = "preview";
     public string PromptVersion { get; set; } = "";
+    public int? InputTokens { get; set; }
+    public int? OutputTokens { get; set; }
     public string? RawResponseJson { get; set; }
     public string? ParsedResponseJson { get; set; }
     public DateTime? AcceptedAt { get; set; }

@@ -674,6 +674,8 @@ export interface AiSettingsUpdate {
   defaultMode: 'normal' | 'cheap';
 }
 
+export type AiAnalysisMode = 'fast' | 'detailed';
+
 export interface AiConnectionTestResponse {
   ok: boolean;
   provider: string;
@@ -684,13 +686,15 @@ export interface AiConnectionTestResponse {
 
 export interface AiSuggestItemRequest {
   photoIds: number[];
-  mode: 'cheap' | 'normal';
+  mode: AiAnalysisMode | 'cheap' | 'normal';
   detail: 'low' | 'high' | 'auto';
   userHint?: string;
 }
 
 export interface AiSuggestItemResponse {
   suggestionId: number | null;
+  identification: AiIdentificationInfo;
+  technicalFacts: AiTechnicalFact[];
   proposedName: string;
   proposedDescription: string;
   proposedQuantity: number | null;
@@ -702,9 +706,36 @@ export interface AiSuggestItemResponse {
   suggestedSubtype: AiSuggestedChoice | null;
   warnings: string[];
   model: string | null;
+  analysisMode: string | null;
   imageDetail: string | null;
   userHint: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
   estimatedCostInfo: string | null;
+}
+
+export interface AiIdentificationInfo {
+  genericName: string;
+  manufacturer: string | null;
+  model: string | null;
+  family: string | null;
+  confidence: number;
+  alternatives: AiIdentificationAlternative[];
+}
+
+export interface AiIdentificationAlternative {
+  name: string;
+  confidence: number;
+  reason: string;
+}
+
+export interface AiTechnicalFact {
+  key: string;
+  label: string;
+  value: string;
+  confidence: number;
+  source: 'visual' | 'visual_inference' | 'product_knowledge' | 'web_verified' | 'user_hint' | 'unverified' | string;
+  warning: string | null;
 }
 
 export interface AiSuggestedTag {

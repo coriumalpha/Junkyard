@@ -6,6 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, EMPTY, finalize, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -14,7 +15,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
-import { AiStatus, AiSuggestItemResponse, AiSuggestedTag, InventoryApiService, InventoryItem, InventoryMode, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse, ItemClass, ItemSubtype } from './inventory-api.service';
+import { AiAnalysisMode, AiStatus, AiSuggestItemResponse, AiSuggestedTag, AiTechnicalFact, InventoryApiService, InventoryItem, InventoryMode, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse, ItemClass, ItemSubtype } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
@@ -24,7 +25,7 @@ type ReviewPanel = 'none' | 'create' | 'assignItem' | 'assignBox';
 @Component({
   selector: 'app-photo-review-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, MatButtonModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
+  imports: [CommonModule, FormsModule, RouterLink, MatButtonModule, MatButtonToggleModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
   templateUrl: './photo-review-page.component.html',
   styleUrl: './photo-review-page.component.scss'
 })
@@ -41,7 +42,17 @@ export class PhotoReviewPageComponent {
   protected readonly aiStatus = signal<AiStatus | null>(null);
   protected readonly aiSuggestion = signal<AiSuggestItemResponse | null>(null);
   protected readonly aiHint = signal('');
+  protected readonly aiMode = signal<AiAnalysisMode>('fast');
+  protected readonly dismissedTechnicalFactKeys = signal<string[]>([]);
   protected readonly aiHintLength = computed(() => this.aiHint().length);
+  protected readonly aiModeHint = computed(() =>
+    this.aiMode() === 'detailed'
+      ? 'Detallado: usa derivado grande y detail=high. Más coste, mejor para placas, etiquetas y texto pequeño.'
+      : 'Rápido: usa detail=low. Coste mínimo, identificación más genérica.');
+  protected readonly acceptedTechnicalFacts = computed(() => {
+    const dismissed = new Set(this.dismissedTechnicalFactKeys());
+    return this.aiSuggestion()?.technicalFacts.filter((fact) => fact.confidence >= 0.65 && !dismissed.has(this.technicalFactKey(fact))) ?? [];
+  });
   protected readonly panel = signal<ReviewPanel>('none');
   protected readonly lastAffectedIds = signal<number[]>([]);
   protected readonly assignBoxId = signal<number | null>(null);
@@ -307,7 +318,7 @@ export class PhotoReviewPageComponent {
     }), 'Ítem creado desde foto.');
   }
 
-  protected suggestWithAi(mode?: 'cheap' | 'normal'): void {
+  protected suggestWithAi(mode?: AiAnalysisMode): void {
     const current = this.current();
     const status = this.aiStatus();
     if (!current || this.aiBusy()) {
@@ -327,12 +338,14 @@ export class PhotoReviewPageComponent {
     }
 
     this.aiBusy.set(true);
+    this.dismissedTechnicalFactKeys.set([]);
     this.error.set(null);
     this.message.set(null);
+    const analysisMode = mode ?? this.aiMode();
     this.api.suggestReviewItem({
       photoIds: ids,
-      mode: mode ?? status?.defaultMode ?? 'normal',
-      detail: status?.imageDetail ?? 'low',
+      mode: analysisMode,
+      detail: analysisMode === 'detailed' ? 'high' : 'low',
       userHint: this.aiHint().trim() || undefined
     }).pipe(
       tap((suggestion) => this.aiSuggestion.set(suggestion)),
@@ -355,7 +368,7 @@ export class PhotoReviewPageComponent {
   protected applyAiDescription(): void {
     const suggestion = this.aiSuggestion();
     if (suggestion?.proposedDescription) {
-      this.draftNotes.set(suggestion.proposedDescription);
+      this.draftNotes.set(this.descriptionWithTechnicalFacts(suggestion.proposedDescription, this.acceptedTechnicalFacts()));
     }
   }
 
@@ -425,7 +438,64 @@ export class PhotoReviewPageComponent {
   }
 
   protected setAiHint(value: string): void {
-    this.aiHint.set(value.slice(0, 500));
+    const next = value.slice(0, 500);
+    this.aiHint.set(next);
+    if (this.looksLikeDetailedHint(next)) {
+      this.aiMode.set('detailed');
+    }
+  }
+
+  protected setAiMode(value: string): void {
+    this.aiMode.set(value === 'detailed' ? 'detailed' : 'fast');
+  }
+
+  protected technicalFactSourceLabel(source: string): string {
+    switch (source) {
+      case 'visual': return 'visual';
+      case 'visual_inference': return 'inferencia visual';
+      case 'product_knowledge': return 'conocimiento producto';
+      case 'web_verified': return 'verificado web';
+      case 'user_hint': return 'pista usuario';
+      default: return 'no verificado';
+    }
+  }
+
+  protected applyTechnicalFact(fact: AiTechnicalFact): void {
+    const line = this.technicalFactLine(fact);
+    const current = this.draftNotes().trim();
+    if (current.includes(line)) {
+      return;
+    }
+    this.draftNotes.set(current ? `${current}\n${line}` : line);
+  }
+
+  protected discardTechnicalFact(fact: AiTechnicalFact): void {
+    const key = this.technicalFactKey(fact);
+    this.dismissedTechnicalFactKeys.update((current) => current.includes(key) ? current : [...current, key]);
+  }
+
+  protected isTechnicalFactDismissed(fact: AiTechnicalFact): boolean {
+    return this.dismissedTechnicalFactKeys().includes(this.technicalFactKey(fact));
+  }
+
+  private looksLikeDetailedHint(value: string): boolean {
+    return /\b(placa|pcb|m[oó]dulo|etiqueta|referencia|ref\.?|modelo|serigraf[ií]a|texto peque[nñ]o|chip|soc|uart|esp|8266|arduino|raspberry)\b/i.test(value);
+  }
+
+  private descriptionWithTechnicalFacts(description: string, facts: AiTechnicalFact[]): string {
+    const factLines = facts.map((fact) => this.technicalFactLine(fact));
+    const uniqueLines = factLines.filter((line, index) => line.length > 0 && factLines.indexOf(line) === index && !description.includes(line));
+    return uniqueLines.length ? `${description.trim()}\n${uniqueLines.join('\n')}` : description.trim();
+  }
+
+  private technicalFactLine(fact: AiTechnicalFact): string {
+    const confidence = this.confidenceLabel(fact.confidence);
+    const warning = fact.warning ? ` (${fact.warning})` : '';
+    return `${fact.label}: ${fact.value} [${confidence}, ${this.technicalFactSourceLabel(fact.source)}]${warning}`;
+  }
+
+  protected technicalFactKey(fact: AiTechnicalFact): string {
+    return `${fact.key}:${fact.value}`.toLowerCase();
   }
 
   protected setDraftItemClassId(value: number | string | null | (number | string | null)[]): void {

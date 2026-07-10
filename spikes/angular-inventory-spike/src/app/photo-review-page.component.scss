@@ -178,10 +178,13 @@
 }
 
 .ai-tool,
+.ai-mode-row,
 .ai-loading,
 .ai-suggestion-panel,
 .ai-suggestion-field,
 .ai-tag-row,
+.ai-identification,
+.ai-fact-row,
 .ai-new-tags,
 .ai-used-hint {
   border: 1px solid rgba(138, 214, 255, 0.18);
@@ -202,6 +205,28 @@
   padding: 10px;
 }
 
+.ai-mode-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.ai-mode-row mat-button-toggle-group {
+  width: 100%;
+}
+
+.ai-mode-row mat-button-toggle {
+  flex: 1 1 0;
+}
+
+.ai-mode-row > span,
+.ai-token-line {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
 .ai-tool > div,
 .ai-suggestion-field > div,
 .ai-tag-row > div {
@@ -212,6 +237,8 @@
 .ai-tool span,
 .ai-suggestion-field span,
 .ai-tag-row span,
+.ai-identification span,
+.ai-fact-row span,
 .ai-new-tags span {
   color: var(--app-muted);
   font-size: 0.78rem;
@@ -263,6 +290,8 @@
 }
 
 .ai-suggestion-field p,
+.ai-identification p,
+.ai-alternatives p,
 .ai-new-tags p {
   margin: 0;
   color: var(--app-text);
@@ -281,6 +310,49 @@
 .ai-tags {
   display: grid;
   gap: 7px;
+}
+
+.ai-identification,
+.ai-facts,
+.ai-fact-row {
+  display: grid;
+  gap: 7px;
+}
+
+.ai-identification {
+  padding: 9px 10px;
+}
+
+.ai-alternatives {
+  display: grid;
+  gap: 4px;
+  padding-top: 3px;
+}
+
+.ai-fact-row {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 9px 10px;
+}
+
+.ai-fact-row.dismissed {
+  opacity: 0.48;
+}
+
+.ai-fact-row > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.ai-fact-row small {
+  color: #ffd39f;
+  font-size: 0.76rem;
+  line-height: 1.3;
+}
+
+.ai-fact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .ai-new-tags {

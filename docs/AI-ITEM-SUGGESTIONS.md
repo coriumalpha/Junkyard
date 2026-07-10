@@ -9,6 +9,8 @@ The feature is a helper, not an automatic cataloguer. It never creates an item, 
 - Short editable item name.
 - Factual description.
 - Quantity when it is reasonably visible.
+- Structured identification: generic name, likely manufacturer, model/family, confidence and alternatives.
+- Technical facts separated from tags, with confidence and source.
 - Existing tags that fit the object.
 - New tag ideas in a separate list, never auto-created.
 - Existing item class and subtype when confidence is reasonable.
@@ -81,7 +83,16 @@ The backend endpoint `/api/ai/photo-review/suggest-item` checks:
 - requested photo IDs exist and are still pending;
 - image count does not exceed the configured limit.
 
-The service sends reduced photo derivatives (`preview`) by default rather than originals. The OpenAI image detail defaults to `low` to reduce cost. Users can change detail in settings, but the UI still requires an explicit button press before any image is sent.
+The photo review flow exposes two effective analysis modes:
+
+- `fast`: sends the `preview` derivative with `detail=low`, uses the cheap model, and asks for a shorter generic suggestion.
+- `detailed`: sends the `ai-detail` derivative, capped at 2048 px, with `detail=high`, uses the normal model, and asks for richer technical identification.
+
+The UI makes the selected mode visible before sending images. It may switch to `detailed` when the user hint clearly mentions small text, PCB markings, modules, labels or references.
+
+The backend records provider, model, analysis mode, image detail, image derivative and token usage when the OpenAI API returns it. It stores response JSON for debugging when configured, but it does not log request images or base64 payloads.
+
+Technical facts are not tags. They are shown separately in the suggestion panel and can be included in the description individually or as part of "Apply all". Future work can migrate accepted facts into class-specific item fields.
 
 ## Human validation flow
 
@@ -89,7 +100,7 @@ The service sends reduced photo derivatives (`preview`) by default rather than o
 2. Open `Nuevo ítem`.
 3. Press `Sugerir con IA`.
 4. Review the proposal.
-5. Apply all fields or individual fields.
+5. Apply all fields or individual fields, including selected technical facts.
 6. Edit manually as needed.
 7. Save the item manually.
 
