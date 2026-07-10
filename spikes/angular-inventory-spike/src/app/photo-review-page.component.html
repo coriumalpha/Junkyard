@@ -64,12 +64,32 @@
             {{ isSelected(current()!) ? 'Seleccionada' : 'Seleccionar' }}
           </button>
         </div>
+        <section class="filmstrip" aria-label="Fotos pendientes cercanas">
+          @for (photo of review()!.pending; track photo.id) {
+            <button
+              type="button"
+              class="film"
+              [class.current]="photo.id === current()!.id"
+              [class.selected]="isSelected(photo)"
+              [attr.aria-current]="photo.id === current()!.id ? 'true' : null"
+              [attr.aria-pressed]="isSelected(photo)"
+              (click)="onFilmClick(photo, $event)">
+              <img [src]="assetUrl(photo.thumbUrl)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.originalFilename" />
+              <span class="film-state active-state" aria-hidden="true">
+                <mat-icon>visibility</mat-icon>
+              </span>
+              <span class="film-check" (click)="toggleSelected(photo); $event.stopPropagation()" [matTooltip]="isSelected(photo) ? 'Quitar de la acción' : 'Añadir a la acción'">
+                <mat-icon>{{ isSelected(photo) ? 'check' : 'add' }}</mat-icon>
+              </span>
+            </button>
+          }
+        </section>
       </mat-card>
 
       <aside class="review-actions">
         <mat-card class="action-card">
           <p class="selection-summary">
-            {{ actionSelectionSize() }} {{ actionSelectionSize() === 1 ? 'foto en la acción' : 'fotos en la acción' }}.
+            {{ selectionSummary() }}
           </p>
           <button mat-flat-button type="button" (click)="openPanel('create')" [disabled]="busy()">
             <mat-icon>add_box</mat-icon>
@@ -193,6 +213,13 @@
                   <strong>Propuesta IA</strong>
                   <span>{{ aiSuggestion()!.model }} · {{ aiSuggestion()!.analysisMode }} · detail={{ aiSuggestion()!.imageDetail }}</span>
                 </div>
+                @if (aiSelectionMismatch()) {
+                  <div class="ai-sync-warning">
+                    <mat-icon>sync_problem</mat-icon>
+                    <span>La selección cambió desde el análisis. No apliques esta propuesta sobre otra selección.</span>
+                    <button mat-button type="button" (click)="restoreAiSelection()">Restaurar selección IA</button>
+                  </div>
+                }
                 @if (aiSuggestion()!.inputTokens || aiSuggestion()!.outputTokens) {
                   <p class="ai-token-line">Tokens: entrada {{ aiSuggestion()!.inputTokens ?? '?' }} · salida {{ aiSuggestion()!.outputTokens ?? '?' }}</p>
                 }
@@ -399,17 +426,6 @@
           </mat-card>
         }
       </aside>
-    </section>
-
-    <section class="filmstrip" aria-label="Fotos pendientes cercanas">
-      @for (photo of review()!.pending; track photo.id) {
-        <button type="button" class="film" [class.current]="photo.id === current()!.id" [class.selected]="isSelected(photo)" (click)="onFilmClick(photo, $event)">
-          <img [src]="assetUrl(photo.thumbUrl)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.originalFilename" />
-          <span class="film-check" (click)="toggleSelected(photo); $event.stopPropagation()">
-            <mat-icon>{{ isSelected(photo) ? 'check' : 'add' }}</mat-icon>
-          </span>
-        </button>
-      }
     </section>
   }
 </main>
