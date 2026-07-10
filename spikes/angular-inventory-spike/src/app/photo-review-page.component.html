@@ -105,16 +105,25 @@
             <mat-icon>add_box</mat-icon>
             <span class="keycap">N</span>
             Crear ítem
+            @if (actionSelectionSize() > 1) {
+              <span>({{ actionSelectionSize() }})</span>
+            }
           </button>
           <button mat-stroked-button type="button" (click)="openPanel('assignItem')" [disabled]="busy()">
             <mat-icon>category</mat-icon>
             <span class="keycap">A</span>
             Asociar a ítem
+            @if (actionSelectionSize() > 1) {
+              <span>({{ actionSelectionSize() }})</span>
+            }
           </button>
           <button mat-stroked-button type="button" (click)="openPanel('assignBox')" [disabled]="busy()">
             <mat-icon>inventory_2</mat-icon>
             <span class="keycap">B</span>
             Asociar a caja
+            @if (actionSelectionSize() > 1) {
+              <span>({{ actionSelectionSize() }})</span>
+            }
           </button>
           <div class="split-actions">
             <button mat-stroked-button type="button" (click)="rotate(-90)" [disabled]="busy()">
@@ -130,6 +139,9 @@
             <mat-icon>delete</mat-icon>
             <span class="keycap">D</span>
             Descartar
+            @if (actionSelectionSize() > 1) {
+              <span>({{ actionSelectionSize() }})</span>
+            }
           </button>
           <div class="split-actions">
             <button mat-button type="button" (click)="skip(-1)" [disabled]="!review()?.previousId">

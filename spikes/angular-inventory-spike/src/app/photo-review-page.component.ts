@@ -308,7 +308,12 @@ export class PhotoReviewPageComponent {
       return;
     }
 
-    this.mutate(() => this.api.discardReviewPhotos(current.id, this.selection(current.id)), 'Foto descartada.');
+    const ids = this.selection(current.id);
+    if (ids.length > 1 && !window.confirm(`Descartar ${ids.length} fotos seleccionadas?`)) {
+      return;
+    }
+
+    this.mutate(() => this.api.discardReviewPhotos(current.id, ids), ids.length > 1 ? 'Fotos descartadas.' : 'Foto descartada.');
   }
 
   protected assignBox(): void {
