@@ -261,7 +261,7 @@
                     <span>Nombre</span>
                     <strong>{{ aiSuggestion()!.proposedName || 'Sin propuesta' }}</strong>
                   </div>
-                  <button mat-button type="button" (click)="applyAiName()" [disabled]="!aiSuggestion()!.proposedName">Usar</button>
+                  <mat-checkbox [checked]="aiUseName()" (change)="setAiFieldSelected('name', $event.checked)" [disabled]="!aiSuggestion()!.proposedName">Usar</mat-checkbox>
                 </div>
 
                 <div class="ai-suggestion-field">
@@ -269,7 +269,7 @@
                     <span>Descripción</span>
                     <p>{{ aiSuggestion()!.proposedDescription || 'Sin propuesta' }}</p>
                   </div>
-                  <button mat-button type="button" (click)="applyAiDescription()" [disabled]="!aiSuggestion()!.proposedDescription">Usar</button>
+                  <mat-checkbox [checked]="aiUseDescription()" (change)="setAiFieldSelected('description', $event.checked)" [disabled]="!aiSuggestion()!.proposedDescription">Usar</mat-checkbox>
                 </div>
 
                 <div class="ai-suggestion-field">
@@ -277,14 +277,14 @@
                     <span>Cantidad · {{ confidenceLabel(aiSuggestion()!.quantityConfidence) }}</span>
                     <strong>{{ aiSuggestion()!.proposedQuantity ?? 'No inferida' }}</strong>
                   </div>
-                  <button mat-button type="button" (click)="applyAiQuantity()" [disabled]="aiSuggestion()!.proposedQuantity === null">Usar</button>
+                  <mat-checkbox [checked]="aiUseQuantity()" (change)="setAiFieldSelected('quantity', $event.checked)" [disabled]="aiSuggestion()!.proposedQuantity === null">Usar</mat-checkbox>
                 </div>
 
                 @if (aiSuggestion()!.suggestedTags.length) {
                   <div class="ai-tags">
                     <div class="ai-section-title">
                       <span>Tags existentes</span>
-                      <button mat-button type="button" (click)="applyAllAiTags()">Añadir todas</button>
+                      <span>{{ aiSelectedTagKeys().length }} seleccionadas</span>
                     </div>
                     @for (tag of aiSuggestion()!.suggestedTags; track tag.tagId ?? tag.tagName) {
                       <div class="ai-tag-row">
@@ -292,7 +292,9 @@
                           <strong>{{ tag.tagName }}</strong>
                           <span>{{ confidenceLabel(tag.confidence) }} · {{ tag.reason }}</span>
                         </div>
-                        <button mat-button type="button" (click)="applyAiTag(tag)" [disabled]="!tag.tagId || draftTagIds().includes(tag.tagId)">Añadir</button>
+                        <mat-checkbox [checked]="isAiTagSelected(tag)" (change)="setAiTagSelected(tag, $event.checked)" [disabled]="!tag.tagId || draftTagIds().includes(tag.tagId)">
+                          Incluir
+                        </mat-checkbox>
                       </div>
                     }
                   </div>
@@ -321,7 +323,7 @@
                         }
                       </strong>
                     </div>
-                    <button mat-button type="button" (click)="applyAiClass()">Usar</button>
+                    <mat-checkbox [checked]="aiUseClass()" (change)="setAiFieldSelected('class', $event.checked)">Usar</mat-checkbox>
                   </div>
                 }
 
@@ -341,7 +343,8 @@
                           }
                         </div>
                         <div class="ai-fact-actions">
-                          <button mat-button type="button" (click)="applyTechnicalFact(fact)" [disabled]="isTechnicalFactDismissed(fact)">Incluir</button>
+                          <mat-checkbox [checked]="isTechnicalFactSelected(fact)" (change)="setTechnicalFactSelected(fact, $event.checked)" [disabled]="isTechnicalFactDismissed(fact)">Incluir</mat-checkbox>
+                          <button mat-button type="button" (click)="applyTechnicalFact(fact)" [disabled]="isTechnicalFactDismissed(fact)">Añadir ahora</button>
                           <button mat-button type="button" (click)="discardTechnicalFact(fact)" [disabled]="isTechnicalFactDismissed(fact)">Descartar</button>
                           <button mat-button type="button" disabled>Verificar</button>
                         </div>
@@ -358,8 +361,29 @@
                   </ul>
                 }
 
+                <div class="ai-preview">
+                  <div class="ai-section-title">
+                    <span>Vista previa final</span>
+                    <span>Editable antes de aplicar</span>
+                  </div>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Nombre final</mat-label>
+                    <input matInput [ngModel]="aiPreviewName()" (ngModelChange)="aiPreviewName.set($event)" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Descripción final</mat-label>
+                    <textarea matInput rows="5" [ngModel]="aiPreviewDescription()" (ngModelChange)="aiPreviewDescription.set($event)"></textarea>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Cantidad final</mat-label>
+                    <input matInput type="number" [ngModel]="aiPreviewQuantity()" (ngModelChange)="aiPreviewQuantity.set($event === '' ? null : +$event)" />
+                  </mat-form-field>
+                </div>
+
                 <div class="ai-actions">
-                  <button mat-flat-button type="button" (click)="applyAllAi()">Aplicar todo</button>
+                  <button mat-flat-button type="button" (click)="applySelectedAi()">Aplicar seleccionados</button>
+                  <button mat-stroked-button type="button" (click)="selectAllAi()">Seleccionar todo</button>
+                  <button mat-stroked-button type="button" (click)="deselectAllAi()">Deseleccionar todo</button>
                   <button mat-stroked-button type="button" (click)="suggestWithAi('detailed')" [disabled]="aiBusy()">Reintentar detallado</button>
                   <button mat-stroked-button type="button" (click)="suggestWithAi('fast')" [disabled]="aiBusy()">Reintentar rápido</button>
                   <button mat-button type="button" (click)="discardAiSuggestion()">Descartar</button>

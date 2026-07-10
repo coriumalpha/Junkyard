@@ -300,6 +300,19 @@
   padding: 10px;
 }
 
+.ai-preview {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(72, 255, 176, 0.18);
+  border-radius: 12px;
+  background: rgba(72, 255, 176, 0.045);
+}
+
+.ai-preview mat-form-field {
+  width: 100%;
+}
+
 .ai-suggestion-field,
 .ai-tag-row {
   display: flex;
@@ -373,6 +386,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  align-items: center;
 }
 
 .ai-new-tags {

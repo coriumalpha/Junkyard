@@ -8,6 +8,7 @@ import { catchError, EMPTY, finalize, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -25,7 +26,7 @@ type ReviewPanel = 'none' | 'create' | 'assignItem' | 'assignBox';
 @Component({
   selector: 'app-photo-review-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, MatButtonModule, MatButtonToggleModule, MatCardModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
+  imports: [CommonModule, FormsModule, RouterLink, MatButtonModule, MatButtonToggleModule, MatCardModule, MatCheckboxModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
   templateUrl: './photo-review-page.component.html',
   styleUrl: './photo-review-page.component.scss'
 })
@@ -42,6 +43,15 @@ export class PhotoReviewPageComponent {
   protected readonly aiStatus = signal<AiStatus | null>(null);
   protected readonly aiSuggestion = signal<AiSuggestItemResponse | null>(null);
   protected readonly aiSuggestionPhotoIds = signal<number[]>([]);
+  protected readonly aiUseName = signal(false);
+  protected readonly aiUseDescription = signal(false);
+  protected readonly aiUseQuantity = signal(false);
+  protected readonly aiUseClass = signal(false);
+  protected readonly aiSelectedTagKeys = signal<string[]>([]);
+  protected readonly aiSelectedTechnicalFactKeys = signal<string[]>([]);
+  protected readonly aiPreviewName = signal('');
+  protected readonly aiPreviewDescription = signal('');
+  protected readonly aiPreviewQuantity = signal<number | null>(null);
   protected readonly aiHint = signal('');
   protected readonly aiMode = signal<AiAnalysisMode>('fast');
   protected readonly dismissedTechnicalFactKeys = signal<string[]>([]);
@@ -51,8 +61,9 @@ export class PhotoReviewPageComponent {
       ? 'Detallado: usa derivado grande y detail=high. Más coste, mejor para placas, etiquetas y texto pequeño.'
       : 'Rápido: usa detail=low. Coste mínimo, identificación más genérica.');
   protected readonly acceptedTechnicalFacts = computed(() => {
+    const selected = new Set(this.aiSelectedTechnicalFactKeys());
     const dismissed = new Set(this.dismissedTechnicalFactKeys());
-    return this.aiSuggestion()?.technicalFacts.filter((fact) => fact.confidence >= 0.65 && !dismissed.has(this.technicalFactKey(fact))) ?? [];
+    return this.aiSuggestion()?.technicalFacts.filter((fact) => selected.has(this.technicalFactKey(fact)) && !dismissed.has(this.technicalFactKey(fact))) ?? [];
   });
   protected readonly selectionSummary = computed(() => {
     const count = this.selectedIds().length;
@@ -371,6 +382,7 @@ export class PhotoReviewPageComponent {
       tap((suggestion) => {
         this.aiSuggestion.set(suggestion);
         this.aiSuggestionPhotoIds.set(ids);
+        this.initializeAiSelection(suggestion);
       }),
       catchError((error: unknown) => {
         this.error.set(this.errorMessage(error, 'No se pudo generar la sugerencia IA.'));
@@ -429,17 +441,58 @@ export class PhotoReviewPageComponent {
   }
 
   protected applyAllAi(): void {
+    this.applySelectedAi();
+  }
+
+  protected applySelectedAi(): void {
     if (this.aiSelectionMismatch()) {
       this.error.set('La selección cambió desde esta propuesta IA. Restaura la selección analizada o genera una propuesta nueva.');
       return;
     }
 
-    this.applyAiName();
-    this.applyAiDescription();
-    this.applyAiQuantity();
-    this.applyAllAiTags();
-    this.applyAiClass();
+    if (this.aiUseName() && this.aiPreviewName().trim()) {
+      this.draftName.set(this.aiPreviewName().trim());
+    }
+    if (this.aiUseDescription() && this.aiPreviewDescription().trim()) {
+      this.draftNotes.set(this.aiPreviewDescription().trim());
+    }
+    if (this.aiUseQuantity() && this.aiPreviewQuantity() !== null) {
+      this.draftQuantity.set(this.aiPreviewQuantity()!);
+    }
+    for (const tag of this.aiSuggestion()?.suggestedTags ?? []) {
+      if (this.aiSelectedTagKeys().includes(this.aiTagKey(tag))) {
+        this.applyAiTag(tag);
+      }
+    }
+    if (this.aiUseClass()) {
+      this.applyAiClass();
+    }
     this.markAiAccepted();
+  }
+
+  protected selectAllAi(): void {
+    const suggestion = this.aiSuggestion();
+    if (!suggestion) {
+      return;
+    }
+
+    this.aiUseName.set(!!suggestion.proposedName);
+    this.aiUseDescription.set(!!suggestion.proposedDescription);
+    this.aiUseQuantity.set(suggestion.proposedQuantity !== null && suggestion.proposedQuantity !== undefined);
+    this.aiUseClass.set(!!suggestion.suggestedClass);
+    this.aiSelectedTagKeys.set(suggestion.suggestedTags.map((tag) => this.aiTagKey(tag)));
+    this.aiSelectedTechnicalFactKeys.set(suggestion.technicalFacts.map((fact) => this.technicalFactKey(fact)));
+    this.refreshAiPreview();
+  }
+
+  protected deselectAllAi(): void {
+    this.aiUseName.set(false);
+    this.aiUseDescription.set(false);
+    this.aiUseQuantity.set(false);
+    this.aiUseClass.set(false);
+    this.aiSelectedTagKeys.set([]);
+    this.aiSelectedTechnicalFactKeys.set([]);
+    this.refreshAiPreview();
   }
 
   protected discardAiSuggestion(markRejected = true): void {
@@ -455,6 +508,41 @@ export class PhotoReviewPageComponent {
     if (ids.length) {
       this.selectedIds.set(ids);
     }
+  }
+
+  protected setAiFieldSelected(field: 'name' | 'description' | 'quantity' | 'class', checked: boolean): void {
+    switch (field) {
+      case 'name':
+        this.aiUseName.set(checked);
+        break;
+      case 'description':
+        this.aiUseDescription.set(checked);
+        break;
+      case 'quantity':
+        this.aiUseQuantity.set(checked);
+        break;
+      case 'class':
+        this.aiUseClass.set(checked);
+        break;
+    }
+    this.refreshAiPreview();
+  }
+
+  protected setAiTagSelected(tag: AiSuggestedTag, checked: boolean): void {
+    this.toggleKey(this.aiSelectedTagKeys, this.aiTagKey(tag), checked);
+  }
+
+  protected isAiTagSelected(tag: AiSuggestedTag): boolean {
+    return this.aiSelectedTagKeys().includes(this.aiTagKey(tag));
+  }
+
+  protected setTechnicalFactSelected(fact: AiTechnicalFact, checked: boolean): void {
+    this.toggleKey(this.aiSelectedTechnicalFactKeys, this.technicalFactKey(fact), checked);
+    this.refreshAiPreview();
+  }
+
+  protected isTechnicalFactSelected(fact: AiTechnicalFact): boolean {
+    return this.aiSelectedTechnicalFactKeys().includes(this.technicalFactKey(fact));
   }
 
   protected markAiAccepted(): void {
@@ -507,6 +595,8 @@ export class PhotoReviewPageComponent {
   protected discardTechnicalFact(fact: AiTechnicalFact): void {
     const key = this.technicalFactKey(fact);
     this.dismissedTechnicalFactKeys.update((current) => current.includes(key) ? current : [...current, key]);
+    this.aiSelectedTechnicalFactKeys.update((current) => current.filter((item) => item !== key));
+    this.refreshAiPreview();
   }
 
   protected isTechnicalFactDismissed(fact: AiTechnicalFact): boolean {
@@ -529,6 +619,10 @@ export class PhotoReviewPageComponent {
 
   protected technicalFactKey(fact: AiTechnicalFact): string {
     return `${fact.key}:${fact.value}`.toLowerCase();
+  }
+
+  protected aiTagKey(tag: AiSuggestedTag): string {
+    return `${tag.tagId ?? 'new'}:${tag.tagName}`.toLowerCase();
   }
 
   protected setDraftItemClassId(value: number | string | null | (number | string | null)[]): void {
@@ -671,6 +765,42 @@ export class PhotoReviewPageComponent {
     return left.every((id) => normalizedRight.has(id));
   }
 
+  private initializeAiSelection(suggestion: AiSuggestItemResponse): void {
+    this.aiUseName.set(!!suggestion.proposedName);
+    this.aiUseDescription.set(!!suggestion.proposedDescription);
+    this.aiUseQuantity.set(suggestion.proposedQuantity !== null && suggestion.proposedQuantity !== undefined && suggestion.quantityConfidence >= 0.65);
+    this.aiUseClass.set(!!suggestion.suggestedClass && suggestion.suggestedClass.confidence >= 0.65);
+    this.aiSelectedTagKeys.set(suggestion.suggestedTags.filter((tag) => tag.confidence >= 0.65).map((tag) => this.aiTagKey(tag)));
+    this.aiSelectedTechnicalFactKeys.set(suggestion.technicalFacts.filter((fact) => fact.confidence >= 0.65).map((fact) => this.technicalFactKey(fact)));
+    this.refreshAiPreview();
+  }
+
+  private refreshAiPreview(): void {
+    const suggestion = this.aiSuggestion();
+    if (!suggestion) {
+      this.aiPreviewName.set('');
+      this.aiPreviewDescription.set('');
+      this.aiPreviewQuantity.set(null);
+      return;
+    }
+
+    const baseDescription = this.aiUseDescription()
+      ? suggestion.proposedDescription
+      : this.draftNotes();
+    this.aiPreviewName.set(this.aiUseName() ? suggestion.proposedName : this.draftName());
+    this.aiPreviewQuantity.set(this.aiUseQuantity() ? suggestion.proposedQuantity : this.draftQuantity());
+    this.aiPreviewDescription.set(this.descriptionWithTechnicalFacts(baseDescription, this.acceptedTechnicalFacts()));
+  }
+
+  private toggleKey(target: { update: (updater: (current: string[]) => string[]) => void }, key: string, checked: boolean): void {
+    target.update((current) => {
+      if (checked) {
+        return current.includes(key) ? current : [...current, key];
+      }
+      return current.filter((item) => item !== key);
+    });
+  }
+
   private mutate(request: () => ReturnType<InventoryApiService['rotateReviewPhotos']>, success: string): void {
     if (this.busy()) {
       return;
@@ -706,6 +836,15 @@ export class PhotoReviewPageComponent {
     const id = this.aiSuggestion()?.suggestionId;
     this.aiSuggestion.set(null);
     this.aiSuggestionPhotoIds.set([]);
+    this.aiUseName.set(false);
+    this.aiUseDescription.set(false);
+    this.aiUseQuantity.set(false);
+    this.aiUseClass.set(false);
+    this.aiSelectedTagKeys.set([]);
+    this.aiSelectedTechnicalFactKeys.set([]);
+    this.aiPreviewName.set('');
+    this.aiPreviewDescription.set('');
+    this.aiPreviewQuantity.set(null);
     this.dismissedTechnicalFactKeys.set([]);
     if (markRejected && id) {
       this.api.rejectAiSuggestion(id).pipe(catchError(() => EMPTY), takeUntilDestroyed(this.destroyRef)).subscribe();
