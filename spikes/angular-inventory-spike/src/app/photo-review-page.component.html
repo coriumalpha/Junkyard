@@ -258,7 +258,8 @@
                 }
 
                 @if (aiSuggestion()!.identification) {
-                  <div class="ai-identification">
+                  <details class="ai-identification ai-used-hint" open>
+                    <summary>Identificación · {{ confidenceLabel(aiSuggestion()!.identification.confidence) }}</summary>
                     <span>Identificación · {{ confidenceLabel(aiSuggestion()!.identification.confidence) }}</span>
                     <strong>{{ aiSuggestion()!.identification.genericName }}</strong>
                     <p>
@@ -280,35 +281,44 @@
                         }
                       </div>
                     }
-                  </div>
+                  </details>
                 }
 
-                <div class="ai-suggestion-field">
-                  <div>
-                    <span>Nombre</span>
-                    <strong>{{ aiSuggestion()!.proposedName || 'Sin propuesta' }}</strong>
+                <details class="ai-used-hint" open>
+                  <summary>Nombre y cantidad</summary>
+                  <div class="ai-suggestion-field">
+                    <div>
+                      <span>Nombre</span>
+                      <strong>{{ aiSuggestion()!.proposedName || 'Sin propuesta' }}</strong>
+                    </div>
+                    <mat-checkbox [checked]="aiUseName()" (change)="setAiFieldSelected('name', $event.checked)" [disabled]="!aiSuggestion()!.proposedName">Usar</mat-checkbox>
                   </div>
-                  <mat-checkbox [checked]="aiUseName()" (change)="setAiFieldSelected('name', $event.checked)" [disabled]="!aiSuggestion()!.proposedName">Usar</mat-checkbox>
-                </div>
 
-                <div class="ai-suggestion-field">
-                  <div>
-                    <span>Descripción</span>
-                    <p>{{ aiSuggestion()!.proposedDescription || 'Sin propuesta' }}</p>
+                  <div class="ai-suggestion-field">
+                    <div>
+                      <span>Cantidad · {{ confidenceLabel(aiSuggestion()!.quantityConfidence) }}</span>
+                      <strong>{{ aiSuggestion()!.proposedQuantity ?? 'No inferida' }}</strong>
+                    </div>
+                    <mat-checkbox [checked]="aiUseQuantity()" (change)="setAiFieldSelected('quantity', $event.checked)" [disabled]="aiSuggestion()!.proposedQuantity === null">Usar</mat-checkbox>
                   </div>
-                  <mat-checkbox [checked]="aiUseDescription()" (change)="setAiFieldSelected('description', $event.checked)" [disabled]="!aiSuggestion()!.proposedDescription">Usar</mat-checkbox>
-                </div>
+                </details>
 
-                <div class="ai-suggestion-field">
-                  <div>
-                    <span>Cantidad · {{ confidenceLabel(aiSuggestion()!.quantityConfidence) }}</span>
-                    <strong>{{ aiSuggestion()!.proposedQuantity ?? 'No inferida' }}</strong>
+                <details class="ai-used-hint" open>
+                  <summary>Descripción</summary>
+                  <div class="ai-suggestion-field">
+                    <div>
+                      <span>Descripción</span>
+                      <p>{{ aiSuggestion()!.proposedDescription || 'Sin propuesta' }}</p>
+                    </div>
+                    <mat-checkbox [checked]="aiUseDescription()" (change)="setAiFieldSelected('description', $event.checked)" [disabled]="!aiSuggestion()!.proposedDescription">Usar</mat-checkbox>
                   </div>
-                  <mat-checkbox [checked]="aiUseQuantity()" (change)="setAiFieldSelected('quantity', $event.checked)" [disabled]="aiSuggestion()!.proposedQuantity === null">Usar</mat-checkbox>
-                </div>
+                </details>
 
-                @if (aiSuggestion()!.suggestedTags.length) {
-                  <div class="ai-tags">
+                @if (aiSuggestion()!.suggestedTags.length || aiSuggestion()!.suggestedClass) {
+                  <details class="ai-used-hint" open>
+                    <summary>Clasificación y tags</summary>
+                  @if (aiSuggestion()!.suggestedTags.length) {
+                    <div class="ai-tags">
                     <div class="ai-section-title">
                       <span>Tags existentes</span>
                       <span>{{ aiSelectedTagKeys().length }} seleccionadas</span>
@@ -324,7 +334,28 @@
                         </mat-checkbox>
                       </div>
                     }
-                  </div>
+                    </div>
+                  }
+                  @if (aiSuggestion()!.suggestedClass) {
+                    <div class="ai-suggestion-field">
+                      <div>
+                        <span>
+                          Clase/Subtipo · {{ confidenceLabel(aiSuggestion()!.suggestedClass!.confidence) }}
+                          @if (aiSuggestion()!.suggestedSubtype) {
+                            / {{ confidenceLabel(aiSuggestion()!.suggestedSubtype!.confidence) }}
+                          }
+                        </span>
+                        <strong>
+                          {{ aiSuggestion()!.suggestedClass!.name }}
+                          @if (aiSuggestion()!.suggestedSubtype) {
+                            · {{ aiSuggestion()!.suggestedSubtype!.name }}
+                          }
+                        </strong>
+                      </div>
+                      <mat-checkbox [checked]="aiUseClass()" (change)="setAiFieldSelected('class', $event.checked)">Usar</mat-checkbox>
+                    </div>
+                  }
+                  </details>
                 }
 
                 @if (aiSuggestion()!.suggestedNewTags.length) {
@@ -334,28 +365,9 @@
                   </div>
                 }
 
-                @if (aiSuggestion()!.suggestedClass) {
-                  <div class="ai-suggestion-field">
-                    <div>
-                      <span>
-                        Clase/Subtipo · {{ confidenceLabel(aiSuggestion()!.suggestedClass!.confidence) }}
-                        @if (aiSuggestion()!.suggestedSubtype) {
-                          / {{ confidenceLabel(aiSuggestion()!.suggestedSubtype!.confidence) }}
-                        }
-                      </span>
-                      <strong>
-                        {{ aiSuggestion()!.suggestedClass!.name }}
-                        @if (aiSuggestion()!.suggestedSubtype) {
-                          · {{ aiSuggestion()!.suggestedSubtype!.name }}
-                        }
-                      </strong>
-                    </div>
-                    <mat-checkbox [checked]="aiUseClass()" (change)="setAiFieldSelected('class', $event.checked)">Usar</mat-checkbox>
-                  </div>
-                }
-
                 @if (aiSuggestion()!.technicalFacts.length) {
-                  <div class="ai-facts">
+                  <details class="ai-facts ai-used-hint" open>
+                    <summary>Datos técnicos</summary>
                     <div class="ai-section-title">
                       <span>Datos técnicos</span>
                       <span>{{ acceptedTechnicalFacts().length }} aceptados para Aplicar todo</span>
@@ -377,15 +389,18 @@
                         </div>
                       </div>
                     }
-                  </div>
+                  </details>
                 }
 
                 @if (aiSuggestion()!.warnings.length) {
-                  <ul class="ai-warnings">
+                  <details class="ai-used-hint">
+                    <summary>Avisos</summary>
+                    <ul class="ai-warnings">
                     @for (warning of aiSuggestion()!.warnings; track warning) {
                       <li>{{ warning }}</li>
                     }
-                  </ul>
+                    </ul>
+                  </details>
                 }
 
                 <div class="ai-preview">
@@ -476,7 +491,10 @@
             <mat-slide-toggle [checked]="draftNeedsReview()" (change)="draftNeedsReview.set($event.checked)">
               Requiere revisión detallada
             </mat-slide-toggle>
-            <button mat-flat-button type="button" (click)="createItem()" [disabled]="busy()">Crear y asignar</button>
+            <div class="split-actions">
+              <button mat-flat-button type="button" (click)="createItem()" [disabled]="busy()">Crear y siguiente</button>
+              <button mat-stroked-button type="button" (click)="createItemNeedsReview()" [disabled]="busy()">Guardar pendiente</button>
+            </div>
           </mat-card>
         }
       </aside>

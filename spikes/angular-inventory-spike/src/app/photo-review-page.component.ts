@@ -366,6 +366,11 @@ export class PhotoReviewPageComponent {
     }), 'Ítem creado desde foto.');
   }
 
+  protected createItemNeedsReview(): void {
+    this.draftNeedsReview.set(true);
+    this.createItem();
+  }
+
   protected suggestWithAi(mode?: AiAnalysisMode): void {
     const current = this.current();
     const status = this.aiStatus();
