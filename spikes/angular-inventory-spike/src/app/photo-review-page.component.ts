@@ -22,6 +22,9 @@ import { SearchableSelectComponent, SearchableSelectOption } from './searchable-
 import { TagPickerComponent } from './tag-picker.component';
 
 type ReviewPanel = 'none' | 'create' | 'assignItem' | 'assignBox';
+type ReviewWorkspaceMode = 'quick' | 'detailed';
+type AiDescriptionStyle = 'narrative' | 'technicalSheet';
+type AiWorkflowStep = 'analyze' | 'review' | 'final';
 
 @Component({
   selector: 'app-photo-review-page',
@@ -54,9 +57,13 @@ export class PhotoReviewPageComponent {
   protected readonly aiPreviewQuantity = signal<number | null>(null);
   protected readonly aiHint = signal('');
   protected readonly aiMode = signal<AiAnalysisMode>('fast');
+  protected readonly aiDescriptionStyle = signal<AiDescriptionStyle>('narrative');
+  protected readonly aiStep = signal<AiWorkflowStep>('analyze');
   protected readonly aiModeManuallySelected = signal(false);
   protected readonly aiModeAutoNotice = signal(false);
+  protected readonly workspaceMode = signal<ReviewWorkspaceMode>('quick');
   protected readonly dismissedTechnicalFactKeys = signal<string[]>([]);
+  protected readonly editedTechnicalFactValues = signal<Record<string, string>>({});
   protected readonly aiHintLength = computed(() => this.aiHint().length);
   protected readonly aiDetailedRecommended = computed(() => this.looksLikeDetailedHint(this.aiHint()));
   protected readonly aiModeHint = computed(() =>
@@ -66,7 +73,34 @@ export class PhotoReviewPageComponent {
   protected readonly acceptedTechnicalFacts = computed(() => {
     const selected = new Set(this.aiSelectedTechnicalFactKeys());
     const dismissed = new Set(this.dismissedTechnicalFactKeys());
-    return this.aiSuggestion()?.technicalFacts.filter((fact) => selected.has(this.technicalFactKey(fact)) && !dismissed.has(this.technicalFactKey(fact))) ?? [];
+    return this.aiSuggestion()?.technicalFacts
+      .filter((fact) => selected.has(this.technicalFactKey(fact)) && !dismissed.has(this.technicalFactKey(fact)))
+      .map((fact) => ({ ...fact, value: this.technicalFactValue(fact) })) ?? [];
+  });
+  protected readonly aiPreviewTagNames = computed(() => {
+    const names = new Set<string>();
+    const selectedTagIds = new Set(this.draftTagIds());
+    for (const tag of this.options().tags) {
+      if (selectedTagIds.has(tag.id)) {
+        names.add(tag.name);
+      }
+    }
+    for (const tag of this.aiSuggestion()?.suggestedTags ?? []) {
+      if (this.isAiTagSelected(tag) && tag.tagId && !selectedTagIds.has(tag.tagId)) {
+        names.add(tag.tagName);
+      }
+    }
+    return [...names];
+  });
+  protected readonly aiPreviewClassification = computed(() => {
+    const suggestion = this.aiSuggestion();
+    if (this.aiUseClass() && suggestion?.suggestedClass) {
+      return [suggestion.suggestedClass.name, suggestion.suggestedSubtype?.name].filter(Boolean).join(' · ');
+    }
+
+    const itemClass = this.selectedItemClass();
+    const subtype = this.itemSubtypes().find((item) => item.id === this.draftItemSubtypeId()) ?? null;
+    return [itemClass?.name, subtype?.name].filter(Boolean).join(' · ');
   });
   protected readonly selectionSummary = computed(() => {
     const count = this.selectedIds().length;
@@ -266,6 +300,7 @@ export class PhotoReviewPageComponent {
     }
 
     if (panel === 'create') {
+      this.workspaceMode.set('quick');
       this.draftName.set('');
       this.draftNotes.set('');
       this.draftQuantity.set(1);
@@ -291,6 +326,26 @@ export class PhotoReviewPageComponent {
 
   protected closePanel(): void {
     this.panel.set('none');
+  }
+
+  protected setWorkspaceMode(value: string): void {
+    const mode: ReviewWorkspaceMode = value === 'detailed' ? 'detailed' : 'quick';
+    this.workspaceMode.set(mode);
+    if (mode === 'detailed' && this.aiStep() === 'analyze' && this.aiSuggestion()) {
+      this.aiStep.set('review');
+    }
+    if (mode === 'detailed' && this.aiDetailedRecommended() && !this.aiModeManuallySelected()) {
+      this.aiMode.set('detailed');
+      this.aiModeAutoNotice.set(true);
+    }
+  }
+
+  protected openDetailedMode(): void {
+    if (this.panel() !== 'create') {
+      this.openPanel('create');
+    }
+    this.setWorkspaceMode('detailed');
+    this.focusPanel('create');
   }
 
   protected rotate(delta: number): void {
@@ -408,6 +463,9 @@ export class PhotoReviewPageComponent {
         this.aiSuggestion.set(suggestion);
         this.aiSuggestionPhotoIds.set(ids);
         this.initializeAiSelection(suggestion);
+        if (this.workspaceMode() === 'detailed') {
+          this.aiStep.set('review');
+        }
       }),
       catchError((error: unknown) => {
         this.error.set(this.errorMessage(error, 'No se pudo generar la sugerencia IA.'));
@@ -493,6 +551,9 @@ export class PhotoReviewPageComponent {
       this.applyAiClass();
     }
     this.markAiAccepted();
+    if (this.workspaceMode() === 'detailed') {
+      this.aiStep.set('final');
+    }
   }
 
   protected selectAllAi(): void {
@@ -570,6 +631,18 @@ export class PhotoReviewPageComponent {
     return this.aiSelectedTechnicalFactKeys().includes(this.technicalFactKey(fact));
   }
 
+  protected technicalFactValue(fact: AiTechnicalFact): string {
+    const edited = this.editedTechnicalFactValues()[this.technicalFactKey(fact)];
+    return edited ?? fact.value;
+  }
+
+  protected setTechnicalFactValue(fact: AiTechnicalFact, value: string): void {
+    const key = this.technicalFactKey(fact);
+    const next = value.trimStart();
+    this.editedTechnicalFactValues.update((current) => ({ ...current, [key]: next }));
+    this.refreshAiPreview();
+  }
+
   protected markAiAccepted(): void {
     const id = this.aiSuggestion()?.suggestionId;
     if (id) {
@@ -603,6 +676,18 @@ export class PhotoReviewPageComponent {
     this.aiMode.set(value === 'detailed' ? 'detailed' : 'fast');
   }
 
+  protected setAiDescriptionStyle(value: string): void {
+    this.aiDescriptionStyle.set(value === 'technicalSheet' ? 'technicalSheet' : 'narrative');
+    this.refreshAiPreview();
+  }
+
+  protected setAiStep(value: string): void {
+    if (value === 'review' && !this.aiSuggestion()) {
+      return;
+    }
+    this.aiStep.set(value === 'final' ? 'final' : value === 'review' ? 'review' : 'analyze');
+  }
+
   protected technicalFactSourceLabel(source: string): string {
     switch (source) {
       case 'visual': return 'visual';
@@ -615,7 +700,7 @@ export class PhotoReviewPageComponent {
   }
 
   protected applyTechnicalFact(fact: AiTechnicalFact): void {
-    const line = this.technicalFactLine(fact);
+    const line = this.technicalFactLine({ ...fact, value: this.technicalFactValue(fact) });
     const current = this.draftNotes().trim();
     if (current.includes(line)) {
       return;
@@ -641,7 +726,19 @@ export class PhotoReviewPageComponent {
   private descriptionWithTechnicalFacts(description: string, facts: AiTechnicalFact[]): string {
     const factLines = facts.map((fact) => this.technicalFactLine(fact));
     const uniqueLines = factLines.filter((line, index) => line.length > 0 && factLines.indexOf(line) === index && !description.includes(line));
-    return uniqueLines.length ? `${description.trim()}\n\nDatos técnicos:\n${uniqueLines.join('\n')}` : description.trim();
+    if (uniqueLines.length === 0) {
+      return description.trim();
+    }
+
+    if (this.aiDescriptionStyle() === 'technicalSheet') {
+      return `${description.trim()}\n\nFicha técnica:\n${uniqueLines.join('\n')}`;
+    }
+
+    const factsText = facts
+      .map((fact) => `${fact.label.toLocaleLowerCase()}: ${fact.value}`)
+      .filter((line, index, lines) => line.length > 0 && lines.indexOf(line) === index)
+      .join('; ');
+    return `${description.trim()}\n\nDatos técnicos relevantes: ${factsText}.`;
   }
 
   private technicalFactLine(fact: AiTechnicalFact): string {
@@ -877,6 +974,9 @@ export class PhotoReviewPageComponent {
     this.aiPreviewDescription.set('');
     this.aiPreviewQuantity.set(null);
     this.dismissedTechnicalFactKeys.set([]);
+    this.editedTechnicalFactValues.set({});
+    this.aiDescriptionStyle.set('narrative');
+    this.aiStep.set('analyze');
     if (markRejected && id) {
       this.api.rejectAiSuggestion(id).pipe(catchError(() => EMPTY), takeUntilDestroyed(this.destroyRef)).subscribe();
     }
