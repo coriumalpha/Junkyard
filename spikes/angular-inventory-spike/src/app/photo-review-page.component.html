@@ -314,35 +314,31 @@
                   </details>
                 }
 
-                <details class="ai-used-hint" open>
-                  <summary>Nombre y cantidad</summary>
-                  <div class="ai-suggestion-field">
-                    <div>
-                      <span>Nombre</span>
-                      <strong>{{ aiSuggestion()!.proposedName || 'Sin propuesta' }}</strong>
-                    </div>
-                    <mat-checkbox [checked]="aiUseName()" (change)="setAiFieldSelected('name', $event.checked)" [disabled]="!aiSuggestion()!.proposedName">Usar</mat-checkbox>
+                <section class="proposal-primary-fields">
+                  <div class="proposal-field proposal-name-field">
+                    <mat-checkbox [checked]="aiUseName()" (change)="setAiFieldSelected('name', $event.checked)" [disabled]="!aiSuggestion()!.proposedName">Nombre</mat-checkbox>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Nombre propuesto</mat-label>
+                      <input matInput [ngModel]="aiPreviewName()" (ngModelChange)="aiPreviewName.set($event)" />
+                    </mat-form-field>
                   </div>
-
-                  <div class="ai-suggestion-field">
-                    <div>
-                      <span>Cantidad · {{ confidenceLabel(aiSuggestion()!.quantityConfidence) }}</span>
-                      <strong>{{ aiSuggestion()!.proposedQuantity ?? 'No inferida' }}</strong>
-                    </div>
-                    <mat-checkbox [checked]="aiUseQuantity()" (change)="setAiFieldSelected('quantity', $event.checked)" [disabled]="aiSuggestion()!.proposedQuantity === null">Usar</mat-checkbox>
+                  <div class="proposal-field proposal-description-field">
+                    <mat-checkbox [checked]="aiUseDescription()" (change)="setAiFieldSelected('description', $event.checked)" [disabled]="!aiSuggestion()!.proposedDescription">Descripción</mat-checkbox>
+                    <span class="confidence-badge">IA</span>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Descripción propuesta</mat-label>
+                      <textarea matInput rows="8" [ngModel]="aiPreviewDescription()" (ngModelChange)="aiPreviewDescription.set($event)"></textarea>
+                    </mat-form-field>
                   </div>
-                </details>
-
-                <details class="ai-used-hint" open>
-                  <summary>Descripción</summary>
-                  <div class="ai-suggestion-field">
-                    <div>
-                      <span>Descripción</span>
-                      <p>{{ aiSuggestion()!.proposedDescription || 'Sin propuesta' }}</p>
-                    </div>
-                    <mat-checkbox [checked]="aiUseDescription()" (change)="setAiFieldSelected('description', $event.checked)" [disabled]="!aiSuggestion()!.proposedDescription">Usar</mat-checkbox>
+                  <div class="proposal-field proposal-quantity-field">
+                    <mat-checkbox [checked]="aiUseQuantity()" (change)="setAiFieldSelected('quantity', $event.checked)" [disabled]="aiSuggestion()!.proposedQuantity === null">Cantidad</mat-checkbox>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Cantidad</mat-label>
+                      <input matInput type="number" [ngModel]="aiPreviewQuantity()" (ngModelChange)="aiPreviewQuantity.set($event === '' ? null : +$event)" />
+                    </mat-form-field>
+                    <span class="confidence-badge">{{ confidenceLabel(aiSuggestion()!.quantityConfidence) }}</span>
                   </div>
-                </details>
+                </section>
 
                 @if (aiSuggestion()!.suggestedTags.length || aiSuggestion()!.suggestedClass) {
                   <details class="ai-used-hint" open>
