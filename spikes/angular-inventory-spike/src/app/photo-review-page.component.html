@@ -398,6 +398,13 @@
                       <span>Datos técnicos</span>
                       <span>{{ includedTechnicalFacts().length }} incluidos · {{ acceptedTechnicalFacts().length }} en descripción</span>
                     </div>
+                    <div class="ai-fact-header" aria-hidden="true">
+                      <span>Incluir</span>
+                      <span>Dato técnico</span>
+                      <span>Valor propuesto</span>
+                      <span>Conf.</span>
+                      <span>En descripción</span>
+                    </div>
                     @for (fact of aiSuggestion()!.technicalFacts; track technicalFactKey(fact)) {
                       <div class="ai-fact-row" [class.dismissed]="isTechnicalFactDismissed(fact)">
                         <mat-checkbox
@@ -573,6 +580,66 @@
           </mat-card>
         }
       </aside>
+
+      @if (panel() === 'create' && workspaceMode() === 'detailed' && aiSuggestion()) {
+        <section class="final-preview-board" aria-label="Vista previa de la ficha final">
+          <div class="final-preview-title">
+            <strong>Vista previa de la ficha final</strong>
+            <span>
+              <mat-icon>check_circle</mat-icon>
+              {{ aiStep() === 'final' ? 'Borrador aplicado' : 'Vista según selección actual' }}
+            </span>
+          </div>
+          <div class="final-preview-grid">
+            <div class="final-preview-cell identity">
+              <span>Nombre</span>
+              <strong>{{ finalPreviewName() || 'Sin nombre' }}</strong>
+              <span>Cantidad</span>
+              <strong>{{ finalPreviewQuantity() ?? 1 }} {{ draftUnit() || 'uds' }}</strong>
+            </div>
+            <div class="final-preview-cell description">
+              <div>
+                <span>Descripción final</span>
+                <button mat-button type="button" (click)="applySelectedAi()">
+                  <mat-icon>edit</mat-icon>
+                  Editar
+                </button>
+              </div>
+              <p>{{ finalPreviewDescription() || 'Sin descripción' }}</p>
+              @if (acceptedTechnicalFacts().length) {
+                <div class="fact-chips">
+                  @for (fact of acceptedTechnicalFacts(); track technicalFactKey(fact)) {
+                    <span>{{ fact.label }}</span>
+                  }
+                </div>
+              }
+            </div>
+            <div class="final-preview-cell compact">
+              <span>Clasificación</span>
+              <strong>{{ aiPreviewClassification() || 'Sin clase' }}</strong>
+              <span>Tags finales</span>
+              <div class="fact-chips">
+                @if (aiPreviewTagNames().length) {
+                  @for (tag of aiPreviewTagNames(); track tag) {
+                    <span>{{ tag }}</span>
+                  }
+                } @else {
+                  <span>Sin tags</span>
+                }
+              </div>
+            </div>
+            <div class="final-preview-cell compact">
+              <span>Contenedor</span>
+              <strong>{{ draftBoxLabel() }}</strong>
+              <span>Estado</span>
+              <label class="preview-check">
+                <input type="checkbox" [checked]="draftNeedsReview()" disabled />
+                Pendiente de completar
+              </label>
+            </div>
+          </div>
+        </section>
+      }
     </section>
   }
 </main>

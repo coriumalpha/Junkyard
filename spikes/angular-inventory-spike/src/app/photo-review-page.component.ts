@@ -110,6 +110,22 @@ export class PhotoReviewPageComponent {
     const subtype = this.itemSubtypes().find((item) => item.id === this.draftItemSubtypeId()) ?? null;
     return [itemClass?.name, subtype?.name].filter(Boolean).join(' · ');
   });
+  protected readonly draftBoxLabel = computed(() => {
+    const id = this.draftBoxId();
+    return this.boxOptions().find((box) => box.value === id)?.label ?? 'Sin contenedor';
+  });
+  protected readonly finalPreviewName = computed(() =>
+    this.workspaceMode() === 'detailed' && this.aiSuggestion() && this.aiStep() !== 'final'
+      ? this.aiPreviewName()
+      : this.draftName());
+  protected readonly finalPreviewDescription = computed(() =>
+    this.workspaceMode() === 'detailed' && this.aiSuggestion() && this.aiStep() !== 'final'
+      ? this.aiPreviewDescription()
+      : this.draftNotes());
+  protected readonly finalPreviewQuantity = computed(() =>
+    this.workspaceMode() === 'detailed' && this.aiSuggestion() && this.aiStep() !== 'final'
+      ? this.aiPreviewQuantity()
+      : this.draftQuantity());
   protected readonly selectionSummary = computed(() => {
     const count = this.selectedIds().length;
     if (count === 0) {
