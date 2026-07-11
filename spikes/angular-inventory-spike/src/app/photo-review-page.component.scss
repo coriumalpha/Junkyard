@@ -317,6 +317,7 @@
   bottom: 0;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin: 0 -14px;
@@ -627,12 +628,26 @@
 }
 
 .detailed-layout .ai-fact-row {
-  grid-template-columns: minmax(120px, 0.8fr) minmax(180px, 1fr) auto;
+  grid-template-columns: auto minmax(120px, 0.85fr) minmax(180px, 1.15fr) auto minmax(132px, auto);
   align-items: center;
   gap: 8px;
   padding: 8px 0;
   border-width: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.065);
+}
+
+.detailed-layout .ai-fact-label {
+  display: grid;
+  gap: 3px;
+}
+
+.detailed-layout .ai-fact-include {
+  justify-self: start;
+}
+
+.detailed-layout .ai-fact-confidence {
+  justify-self: start;
+  white-space: nowrap;
 }
 
 .detailed-layout .ai-fact-actions {
@@ -645,7 +660,30 @@
 }
 
 .detailed-layout .ai-fact-actions button {
+  width: 32px;
+  height: 32px;
   min-height: 32px;
+  padding: 0;
+}
+
+.detailed-layout .final-description-field textarea {
+  min-height: 210px;
+  line-height: 1.45;
+}
+
+.detailed-layout .final-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 2px -14px -14px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--app-border);
+  background: color-mix(in srgb, var(--app-surface-raised) 92%, #05070b);
+  backdrop-filter: blur(10px);
 }
 
 .ai-used-hint summary {

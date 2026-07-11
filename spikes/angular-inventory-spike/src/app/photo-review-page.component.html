@@ -226,7 +226,7 @@
                   } @else {
                     <mat-icon>auto_fix_high</mat-icon>
                   }
-                  Sugerir con IA
+                  {{ workspaceMode() === 'detailed' ? 'Analizar fotografías' : 'Sugerir con IA' }}
                 </button>
               </div>
               <div class="ai-mode-row">
@@ -396,13 +396,18 @@
                     <summary>Datos técnicos</summary>
                     <div class="ai-section-title">
                       <span>Datos técnicos</span>
-                      <span>{{ acceptedTechnicalFacts().length }} en descripción</span>
+                      <span>{{ includedTechnicalFacts().length }} incluidos · {{ acceptedTechnicalFacts().length }} en descripción</span>
                     </div>
                     @for (fact of aiSuggestion()!.technicalFacts; track technicalFactKey(fact)) {
                       <div class="ai-fact-row" [class.dismissed]="isTechnicalFactDismissed(fact)">
-                        <div>
+                        <mat-checkbox
+                          class="ai-fact-include"
+                          [checked]="isTechnicalFactIncluded(fact)"
+                          (change)="setTechnicalFactIncluded(fact, $event.checked)"
+                          [disabled]="isTechnicalFactDismissed(fact)"
+                          aria-label="Incluir dato técnico" />
+                        <div class="ai-fact-label">
                           <strong>{{ fact.label }}</strong>
-                          <span>{{ confidenceLabel(fact.confidence) }} · {{ technicalFactSourceLabel(fact.source) }}</span>
                           @if (fact.warning) {
                             <small>{{ fact.warning }}</small>
                           }
@@ -411,11 +416,12 @@
                           <mat-label>Valor editable</mat-label>
                           <input matInput [ngModel]="technicalFactValue(fact)" (ngModelChange)="setTechnicalFactValue(fact, $event)" [disabled]="isTechnicalFactDismissed(fact)" />
                         </mat-form-field>
+                        <span class="confidence-badge ai-fact-confidence" [matTooltip]="technicalFactSourceLabel(fact.source)">{{ confidenceLabel(fact.confidence) }}</span>
                         <div class="ai-fact-actions">
-                          <mat-checkbox [checked]="isTechnicalFactSelected(fact)" (change)="setTechnicalFactSelected(fact, $event.checked)" [disabled]="isTechnicalFactDismissed(fact)">En descripción</mat-checkbox>
-                          <button mat-button type="button" (click)="applyTechnicalFact(fact)" [disabled]="isTechnicalFactDismissed(fact)">Añadir ahora</button>
-                          <button mat-button type="button" (click)="discardTechnicalFact(fact)" [disabled]="isTechnicalFactDismissed(fact)">Descartar</button>
-                          <button mat-button type="button" disabled>Verificar</button>
+                          <mat-checkbox [checked]="isTechnicalFactSelected(fact)" (change)="setTechnicalFactSelected(fact, $event.checked)" [disabled]="isTechnicalFactDismissed(fact) || !isTechnicalFactIncluded(fact)">En descripción</mat-checkbox>
+                          <button mat-icon-button type="button" (click)="discardTechnicalFact(fact)" [disabled]="isTechnicalFactDismissed(fact)" matTooltip="Descartar dato técnico">
+                            <mat-icon>close</mat-icon>
+                          </button>
                         </div>
                       </div>
                     }
@@ -433,16 +439,13 @@
                   </details>
                 }
 
-                <div class="ai-actions">
-                  <button mat-flat-button type="button" (click)="applySelectedAi()">Aplicar seleccionados</button>
-                  <button mat-stroked-button type="button" (click)="selectAllAi()">Seleccionar todo</button>
-                  <button mat-stroked-button type="button" (click)="deselectAllAi()">Deseleccionar todo</button>
-                  <button mat-stroked-button type="button" (click)="suggestWithAi('detailed')" [disabled]="aiBusy()">Reintentar detallado</button>
-                  <button mat-stroked-button type="button" (click)="suggestWithAi('fast')" [disabled]="aiBusy()">Reintentar rápido</button>
-                  <button mat-button type="button" (click)="discardAiSuggestion()">Descartar</button>
-                </div>
                 <div class="detail-sticky-actions">
                   <button mat-stroked-button type="button" (click)="setAiStep('analyze')">Atrás</button>
+                  <button mat-stroked-button type="button" (click)="selectAllAi()">Seleccionar todo</button>
+                  <button mat-stroked-button type="button" (click)="deselectAllAi()">Deseleccionar todo</button>
+                  <button mat-stroked-button type="button" (click)="suggestWithAi('detailed')" [disabled]="aiBusy()">Reintentar</button>
+                  <button mat-button type="button" (click)="discardAiSuggestion()">Descartar</button>
+                  <button mat-stroked-button type="button" (click)="applySelectedAi()">Aplicar seleccionados</button>
                   <button mat-flat-button type="button" (click)="applySelectedAi()">Continuar a ficha final</button>
                 </div>
                 </section>
@@ -487,7 +490,7 @@
             }
 
             @if (workspaceMode() === 'quick' || aiStep() === 'final') {
-            <mat-form-field appearance="outline">
+            <mat-form-field appearance="outline" class="final-name-field">
               <mat-label>Nombre</mat-label>
               <input #createNameInput matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" autocomplete="off" />
             </mat-form-field>
@@ -540,9 +543,9 @@
                 </mat-form-field>
               }
             </div>
-            <mat-form-field appearance="outline">
-              <mat-label>Descripción</mat-label>
-              <textarea matInput rows="4" [ngModel]="draftNotes()" (ngModelChange)="draftNotes.set($event)"></textarea>
+            <mat-form-field appearance="outline" class="final-description-field">
+              <mat-label>{{ workspaceMode() === 'detailed' ? 'Descripción final' : 'Descripción' }}</mat-label>
+              <textarea matInput [rows]="workspaceMode() === 'detailed' ? 9 : 4" [ngModel]="draftNotes()" (ngModelChange)="draftNotes.set($event)"></textarea>
             </mat-form-field>
             @if (workspaceMode() === 'detailed') {
               <mat-slide-toggle [checked]="draftIsQuarantined()" (change)="draftIsQuarantined.set($event.checked)">
@@ -558,9 +561,10 @@
                 Abrir en modo detallado
               </button>
             }
-            <div class="split-actions">
+            <div class="split-actions final-actions">
               @if (workspaceMode() === 'detailed') {
                 <button mat-stroked-button type="button" (click)="setAiStep(aiSuggestion() ? 'review' : 'analyze')">Atrás</button>
+                <button mat-stroked-button type="button" (click)="createItem()" [disabled]="busy()">Crear ítem</button>
               }
               <button mat-flat-button type="button" (click)="createItem()" [disabled]="busy()">Crear y siguiente</button>
               <button mat-stroked-button type="button" (click)="createItemNeedsReview()" [disabled]="busy()">Guardar pendiente</button>

@@ -51,6 +51,7 @@ export class PhotoReviewPageComponent {
   protected readonly aiUseQuantity = signal(false);
   protected readonly aiUseClass = signal(false);
   protected readonly aiSelectedTagKeys = signal<string[]>([]);
+  protected readonly aiIncludedTechnicalFactKeys = signal<string[]>([]);
   protected readonly aiSelectedTechnicalFactKeys = signal<string[]>([]);
   protected readonly aiPreviewName = signal('');
   protected readonly aiPreviewDescription = signal('');
@@ -75,6 +76,13 @@ export class PhotoReviewPageComponent {
     const dismissed = new Set(this.dismissedTechnicalFactKeys());
     return this.aiSuggestion()?.technicalFacts
       .filter((fact) => selected.has(this.technicalFactKey(fact)) && !dismissed.has(this.technicalFactKey(fact)))
+      .map((fact) => ({ ...fact, value: this.technicalFactValue(fact) })) ?? [];
+  });
+  protected readonly includedTechnicalFacts = computed(() => {
+    const included = new Set(this.aiIncludedTechnicalFactKeys());
+    const dismissed = new Set(this.dismissedTechnicalFactKeys());
+    return this.aiSuggestion()?.technicalFacts
+      .filter((fact) => included.has(this.technicalFactKey(fact)) && !dismissed.has(this.technicalFactKey(fact)))
       .map((fact) => ({ ...fact, value: this.technicalFactValue(fact) })) ?? [];
   });
   protected readonly aiPreviewTagNames = computed(() => {
@@ -567,6 +575,7 @@ export class PhotoReviewPageComponent {
     this.aiUseQuantity.set(suggestion.proposedQuantity !== null && suggestion.proposedQuantity !== undefined);
     this.aiUseClass.set(!!suggestion.suggestedClass);
     this.aiSelectedTagKeys.set(suggestion.suggestedTags.map((tag) => this.aiTagKey(tag)));
+    this.aiIncludedTechnicalFactKeys.set(suggestion.technicalFacts.map((fact) => this.technicalFactKey(fact)));
     this.aiSelectedTechnicalFactKeys.set(suggestion.technicalFacts.map((fact) => this.technicalFactKey(fact)));
     this.refreshAiPreview();
   }
@@ -577,6 +586,7 @@ export class PhotoReviewPageComponent {
     this.aiUseQuantity.set(false);
     this.aiUseClass.set(false);
     this.aiSelectedTagKeys.set([]);
+    this.aiIncludedTechnicalFactKeys.set([]);
     this.aiSelectedTechnicalFactKeys.set([]);
     this.refreshAiPreview();
   }
@@ -623,12 +633,29 @@ export class PhotoReviewPageComponent {
   }
 
   protected setTechnicalFactSelected(fact: AiTechnicalFact, checked: boolean): void {
-    this.toggleKey(this.aiSelectedTechnicalFactKeys, this.technicalFactKey(fact), checked);
+    const key = this.technicalFactKey(fact);
+    if (checked) {
+      this.toggleKey(this.aiIncludedTechnicalFactKeys, key, true);
+    }
+    this.toggleKey(this.aiSelectedTechnicalFactKeys, key, checked);
     this.refreshAiPreview();
   }
 
   protected isTechnicalFactSelected(fact: AiTechnicalFact): boolean {
     return this.aiSelectedTechnicalFactKeys().includes(this.technicalFactKey(fact));
+  }
+
+  protected setTechnicalFactIncluded(fact: AiTechnicalFact, checked: boolean): void {
+    const key = this.technicalFactKey(fact);
+    this.toggleKey(this.aiIncludedTechnicalFactKeys, key, checked);
+    if (!checked) {
+      this.aiSelectedTechnicalFactKeys.update((current) => current.filter((item) => item !== key));
+    }
+    this.refreshAiPreview();
+  }
+
+  protected isTechnicalFactIncluded(fact: AiTechnicalFact): boolean {
+    return this.aiIncludedTechnicalFactKeys().includes(this.technicalFactKey(fact));
   }
 
   protected technicalFactValue(fact: AiTechnicalFact): string {
@@ -679,6 +706,9 @@ export class PhotoReviewPageComponent {
   protected setAiDescriptionStyle(value: string): void {
     this.aiDescriptionStyle.set(value === 'technicalSheet' ? 'technicalSheet' : 'narrative');
     this.refreshAiPreview();
+    if (this.workspaceMode() === 'detailed' && this.aiStep() === 'final' && this.aiUseDescription()) {
+      this.draftNotes.set(this.aiPreviewDescription().trim());
+    }
   }
 
   protected setAiStep(value: string): void {
@@ -711,6 +741,7 @@ export class PhotoReviewPageComponent {
   protected discardTechnicalFact(fact: AiTechnicalFact): void {
     const key = this.technicalFactKey(fact);
     this.dismissedTechnicalFactKeys.update((current) => current.includes(key) ? current : [...current, key]);
+    this.aiIncludedTechnicalFactKeys.update((current) => current.filter((item) => item !== key));
     this.aiSelectedTechnicalFactKeys.update((current) => current.filter((item) => item !== key));
     this.refreshAiPreview();
   }
@@ -899,6 +930,7 @@ export class PhotoReviewPageComponent {
     this.aiUseQuantity.set(suggestion.proposedQuantity !== null && suggestion.proposedQuantity !== undefined && suggestion.quantityConfidence >= 0.65);
     this.aiUseClass.set(!!suggestion.suggestedClass && suggestion.suggestedClass.confidence >= 0.65);
     this.aiSelectedTagKeys.set(suggestion.suggestedTags.filter((tag) => tag.confidence >= 0.65).map((tag) => this.aiTagKey(tag)));
+    this.aiIncludedTechnicalFactKeys.set(suggestion.technicalFacts.map((fact) => this.technicalFactKey(fact)));
     this.aiSelectedTechnicalFactKeys.set(suggestion.technicalFacts.filter((fact) => fact.confidence >= 0.65).map((fact) => this.technicalFactKey(fact)));
     this.refreshAiPreview();
   }
@@ -969,6 +1001,7 @@ export class PhotoReviewPageComponent {
     this.aiUseQuantity.set(false);
     this.aiUseClass.set(false);
     this.aiSelectedTagKeys.set([]);
+    this.aiIncludedTechnicalFactKeys.set([]);
     this.aiSelectedTechnicalFactKeys.set([]);
     this.aiPreviewName.set('');
     this.aiPreviewDescription.set('');
