@@ -1,0 +1,53 @@
+.property-fields {
+  display: grid;
+  gap: 16px;
+}
+
+.property-fields header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.property-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.property-field {
+  display: grid;
+  gap: 7px;
+}
+
+.property-field > span {
+  color: var(--app-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.property-field.required > span::after {
+  content: " *";
+  color: #ff8a8a;
+}
+
+.property-field :is(input, select, textarea) {
+  width: 100%;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.property-field strong {
+  color: var(--app-text);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.help {
+  color: var(--app-muted);
+}

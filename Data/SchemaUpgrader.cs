@@ -24,6 +24,7 @@ public static class SchemaUpgrader
         EnsureTags(db);
         EnsureItemConditions(db);
         EnsureItemClassifications(db);
+        EnsureItemProperties(db);
         EnsureInventoryActions(db);
         AddColumn(db, "Items", "DescriptionMarkdown", "INTEGER NOT NULL DEFAULT 0");
         db.Database.ExecuteSqlRaw("""
@@ -244,6 +245,69 @@ public static class SchemaUpgrader
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_ItemClasses_IsActive_SortOrder_Name" ON "ItemClasses" ("IsActive", "SortOrder", "Name");""");
         db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemSubtypes_ItemClassId_Name" ON "ItemSubtypes" ("ItemClassId", "Name");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_ItemSubtypes_ItemClassId_IsActive_SortOrder_Name" ON "ItemSubtypes" ("ItemClassId", "IsActive", "SortOrder", "Name");""");
+    }
+
+    private static void EnsureItemProperties(InventoryDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "ItemPropertyDefinitions" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ItemPropertyDefinitions" PRIMARY KEY AUTOINCREMENT,
+                "Scope" TEXT NOT NULL,
+                "ItemClassId" INTEGER NULL,
+                "ItemSubtypeId" INTEGER NULL,
+                "Key" TEXT NOT NULL,
+                "Name" TEXT NOT NULL,
+                "DataType" TEXT NOT NULL,
+                "SortOrder" INTEGER NOT NULL DEFAULT 0,
+                "IsActive" INTEGER NOT NULL DEFAULT 1,
+                "IsRequired" INTEGER NOT NULL DEFAULT 0,
+                "Unit" TEXT NULL,
+                "Placeholder" TEXT NULL,
+                "HelpText" TEXT NULL,
+                "MinNumber" TEXT NULL,
+                "MaxNumber" TEXT NULL,
+                "DefaultValueJson" TEXT NULL,
+                "CreatedAt" TEXT NOT NULL,
+                "UpdatedAt" TEXT NOT NULL,
+                CONSTRAINT "FK_ItemPropertyDefinitions_ItemClasses_ItemClassId" FOREIGN KEY ("ItemClassId") REFERENCES "ItemClasses" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_ItemPropertyDefinitions_ItemSubtypes_ItemSubtypeId" FOREIGN KEY ("ItemSubtypeId") REFERENCES "ItemSubtypes" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "CK_ItemPropertyDefinitions_ScopeTarget" CHECK (("Scope" = 'Class' AND "ItemClassId" IS NOT NULL AND "ItemSubtypeId" IS NULL) OR ("Scope" = 'Subtype' AND "ItemSubtypeId" IS NOT NULL AND "ItemClassId" IS NULL))
+            );
+            CREATE TABLE IF NOT EXISTS "ItemPropertyOptions" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ItemPropertyOptions" PRIMARY KEY AUTOINCREMENT,
+                "DefinitionId" INTEGER NOT NULL,
+                "Value" TEXT NOT NULL,
+                "Label" TEXT NOT NULL,
+                "SortOrder" INTEGER NOT NULL DEFAULT 0,
+                "IsActive" INTEGER NOT NULL DEFAULT 1,
+                "CreatedAt" TEXT NOT NULL,
+                "UpdatedAt" TEXT NOT NULL,
+                CONSTRAINT "FK_ItemPropertyOptions_ItemPropertyDefinitions_DefinitionId" FOREIGN KEY ("DefinitionId") REFERENCES "ItemPropertyDefinitions" ("Id") ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS "ItemPropertyValues" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ItemPropertyValues" PRIMARY KEY AUTOINCREMENT,
+                "ItemId" INTEGER NOT NULL,
+                "DefinitionId" INTEGER NOT NULL,
+                "TextValue" TEXT NULL,
+                "LongTextValue" TEXT NULL,
+                "IntegerValue" INTEGER NULL,
+                "DecimalValue" TEXT NULL,
+                "BooleanValue" INTEGER NULL,
+                "DateValue" TEXT NULL,
+                "JsonValue" TEXT NULL,
+                "CreatedAt" TEXT NOT NULL,
+                "UpdatedAt" TEXT NOT NULL,
+                CONSTRAINT "FK_ItemPropertyValues_Items_ItemId" FOREIGN KEY ("ItemId") REFERENCES "Items" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_ItemPropertyValues_ItemPropertyDefinitions_DefinitionId" FOREIGN KEY ("DefinitionId") REFERENCES "ItemPropertyDefinitions" ("Id") ON DELETE CASCADE
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemPropertyDefinitions_Class_Key" ON "ItemPropertyDefinitions" ("Scope", "ItemClassId", "Key") WHERE "Scope" = 'Class' AND "ItemClassId" IS NOT NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemPropertyDefinitions_Subtype_Key" ON "ItemPropertyDefinitions" ("Scope", "ItemSubtypeId", "Key") WHERE "Scope" = 'Subtype' AND "ItemSubtypeId" IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS "IX_ItemPropertyDefinitions_List" ON "ItemPropertyDefinitions" ("Scope", "ItemClassId", "ItemSubtypeId", "IsActive", "SortOrder", "Name");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemPropertyOptions_DefinitionId_Value" ON "ItemPropertyOptions" ("DefinitionId", "Value");
+            CREATE INDEX IF NOT EXISTS "IX_ItemPropertyOptions_List" ON "ItemPropertyOptions" ("DefinitionId", "IsActive", "SortOrder", "Label");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemPropertyValues_ItemId_DefinitionId" ON "ItemPropertyValues" ("ItemId", "DefinitionId");
+            CREATE INDEX IF NOT EXISTS "IX_ItemPropertyValues_DefinitionId" ON "ItemPropertyValues" ("DefinitionId");
+            """);
     }
 
     private static void BackfillItemConditions(InventoryDbContext db)

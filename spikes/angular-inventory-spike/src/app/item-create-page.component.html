@@ -77,6 +77,12 @@
           </div>
         }
 
+        <app-item-property-fields
+          class="wide"
+          [fields]="propertyFields()"
+          [values]="form().propertyValues ?? []"
+          (valuesChange)="setPropertyValues($event)" />
+
         <app-searchable-select
           label="Contenedor"
           [value]="form().boxId"

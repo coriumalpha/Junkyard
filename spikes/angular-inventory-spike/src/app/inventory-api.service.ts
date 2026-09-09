@@ -157,6 +157,78 @@ export interface ItemSubtypeUpdate {
   isActive: boolean;
 }
 
+export type ItemPropertyScope = 'Class' | 'Subtype';
+export type ItemPropertyDataType = 'ShortText' | 'LongText' | 'Integer' | 'Decimal' | 'Boolean' | 'Date' | 'Url' | 'Select' | 'MultiSelect';
+
+export interface ItemPropertyOption {
+  id: number;
+  value: string;
+  label: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface ItemPropertyDefinition {
+  id: number;
+  scope: ItemPropertyScope;
+  itemClassId: number | null;
+  itemSubtypeId: number | null;
+  key: string;
+  name: string;
+  dataType: ItemPropertyDataType;
+  sortOrder: number;
+  isActive: boolean;
+  isRequired: boolean;
+  unit: string | null;
+  placeholder: string | null;
+  helpText: string | null;
+  minNumber: number | null;
+  maxNumber: number | null;
+  defaultValueJson: string | null;
+  options: ItemPropertyOption[];
+}
+
+export interface ItemPropertyDefinitionsResponse {
+  definitions: ItemPropertyDefinition[];
+}
+
+export interface ItemPropertyOptionUpdate {
+  value: string;
+  label: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface ItemPropertyDefinitionUpdate {
+  scope: ItemPropertyScope;
+  itemClassId: number | null;
+  itemSubtypeId: number | null;
+  key: string;
+  name: string;
+  dataType: ItemPropertyDataType;
+  sortOrder: number;
+  isActive: boolean;
+  isRequired: boolean;
+  unit: string;
+  placeholder: string;
+  helpText: string;
+  minNumber: number | null;
+  maxNumber: number | null;
+  defaultValueJson: string;
+  options: ItemPropertyOptionUpdate[];
+}
+
+export interface ItemPropertyValue {
+  definitionId: number;
+  value: unknown;
+}
+
+export interface ItemPropertyField {
+  definition: ItemPropertyDefinition;
+  value: ItemPropertyValue | null;
+  applies: boolean;
+}
+
 export interface TagUpdate {
   name: string;
   color: string;
@@ -423,6 +495,8 @@ export interface RelatedItem { id: number; code: string; name: string; archived:
 export interface InventoryItemDetail {
   descriptionMarkdown: boolean;
   relatedItems: RelatedItem[];
+  propertyFields: ItemPropertyField[];
+  retainedPropertyValues: ItemPropertyField[];
   id: number;
   code: string;
   name: string;
@@ -460,6 +534,7 @@ export interface InventoryItemDetail {
 export interface InventoryItemUpdate {
   descriptionMarkdown?: boolean;
   relatedItemIds?: number[];
+  propertyValues?: ItemPropertyValue[];
   code: string;
   name: string;
   category: string;
@@ -895,6 +970,32 @@ export class InventoryApiService {
 
   setItemSubtypeActive(id: number, isActive: boolean): Observable<ItemSubtype> {
     return this.http.patch<ItemSubtype>(`/api/item-subtypes/${id}/active`, { isActive });
+  }
+
+  fetchItemProperties(itemClassId: number | null, itemSubtypeId: number | null, includeInactive = false): Observable<ItemPropertyDefinitionsResponse> {
+    let params = new HttpParams();
+    if (itemClassId) {
+      params = params.set('itemClassId', String(itemClassId));
+    }
+    if (itemSubtypeId) {
+      params = params.set('itemSubtypeId', String(itemSubtypeId));
+    }
+    if (includeInactive) {
+      params = params.set('includeInactive', 'true');
+    }
+    return this.http.get<ItemPropertyDefinitionsResponse>('/api/item-properties', { params });
+  }
+
+  createItemProperty(input: ItemPropertyDefinitionUpdate): Observable<ItemPropertyDefinition> {
+    return this.http.post<ItemPropertyDefinition>('/api/item-properties', input);
+  }
+
+  updateItemProperty(id: number, input: ItemPropertyDefinitionUpdate): Observable<ItemPropertyDefinition> {
+    return this.http.put<ItemPropertyDefinition>(`/api/item-properties/${id}`, input);
+  }
+
+  setItemPropertyActive(id: number, isActive: boolean): Observable<ItemPropertyDefinition> {
+    return this.http.patch<ItemPropertyDefinition>(`/api/item-properties/${id}/active`, { isActive });
   }
 
   fetchItemClassificationCleanup(): Observable<ItemClassificationCleanupReport> {

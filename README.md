@@ -390,6 +390,7 @@ Use maintenance and diagnostic screens to find:
 - Inventory modes: individual, fungible, kit and lot.
 - Subtypes per class.
 - Class/subtype management UI.
+- Generic class/subtype properties with typed item values.
 - Active/inactive handling instead of destructive deletion.
 - Classification diagnostics.
 - Support for migration away from temporary tags.
@@ -559,6 +560,7 @@ Available documentation:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Item classification](docs/ITEM-CLASSIFICATION.md)
+- [Item properties by class and subtype](docs/ITEM-PROPERTIES.md)
 - [AI item suggestions](docs/AI-ITEM-SUGGESTIONS.md)
 - [Privacy and Data Handling](docs/PRIVACY.md)
 

@@ -1,5 +1,6 @@
 import { DescriptionEditorComponent } from './description-editor.component';
 import { DescriptionViewComponent } from './description-view.component';
+import { ItemPropertyFieldsComponent } from './item-property-fields.component';
 import { RelatedItemsPickerComponent } from './related-items-picker.component';
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
@@ -23,7 +24,7 @@ import { EntityMiniCardComponent } from './entity-mini-card.component';
 import { ColorPickerComponent } from './color-picker.component';
 import { HierarchyTrailComponent, HierarchyTrailNode } from './hierarchy-trail.component';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
-import { InventoryAction, InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryMode, InventoryOptionsResponse, InventoryPhoto, ItemClass, ItemSubtype } from './inventory-api.service';
+import { InventoryAction, InventoryApiService, InventoryBoxDetail, InventoryBoxUpdate, InventoryHierarchyNode, InventoryItem, InventoryItemDetail, InventoryItemUpdate, InventoryMode, InventoryOptionsResponse, InventoryPhoto, ItemClass, ItemPropertyField, ItemPropertyValue, ItemSubtype } from './inventory-api.service';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
 
@@ -35,7 +36,7 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
   selector: 'app-detail-page',
   standalone: true,
   imports: [
-    DescriptionEditorComponent, DescriptionViewComponent, RelatedItemsPickerComponent,
+    DescriptionEditorComponent, DescriptionViewComponent, ItemPropertyFieldsComponent, RelatedItemsPickerComponent,
     CommonModule,
     FormsModule,
     RouterLink,
@@ -73,6 +74,7 @@ export class DetailPageComponent {
   protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], itemClasses: [], itemSubtypes: [], locations: [], boxes: [] });
   protected readonly itemClasses = signal<ItemClass[]>([]);
   protected readonly itemSubtypes = signal<ItemSubtype[]>([]);
+  protected readonly editPropertyFields = signal<ItemPropertyField[]>([]);
   protected readonly itemForm = signal<InventoryItemUpdate>(this.emptyItemForm());
   protected readonly boxForm = signal<InventoryBoxUpdate>(this.emptyBoxForm());
   protected readonly newTagName = signal('');
@@ -315,8 +317,10 @@ export class DetailPageComponent {
       notes: item.notes ?? '',
       descriptionMarkdown: item.descriptionMarkdown,
       relatedItemIds: item.relatedItems.map(i=>i.id),
+      propertyValues: item.propertyFields.map((field) => ({ definitionId: field.definition.id, value: field.value?.value ?? null })),
       boxId: item.box?.id ?? null
     });
+    this.editPropertyFields.set(item.propertyFields);
     this.loadItemSubtypes(item.itemClassId);
     this.formError.set(null);
     this.saveMessage.set(null);
@@ -369,8 +373,9 @@ export class DetailPageComponent {
 
   protected setItemClassId(value: number | string | null | (number | string | null)[]): void {
     const itemClassId = typeof value === 'number' && value > 0 ? value : null;
-    this.itemForm.update((current) => ({ ...current, itemClassId, itemSubtypeId: null }));
+    this.itemForm.update((current) => ({ ...current, itemClassId, itemSubtypeId: null, propertyValues: [] }));
     this.loadItemSubtypes(itemClassId);
+    this.loadItemProperties(itemClassId, null);
   }
 
   protected setItemSubtypeId(value: number | string | null | (number | string | null)[]): void {
@@ -380,7 +385,12 @@ export class DetailPageComponent {
       return;
     }
 
-    this.itemForm.update((current) => ({ ...current, itemSubtypeId }));
+    this.itemForm.update((current) => ({ ...current, itemSubtypeId, propertyValues: [] }));
+    this.loadItemProperties(this.itemForm().itemClassId, itemSubtypeId);
+  }
+
+  protected setPropertyValues(values: ItemPropertyValue[]): void {
+    this.itemForm.update((current) => ({ ...current, propertyValues: values }));
   }
 
   protected saveItem(): void {
@@ -436,8 +446,10 @@ export class DetailPageComponent {
           notes: updated.notes ?? '',
           descriptionMarkdown: updated.descriptionMarkdown,
           relatedItemIds: updated.relatedItems.map(i=>i.id),
+          propertyValues: updated.propertyFields.map((field) => ({ definitionId: field.definition.id, value: field.value?.value ?? null })),
           boxId: updated.box?.id ?? null
         });
+        this.editPropertyFields.set(updated.propertyFields);
         this.editingItem.set(false);
         this.saveMessage.set('Ítem guardado.');
       }),
@@ -1290,6 +1302,7 @@ export class DetailPageComponent {
       notes: '',
       descriptionMarkdown: true,
       relatedItemIds: [],
+      propertyValues: [],
       boxId: null
     };
   }
@@ -1310,6 +1323,17 @@ export class DetailPageComponent {
       }),
       catchError(() => {
         this.itemSubtypes.set([]);
+        return EMPTY;
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  private loadItemProperties(itemClassId: number | null, itemSubtypeId: number | null): void {
+    this.api.fetchItemProperties(itemClassId, itemSubtypeId).pipe(
+      tap((response) => this.editPropertyFields.set(response.definitions.map((definition) => ({ definition, value: null, applies: true })))),
+      catchError(() => {
+        this.editPropertyFields.set([]);
         return EMPTY;
       }),
       takeUntilDestroyed(this.destroyRef)

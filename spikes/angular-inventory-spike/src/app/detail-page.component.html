@@ -202,6 +202,19 @@
         }
       </mat-card>
 
+      @if (item()!.propertyFields.length || item()!.retainedPropertyValues.length) {
+        <mat-card class="info-card item-side-wide">
+          <app-item-property-fields [fields]="item()!.propertyFields" [readonly]="true" />
+          @if (item()!.retainedPropertyValues.length) {
+            <div class="retained-properties">
+              <p class="eyebrow">Conservadas</p>
+              <p>Valores guardados que ya no aplican a la clase o subtipo actual.</p>
+              <app-item-property-fields [fields]="item()!.retainedPropertyValues" [readonly]="true" />
+            </div>
+          }
+        </mat-card>
+      }
+
       <mat-card class="info-card item-side-wide related-card"><div class="section-head"><h2>Elementos relacionados</h2>@if (!item()!.archived) { <button mat-stroked-button type="button" (click)="startItemEdit('relations')">Vincular elementos</button> }</div>
       <div class="related-links">@for (related of item()!.relatedItems; track related.id) { <a [routerLink]="['/item',related.id]"><small>{{ related.code | inventoryCode }}</small><strong>{{ related.name }}</strong>@if(related.archived){<span>Archivado</span>}<span aria-hidden="true">↗</span></a> }@empty{<p class="empty-note">Conecta esta ficha con sus accesorios, componentes u otros objetos.</p>}</div></mat-card>
       @if (editingItem()) {
@@ -268,6 +281,12 @@
                 <span>{{ selectedItemClass() ? inventoryModeLabel(selectedItemClass()!.inventoryMode) : 'Sin clase' }}</span>
               </div>
             }
+
+            <app-item-property-fields
+              class="wide"
+              [fields]="editPropertyFields()"
+              [values]="itemForm().propertyValues ?? []"
+              (valuesChange)="setPropertyValues($event)" />
 
             <app-searchable-select
               label="Contenedor"

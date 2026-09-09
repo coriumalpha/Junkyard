@@ -545,6 +545,44 @@ app.MapPatch("/api/item-subtypes/{id:int}/active", async (
     await db.SaveChangesAsync(cancellationToken);
     return Results.Json(ToItemSubtypeDto(subtype));
 });
+app.MapGet("/api/item-properties", async (
+    int? itemClassId,
+    int? itemSubtypeId,
+    bool? includeInactive,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var response = await queryService.GetItemPropertyDefinitionsAsync(itemClassId, itemSubtypeId, includeInactive == true, cancellationToken);
+    return Results.Json(response);
+});
+app.MapPost("/api/item-properties", async (
+    ItemPropertyDefinitionUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (definition, error) = await queryService.CreateItemPropertyDefinitionAsync(input, cancellationToken);
+    return error is not null ? Results.BadRequest(new { error }) : Results.Json(definition);
+});
+app.MapPut("/api/item-properties/{id:int}", async (
+    int id,
+    ItemPropertyDefinitionUpdateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (definition, error) = await queryService.UpdateItemPropertyDefinitionAsync(id, input, cancellationToken);
+    if (error is not null) return Results.BadRequest(new { error });
+    return definition is null ? Results.NotFound() : Results.Json(definition);
+});
+app.MapPatch("/api/item-properties/{id:int}/active", async (
+    int id,
+    ActiveStateDto input,
+    InventoryLiveQueryService queryService,
+    CancellationToken cancellationToken) =>
+{
+    var (definition, error) = await queryService.SetItemPropertyDefinitionActiveAsync(id, input.IsActive, cancellationToken);
+    if (error is not null) return Results.BadRequest(new { error });
+    return definition is null ? Results.NotFound() : Results.Json(definition);
+});
 app.MapGet("/api/cleanup/item-classification", async (
     InventoryLiveQueryService queryService,
     CancellationToken cancellationToken) =>

@@ -14,7 +14,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { ColorPickerComponent } from './color-picker.component';
-import { InventoryApiService, InventoryMode, ItemClass, ItemClassUpdate, ItemSubtype, ItemSubtypeUpdate } from './inventory-api.service';
+import { InventoryApiService, InventoryMode, ItemClass, ItemClassUpdate, ItemPropertyDataType, ItemPropertyDefinition, ItemPropertyDefinitionUpdate, ItemSubtype, ItemSubtypeUpdate } from './inventory-api.service';
 
 interface ClassDraft {
   name: string;
@@ -37,6 +37,24 @@ interface SubtypeDraft {
   isActive: boolean;
 }
 
+interface PropertyDraft {
+  scope: 'Class' | 'Subtype';
+  itemSubtypeId: number | null;
+  key: string;
+  name: string;
+  dataType: ItemPropertyDataType;
+  sortOrder: number;
+  isActive: boolean;
+  isRequired: boolean;
+  unit: string;
+  placeholder: string;
+  helpText: string;
+  minNumber: number | null;
+  maxNumber: number | null;
+  defaultValueJson: string;
+  optionsText: string;
+}
+
 @Component({
   selector: 'app-settings-classes-page',
   standalone: true,
@@ -56,14 +74,21 @@ export class SettingsClassesPageComponent {
   protected readonly message = signal<string | null>(null);
   protected readonly classDraft = signal<ClassDraft>(this.emptyClassDraft());
   protected readonly subtypeDraft = signal<SubtypeDraft>(this.emptySubtypeDraft(null));
+  protected readonly propertyDefinitions = signal<ItemPropertyDefinition[]>([]);
+  protected readonly propertyDraft = signal<PropertyDraft>(this.emptyPropertyDraft('Class'));
+  protected readonly editingPropertyId = signal<number | null>(null);
+  protected readonly propertyEditorOpen = signal(false);
   protected readonly colorEditorOpen = signal(false);
   protected readonly subtypeEditorOpen = signal(false);
   protected readonly inventoryModes: InventoryMode[] = ['Individual', 'Fungible', 'Kit', 'Lot'];
+  protected readonly propertyTypes: ItemPropertyDataType[] = ['ShortText', 'LongText', 'Integer', 'Decimal', 'Boolean', 'Date', 'Url', 'Select', 'MultiSelect'];
 
   protected readonly selectedClass = computed(() =>
     this.classes().find((itemClass) => itemClass.id === this.selectedClassId()) ?? null);
   protected readonly selectedSubtypes = computed(() =>
     this.subtypes().filter((subtype) => subtype.itemClassId === this.selectedClassId()));
+  protected readonly classProperties = computed(() => this.propertyDefinitions().filter((definition) => definition.scope === 'Class'));
+  protected readonly subtypeProperties = computed(() => this.propertyDefinitions().filter((definition) => definition.scope === 'Subtype'));
 
   private readonly api = inject(InventoryApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -111,6 +136,8 @@ export class SettingsClassesPageComponent {
     this.colorEditorOpen.set(false);
     this.classDraft.set(this.emptyClassDraft());
     this.subtypeDraft.set(this.emptySubtypeDraft(null));
+    this.propertyDefinitions.set([]);
+    this.propertyEditorOpen.set(false);
     this.error.set(null);
     this.message.set(null);
   }
@@ -131,6 +158,7 @@ export class SettingsClassesPageComponent {
       isActive: itemClass.isActive
     });
     this.error.set(null);
+    this.loadProperties(itemClass.id);
   }
 
   protected saveClass(): void {
@@ -266,6 +294,77 @@ export class SettingsClassesPageComponent {
     this.subtypeDraft.update((draft) => ({ ...draft, ...patch }));
   }
 
+  protected patchPropertyDraft(patch: Partial<PropertyDraft>): void {
+    this.propertyDraft.update((draft) => ({ ...draft, ...patch }));
+  }
+
+  protected startCreateProperty(scope: 'Class' | 'Subtype', subtypeId: number | null = null): void {
+    this.editingPropertyId.set(null);
+    this.propertyDraft.set(this.emptyPropertyDraft(scope, subtypeId));
+    this.propertyEditorOpen.set(true);
+  }
+
+  protected editProperty(definition: ItemPropertyDefinition): void {
+    this.editingPropertyId.set(definition.id);
+    this.propertyDraft.set({
+      scope: definition.scope,
+      itemSubtypeId: definition.itemSubtypeId,
+      key: definition.key,
+      name: definition.name,
+      dataType: definition.dataType,
+      sortOrder: definition.sortOrder,
+      isActive: definition.isActive,
+      isRequired: definition.isRequired,
+      unit: definition.unit ?? '',
+      placeholder: definition.placeholder ?? '',
+      helpText: definition.helpText ?? '',
+      minNumber: definition.minNumber,
+      maxNumber: definition.maxNumber,
+      defaultValueJson: definition.defaultValueJson ?? '',
+      optionsText: definition.options.map((option) => `${option.value}|${option.label}`).join('\n')
+    });
+    this.propertyEditorOpen.set(true);
+  }
+
+  protected saveProperty(): void {
+    const draft = this.propertyDraft();
+    if (!this.selectedClassId() || !draft.name.trim() || this.saving()) return;
+    const input: ItemPropertyDefinitionUpdate = {
+      scope: draft.scope,
+      itemClassId: draft.scope === 'Class' ? this.selectedClassId() : null,
+      itemSubtypeId: draft.scope === 'Subtype' ? draft.itemSubtypeId : null,
+      key: draft.key.trim(),
+      name: draft.name.trim(),
+      dataType: draft.dataType,
+      sortOrder: draft.sortOrder,
+      isActive: draft.isActive,
+      isRequired: draft.isRequired,
+      unit: draft.unit.trim(),
+      placeholder: draft.placeholder.trim(),
+      helpText: draft.helpText.trim(),
+      minNumber: draft.minNumber,
+      maxNumber: draft.maxNumber,
+      defaultValueJson: draft.defaultValueJson.trim(),
+      options: this.parseOptions(draft.optionsText)
+    };
+    const request = this.editingPropertyId()
+      ? this.api.updateItemProperty(this.editingPropertyId()!, input)
+      : this.api.createItemProperty(input);
+    this.persistProperty(request, this.editingPropertyId() ? 'Propiedad actualizada.' : 'Propiedad creada.');
+  }
+
+  protected toggleProperty(definition: ItemPropertyDefinition): void {
+    this.persistProperty(this.api.setItemPropertyActive(definition.id, !definition.isActive), !definition.isActive ? 'Propiedad activada.' : 'Propiedad desactivada.');
+  }
+
+  protected propertyTypeLabel(type: ItemPropertyDataType): string {
+    return ({ ShortText: 'Texto corto', LongText: 'Texto largo', Integer: 'Entero', Decimal: 'Decimal', Boolean: 'Sí/No', Date: 'Fecha', Url: 'URL', Select: 'Select', MultiSelect: 'Multi-select' } as Record<ItemPropertyDataType, string>)[type];
+  }
+
+  protected propertiesForSubtype(subtypeId: number): ItemPropertyDefinition[] {
+    return this.subtypeProperties().filter((property) => property.itemSubtypeId === subtypeId);
+  }
+
   private persistClass(request: ReturnType<InventoryApiService['createItemClass']>, success: string): void {
     this.saving.set(true);
     this.error.set(null);
@@ -276,6 +375,7 @@ export class SettingsClassesPageComponent {
         this.editingClassId.set(itemClass.id);
         this.colorEditorOpen.set(false);
         this.message.set(success);
+        this.loadProperties(itemClass.id);
       }),
       catchError((error: unknown) => {
         this.error.set(this.describeError(error, 'No se pudo guardar la clase.'));
@@ -297,6 +397,7 @@ export class SettingsClassesPageComponent {
         this.editingSubtypeId.set(subtype.id);
         this.subtypeEditorOpen.set(false);
         this.message.set(success);
+        this.loadProperties(subtype.itemClassId);
       }),
       catchError((error: unknown) => {
         this.error.set(this.describeError(error, 'No se pudo guardar el subtipo.'));
@@ -314,6 +415,69 @@ export class SettingsClassesPageComponent {
 
   private emptySubtypeDraft(itemClassId: number | null): SubtypeDraft {
     return { itemClassId, name: '', unit: 'uds', minStock: null, targetStock: null, description: '', sortOrder: null, isActive: true };
+  }
+
+  private emptyPropertyDraft(scope: 'Class' | 'Subtype', subtypeId: number | null = null): PropertyDraft {
+    return {
+      scope,
+      itemSubtypeId: subtypeId,
+      key: '',
+      name: '',
+      dataType: 'ShortText',
+      sortOrder: 0,
+      isActive: true,
+      isRequired: false,
+      unit: '',
+      placeholder: '',
+      helpText: '',
+      minNumber: null,
+      maxNumber: null,
+      defaultValueJson: '',
+      optionsText: ''
+    };
+  }
+
+  private loadProperties(itemClassId: number | null): void {
+    if (!itemClassId) {
+      this.propertyDefinitions.set([]);
+      return;
+    }
+    this.api.fetchItemProperties(itemClassId, null, true).pipe(
+      tap((response) => this.propertyDefinitions.set(response.definitions)),
+      catchError(() => {
+        this.propertyDefinitions.set([]);
+        return EMPTY;
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  private persistProperty(request: ReturnType<InventoryApiService['createItemProperty']>, success: string): void {
+    this.saving.set(true);
+    this.error.set(null);
+    request.pipe(
+      tap(() => {
+        this.propertyEditorOpen.set(false);
+        this.editingPropertyId.set(null);
+        this.message.set(success);
+        this.loadProperties(this.selectedClassId());
+      }),
+      catchError((error: unknown) => {
+        this.error.set(this.describeError(error, 'No se pudo guardar la propiedad.'));
+        return EMPTY;
+      }),
+      finalize(() => this.saving.set(false)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  private parseOptions(text: string) {
+    return text.split('\n')
+      .map((line, index) => {
+        const [value, ...label] = line.split('|');
+        return { value: value.trim(), label: (label.join('|') || value).trim(), sortOrder: index, isActive: true };
+      })
+      .filter((option) => option.value && option.label);
   }
 
   private sortClasses(classes: ItemClass[]): ItemClass[] {

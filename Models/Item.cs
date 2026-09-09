@@ -31,6 +31,7 @@ public class Item
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public List<ItemTag> ItemTags { get; set; } = [];
+    public List<ItemPropertyValue> PropertyValues { get; set; } = [];
 
     public static string FormatItCode(int sequence) => $"{ItPrefix}{sequence / 1000:000}-{sequence % 1000:000}";
 

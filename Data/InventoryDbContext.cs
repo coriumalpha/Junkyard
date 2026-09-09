@@ -11,6 +11,9 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
     public DbSet<ItemRelation> ItemRelations => Set<ItemRelation>();
     public DbSet<ItemClass> ItemClasses => Set<ItemClass>();
     public DbSet<ItemSubtype> ItemSubtypes => Set<ItemSubtype>();
+    public DbSet<ItemPropertyDefinition> ItemPropertyDefinitions => Set<ItemPropertyDefinition>();
+    public DbSet<ItemPropertyOption> ItemPropertyOptions => Set<ItemPropertyOption>();
+    public DbSet<ItemPropertyValue> ItemPropertyValues => Set<ItemPropertyValue>();
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<ItemCondition> ItemConditions => Set<ItemCondition>();
     public DbSet<ItemTag> ItemTags => Set<ItemTag>();
@@ -96,6 +99,44 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.HasOne(x => x.ItemClass).WithMany(x => x.Subtypes).HasForeignKey(x => x.ItemClassId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(x => new { x.ItemClassId, x.Name }).IsUnique();
             entity.HasIndex(x => new { x.ItemClassId, x.IsActive, x.SortOrder, x.Name });
+        });
+
+        modelBuilder.Entity<ItemPropertyDefinition>(entity =>
+        {
+            entity.Property(x => x.Scope).HasConversion<string>().HasMaxLength(16);
+            entity.Property(x => x.Key).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.DataType).HasConversion<string>().HasMaxLength(24);
+            entity.Property(x => x.Unit).HasMaxLength(32);
+            entity.Property(x => x.Placeholder).HasMaxLength(160);
+            entity.Property(x => x.HelpText).HasMaxLength(500);
+            entity.Property(x => x.MinNumber).HasPrecision(18, 6);
+            entity.Property(x => x.MaxNumber).HasPrecision(18, 6);
+            entity.HasOne(x => x.ItemClass).WithMany(x => x.PropertyDefinitions).HasForeignKey(x => x.ItemClassId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ItemSubtype).WithMany(x => x.PropertyDefinitions).HasForeignKey(x => x.ItemSubtypeId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.Scope, x.ItemClassId, x.Key }).IsUnique().HasFilter("\"Scope\" = 'Class' AND \"ItemClassId\" IS NOT NULL");
+            entity.HasIndex(x => new { x.Scope, x.ItemSubtypeId, x.Key }).IsUnique().HasFilter("\"Scope\" = 'Subtype' AND \"ItemSubtypeId\" IS NOT NULL");
+            entity.HasIndex(x => new { x.Scope, x.ItemClassId, x.ItemSubtypeId, x.IsActive, x.SortOrder, x.Name });
+            entity.ToTable(t => t.HasCheckConstraint("CK_ItemPropertyDefinitions_ScopeTarget", "(\"Scope\" = 'Class' AND \"ItemClassId\" IS NOT NULL AND \"ItemSubtypeId\" IS NULL) OR (\"Scope\" = 'Subtype' AND \"ItemSubtypeId\" IS NOT NULL AND \"ItemClassId\" IS NULL)"));
+        });
+
+        modelBuilder.Entity<ItemPropertyOption>(entity =>
+        {
+            entity.Property(x => x.Value).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Label).HasMaxLength(160).IsRequired();
+            entity.HasOne(x => x.Definition).WithMany(x => x.Options).HasForeignKey(x => x.DefinitionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.DefinitionId, x.Value }).IsUnique();
+            entity.HasIndex(x => new { x.DefinitionId, x.IsActive, x.SortOrder, x.Label });
+        });
+
+        modelBuilder.Entity<ItemPropertyValue>(entity =>
+        {
+            entity.Property(x => x.TextValue).HasMaxLength(500);
+            entity.Property(x => x.DecimalValue).HasPrecision(18, 6);
+            entity.HasOne(x => x.Item).WithMany(x => x.PropertyValues).HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Definition).WithMany(x => x.Values).HasForeignKey(x => x.DefinitionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.ItemId, x.DefinitionId }).IsUnique();
+            entity.HasIndex(x => x.DefinitionId);
         });
 
         modelBuilder.Entity<Tag>(entity =>

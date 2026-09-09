@@ -171,6 +171,145 @@
         </div>
       </mat-card>
 
+      @if (selectedClassId()) {
+        <mat-card class="editor-card">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Propiedades</p>
+              <h2>Campos específicos</h2>
+            </div>
+            <button mat-flat-button type="button" (click)="startCreateProperty('Class')" [disabled]="saving()">
+              <mat-icon>add</mat-icon>
+              Propiedad de clase
+            </button>
+          </div>
+
+          <div class="subtype-list">
+            <p class="eyebrow">Heredadas por todos los subtipos</p>
+            @for (property of classProperties(); track property.id) {
+              <div class="subtype-row" [class.inactive]="!property.isActive">
+                <div>
+                  <strong>{{ property.name }}</strong>
+                  <small>{{ property.key }} · {{ propertyTypeLabel(property.dataType) }} · orden {{ property.sortOrder }} @if (property.isRequired) { · Obligatoria } @if (property.unit) { · {{ property.unit }} }</small>
+                </div>
+                <div class="row-actions">
+                  <button mat-stroked-button type="button" (click)="editProperty(property)" [disabled]="saving()"><mat-icon>edit</mat-icon>Editar</button>
+                  <button mat-icon-button type="button" (click)="toggleProperty(property)" [disabled]="saving()" [attr.aria-label]="property.isActive ? 'Desactivar propiedad' : 'Activar propiedad'">
+                    <mat-icon>{{ property.isActive ? 'toggle_off' : 'toggle_on' }}</mat-icon>
+                  </button>
+                </div>
+              </div>
+            } @empty {
+              <section class="state-panel empty"><mat-icon>data_object</mat-icon><span>Sin propiedades de clase.</span></section>
+            }
+
+            <p class="eyebrow">Propias de subtipos</p>
+            @for (subtype of selectedSubtypes(); track subtype.id) {
+              <div class="subtype-property-head">
+                <strong>{{ subtype.name }}</strong>
+                <button mat-stroked-button type="button" (click)="startCreateProperty('Subtype', subtype.id)" [disabled]="saving()"><mat-icon>add</mat-icon>Propiedad</button>
+              </div>
+              @for (property of propertiesForSubtype(subtype.id); track property.id) {
+                <div class="subtype-row" [class.inactive]="!property.isActive">
+                  <div>
+                    <strong>{{ property.name }}</strong>
+                    <small>{{ property.key }} · {{ propertyTypeLabel(property.dataType) }} · orden {{ property.sortOrder }} @if (property.isRequired) { · Obligatoria } @if (property.unit) { · {{ property.unit }} }</small>
+                  </div>
+                  <div class="row-actions">
+                    <button mat-stroked-button type="button" (click)="editProperty(property)" [disabled]="saving()"><mat-icon>edit</mat-icon>Editar</button>
+                    <button mat-icon-button type="button" (click)="toggleProperty(property)" [disabled]="saving()" [attr.aria-label]="property.isActive ? 'Desactivar propiedad' : 'Activar propiedad'">
+                      <mat-icon>{{ property.isActive ? 'toggle_off' : 'toggle_on' }}</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        </mat-card>
+      }
+
+      @if (propertyEditorOpen()) {
+        <mat-card class="editor-card subtype-editor">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Propiedad</p>
+              <h2>{{ editingPropertyId() ? 'Editar propiedad' : 'Nueva propiedad' }}</h2>
+            </div>
+          </div>
+          <div class="form-grid subtype-form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Ámbito</mat-label>
+              <mat-select [ngModel]="propertyDraft().scope" (ngModelChange)="patchPropertyDraft({ scope: $event, itemSubtypeId: $event === 'Class' ? null : propertyDraft().itemSubtypeId })">
+                <mat-option value="Class">Clase</mat-option>
+                <mat-option value="Subtype">Subtipo</mat-option>
+              </mat-select>
+            </mat-form-field>
+            @if (propertyDraft().scope === 'Subtype') {
+              <mat-form-field appearance="outline">
+                <mat-label>Subtipo</mat-label>
+                <mat-select [ngModel]="propertyDraft().itemSubtypeId" (ngModelChange)="patchPropertyDraft({ itemSubtypeId: $event })">
+                  @for (subtype of selectedSubtypes(); track subtype.id) {
+                    <mat-option [value]="subtype.id">{{ subtype.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre visible</mat-label>
+              <input matInput [ngModel]="propertyDraft().name" (ngModelChange)="patchPropertyDraft({ name: $event })" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Identificador interno</mat-label>
+              <input matInput [ngModel]="propertyDraft().key" (ngModelChange)="patchPropertyDraft({ key: $event })" placeholder="vacío = generado desde nombre" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Tipo</mat-label>
+              <mat-select [ngModel]="propertyDraft().dataType" (ngModelChange)="patchPropertyDraft({ dataType: $event })">
+                @for (type of propertyTypes; track type) {
+                  <mat-option [value]="type">{{ propertyTypeLabel(type) }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Orden</mat-label>
+              <input matInput type="number" [ngModel]="propertyDraft().sortOrder" (ngModelChange)="patchPropertyDraft({ sortOrder: +$event || 0 })" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Unidad</mat-label>
+              <input matInput [ngModel]="propertyDraft().unit" (ngModelChange)="patchPropertyDraft({ unit: $event })" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Placeholder</mat-label>
+              <input matInput [ngModel]="propertyDraft().placeholder" (ngModelChange)="patchPropertyDraft({ placeholder: $event })" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Mínimo</mat-label>
+              <input matInput type="number" [ngModel]="propertyDraft().minNumber" (ngModelChange)="patchPropertyDraft({ minNumber: $event === '' ? null : +$event })" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Máximo</mat-label>
+              <input matInput type="number" [ngModel]="propertyDraft().maxNumber" (ngModelChange)="patchPropertyDraft({ maxNumber: $event === '' ? null : +$event })" />
+            </mat-form-field>
+            <mat-slide-toggle [ngModel]="propertyDraft().isActive" (ngModelChange)="patchPropertyDraft({ isActive: $event })">Activa</mat-slide-toggle>
+            <mat-slide-toggle [ngModel]="propertyDraft().isRequired" (ngModelChange)="patchPropertyDraft({ isRequired: $event })">Obligatoria</mat-slide-toggle>
+            <mat-form-field appearance="outline" class="wide">
+              <mat-label>Ayuda</mat-label>
+              <textarea matInput rows="2" [ngModel]="propertyDraft().helpText" (ngModelChange)="patchPropertyDraft({ helpText: $event })"></textarea>
+            </mat-form-field>
+            @if (propertyDraft().dataType === 'Select' || propertyDraft().dataType === 'MultiSelect') {
+              <mat-form-field appearance="outline" class="wide">
+                <mat-label>Opciones</mat-label>
+                <textarea matInput rows="5" [ngModel]="propertyDraft().optionsText" (ngModelChange)="patchPropertyDraft({ optionsText: $event })" placeholder="valor|Etiqueta visible&#10;otro|Otra opción"></textarea>
+              </mat-form-field>
+            }
+          </div>
+          <div class="edit-actions">
+            <button mat-stroked-button type="button" (click)="propertyEditorOpen.set(false)" [disabled]="saving()">Cancelar</button>
+            <button mat-flat-button type="button" (click)="saveProperty()" [disabled]="!propertyDraft().name.trim() || saving()">Guardar propiedad</button>
+          </div>
+        </mat-card>
+      }
+
       @if (subtypeEditorOpen()) {
         <mat-card class="editor-card subtype-editor">
           <div class="panel-head">

@@ -22,4 +22,5 @@ public class ItemClass
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public List<ItemSubtype> Subtypes { get; set; } = [];
     public List<Item> Items { get; set; } = [];
+    public List<ItemPropertyDefinition> PropertyDefinitions { get; set; } = [];
 }

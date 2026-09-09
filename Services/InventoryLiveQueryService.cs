@@ -1,12 +1,15 @@
 using Inventario.Data;
 using Inventario.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Inventario.Services;
 
 public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorage photoStorage)
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     public async Task<List<RelatedItemDto>> GetRelatedItemsAsync(int id, CancellationToken ct)
     {
         var ids = await db.ItemRelations.Where(r => r.ItemId == id || r.RelatedItemId == id)
@@ -36,6 +39,57 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             if (!wanted.Remove(other)) db.ItemRelations.Remove(edge);
         }
         foreach (var other in wanted) db.ItemRelations.Add(new ItemRelation { ItemId = Math.Min(self, other), RelatedItemId = Math.Max(self, other) });
+    }
+
+    public async Task<ItemPropertyDefinitionsResponseDto> GetItemPropertyDefinitionsAsync(
+        int? itemClassId,
+        int? itemSubtypeId,
+        bool includeInactive,
+        CancellationToken ct)
+    {
+        var definitions = await LoadEffectivePropertyDefinitionsAsync(itemClassId, itemSubtypeId, includeInactive, ct);
+        return new ItemPropertyDefinitionsResponseDto(definitions.Select(ToPropertyDefinitionDto).ToList());
+    }
+
+    public async Task<(ItemPropertyDefinitionDto? Definition, string? Error)> CreateItemPropertyDefinitionAsync(
+        ItemPropertyDefinitionUpdateDto input,
+        CancellationToken ct)
+    {
+        var (definition, error) = await BuildPropertyDefinitionAsync(new ItemPropertyDefinition(), input, ct, isNew: true);
+        if (error is not null) return (null, error);
+        db.ItemPropertyDefinitions.Add(definition!);
+        await ReplacePropertyOptionsAsync(definition!, input.Options, ct);
+        await db.SaveChangesAsync(ct);
+        return (ToPropertyDefinitionDto(definition!), null);
+    }
+
+    public async Task<(ItemPropertyDefinitionDto? Definition, string? Error)> UpdateItemPropertyDefinitionAsync(
+        int id,
+        ItemPropertyDefinitionUpdateDto input,
+        CancellationToken ct)
+    {
+        var definition = await db.ItemPropertyDefinitions.Include(row => row.Options).FirstOrDefaultAsync(row => row.Id == id, ct);
+        if (definition is null) return (null, null);
+        var error = await ValidatePropertyDefinitionMoveAsync(definition, input, ct);
+        if (error is not null) return (null, error);
+        (_, error) = await BuildPropertyDefinitionAsync(definition, input, ct, isNew: false);
+        if (error is not null) return (null, error);
+        await ReplacePropertyOptionsAsync(definition, input.Options, ct);
+        await db.SaveChangesAsync(ct);
+        return (ToPropertyDefinitionDto(definition), null);
+    }
+
+    public async Task<(ItemPropertyDefinitionDto? Definition, string? Error)> SetItemPropertyDefinitionActiveAsync(
+        int id,
+        bool isActive,
+        CancellationToken ct)
+    {
+        var definition = await db.ItemPropertyDefinitions.Include(row => row.Options).FirstOrDefaultAsync(row => row.Id == id, ct);
+        if (definition is null) return (null, null);
+        definition.IsActive = isActive;
+        definition.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return (ToPropertyDefinitionDto(definition), null);
     }
 
     public async Task<InventoryItemDetailDto?> GetItemDetailAsync(int id, CancellationToken cancellationToken)
@@ -106,7 +160,9 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             linkedRows.Actions,
             linkedRows.Comments,
             item.DescriptionMarkdown,
-            await GetRelatedItemsAsync(item.Id, cancellationToken));
+            await GetRelatedItemsAsync(item.Id, cancellationToken),
+            await GetItemPropertyFieldsAsync(item, cancellationToken),
+            await GetRetainedPropertyValuesAsync(item, cancellationToken));
     }
 
     public async Task<ArchiveDto> GetArchiveAsync(CancellationToken cancellationToken)
@@ -203,6 +259,12 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (null, classValidationError);
         }
 
+        var propertyError = await ValidateItemPropertyValuesAsync(input.ItemClassId, input.ItemSubtypeId, input.PropertyValues, requireWhenProvided: true, cancellationToken);
+        if (propertyError is not null)
+        {
+            return (null, propertyError);
+        }
+
         if (input.BoxId is int boxId && boxId > 0 && !await db.Boxes.AnyAsync(box => box.Id == boxId, cancellationToken))
         {
             return (null, "El contenedor seleccionado no existe.");
@@ -255,6 +317,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         db.Items.Add(item);
         await db.SaveChangesAsync(cancellationToken);
         await SetRelatedItemsAsync(item.Id, input.RelatedItemIds, cancellationToken);
+        await SetItemPropertyValuesAsync(item.Id, input.ItemClassId, input.ItemSubtypeId, input.PropertyValues, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (await GetItemDetailAsync(item.Id, cancellationToken), null);
@@ -296,6 +359,12 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         if (classValidationError is not null)
         {
             return (null, classValidationError);
+        }
+
+        var propertyError = await ValidateItemPropertyValuesAsync(input.ItemClassId, input.ItemSubtypeId, input.PropertyValues, requireWhenProvided: true, cancellationToken);
+        if (propertyError is not null)
+        {
+            return (null, propertyError);
         }
 
         if (input.BoxId is int boxId && boxId > 0 && !await db.Boxes.AnyAsync(box => box.Id == boxId, cancellationToken))
@@ -340,6 +409,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         item.Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim();
         item.DescriptionMarkdown = input.DescriptionMarkdown ?? item.DescriptionMarkdown;
         await SetRelatedItemsAsync(id, input.RelatedItemIds, cancellationToken);
+        await SetItemPropertyValuesAsync(id, input.ItemClassId, input.ItemSubtypeId, input.PropertyValues, cancellationToken);
         item.UpdatedAt = DateTime.UtcNow;
         item.ItemTags.Clear();
         foreach (var tag in tags.OrderBy(tag => tag.Name))
@@ -2403,6 +2473,418 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         return subtypeBelongsToClass ? null : "El subtipo seleccionado no pertenece a la clase del ítem.";
     }
 
+    private async Task<List<ItemPropertyFieldDto>> GetItemPropertyFieldsAsync(Item item, CancellationToken ct)
+    {
+        var definitions = await LoadEffectivePropertyDefinitionsAsync(item.ItemClassId, item.ItemSubtypeId, includeInactive: false, ct);
+        var definitionIds = definitions.Select(row => row.Id).ToList();
+        var values = definitionIds.Count == 0
+            ? new Dictionary<int, ItemPropertyValue>()
+            : await db.ItemPropertyValues.AsNoTracking()
+                .Where(value => value.ItemId == item.Id && definitionIds.Contains(value.DefinitionId))
+                .ToDictionaryAsync(value => value.DefinitionId, ct);
+
+        return definitions
+            .Select(definition => new ItemPropertyFieldDto(
+                ToPropertyDefinitionDto(definition),
+                values.TryGetValue(definition.Id, out var value) ? ToPropertyValueDto(value, definition) : null,
+                true))
+            .ToList();
+    }
+
+    private async Task<List<ItemPropertyFieldDto>> GetRetainedPropertyValuesAsync(Item item, CancellationToken ct)
+    {
+        var effectiveIds = (await LoadEffectivePropertyDefinitionsAsync(item.ItemClassId, item.ItemSubtypeId, includeInactive: true, ct))
+            .Select(definition => definition.Id)
+            .ToHashSet();
+        var retained = await db.ItemPropertyValues.AsNoTracking()
+            .Include(value => value.Definition).ThenInclude(definition => definition.Options)
+            .Where(value => value.ItemId == item.Id && !effectiveIds.Contains(value.DefinitionId))
+            .OrderBy(value => value.Definition.Name)
+            .ToListAsync(ct);
+        return retained
+            .Select(value => new ItemPropertyFieldDto(ToPropertyDefinitionDto(value.Definition), ToPropertyValueDto(value, value.Definition), false))
+            .ToList();
+    }
+
+    private async Task<List<ItemPropertyDefinition>> LoadEffectivePropertyDefinitionsAsync(int? itemClassId, int? itemSubtypeId, bool includeInactive, CancellationToken ct)
+    {
+        var normalizedClassId = itemClassId is > 0 ? itemClassId : null;
+        var normalizedSubtypeId = itemSubtypeId is > 0 ? itemSubtypeId : null;
+        if (normalizedSubtypeId is int sid && normalizedClassId is null)
+        {
+            normalizedClassId = await db.ItemSubtypes.AsNoTracking()
+                .Where(subtype => subtype.Id == sid)
+                .Select(subtype => (int?)subtype.ItemClassId)
+                .FirstOrDefaultAsync(ct);
+        }
+
+        var query = db.ItemPropertyDefinitions.AsNoTracking()
+            .Include(definition => definition.Options)
+            .Where(definition =>
+                (normalizedClassId != null && definition.Scope == ItemPropertyScope.Class && definition.ItemClassId == normalizedClassId)
+                || (normalizedSubtypeId != null && definition.Scope == ItemPropertyScope.Subtype && definition.ItemSubtypeId == normalizedSubtypeId)
+                || (includeInactive && normalizedClassId != null && normalizedSubtypeId == null && definition.Scope == ItemPropertyScope.Subtype && definition.ItemSubtype != null && definition.ItemSubtype.ItemClassId == normalizedClassId));
+        if (!includeInactive)
+        {
+            query = query.Where(definition => definition.IsActive);
+        }
+
+        return await query
+            .OrderBy(definition => definition.Scope == ItemPropertyScope.Class ? 0 : 1)
+            .ThenBy(definition => definition.SortOrder)
+            .ThenBy(definition => definition.Name)
+            .ToListAsync(ct);
+    }
+
+    private async Task<string?> ValidateItemPropertyValuesAsync(int? itemClassId, int? itemSubtypeId, List<ItemPropertyValueUpdateDto>? values, bool requireWhenProvided, CancellationToken ct)
+    {
+        if (values is null) return null;
+        var definitions = await LoadEffectivePropertyDefinitionsAsync(itemClassId, itemSubtypeId, includeInactive: false, ct);
+        var byId = definitions.ToDictionary(definition => definition.Id);
+        var provided = values.GroupBy(value => value.DefinitionId).ToDictionary(group => group.Key, group => group.Last());
+        foreach (var value in values)
+        {
+            if (!byId.TryGetValue(value.DefinitionId, out var definition))
+            {
+                return "Una propiedad enviada no aplica a la clase o subtipo actual.";
+            }
+            var error = ValidatePropertyValue(definition, value.Value);
+            if (error is not null) return error;
+        }
+
+        if (requireWhenProvided)
+        {
+            foreach (var definition in definitions.Where(definition => definition.IsRequired))
+            {
+                if (!provided.TryGetValue(definition.Id, out var value) || IsEmptyPropertyValue(value.Value))
+                {
+                    return $"La propiedad «{definition.Name}» es obligatoria.";
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private async Task SetItemPropertyValuesAsync(int itemId, int? itemClassId, int? itemSubtypeId, List<ItemPropertyValueUpdateDto>? values, CancellationToken ct)
+    {
+        if (values is null) return;
+        var definitions = (await LoadEffectivePropertyDefinitionsAsync(itemClassId, itemSubtypeId, includeInactive: false, ct)).ToDictionary(definition => definition.Id);
+        var definitionIds = definitions.Keys.ToList();
+        var existing = await db.ItemPropertyValues
+            .Where(value => value.ItemId == itemId && definitionIds.Contains(value.DefinitionId))
+            .ToDictionaryAsync(value => value.DefinitionId, ct);
+
+        foreach (var input in values.GroupBy(value => value.DefinitionId).Select(group => group.Last()))
+        {
+            var definition = definitions[input.DefinitionId];
+            if (IsEmptyPropertyValue(input.Value))
+            {
+                if (existing.TryGetValue(definition.Id, out var emptyValue)) db.ItemPropertyValues.Remove(emptyValue);
+                continue;
+            }
+
+            if (!existing.TryGetValue(definition.Id, out var row))
+            {
+                row = new ItemPropertyValue { ItemId = itemId, DefinitionId = definition.Id };
+                db.ItemPropertyValues.Add(row);
+            }
+
+            ApplyPropertyValue(row, definition, input.Value);
+        }
+    }
+
+    private async Task<(ItemPropertyDefinition? Definition, string? Error)> BuildPropertyDefinitionAsync(ItemPropertyDefinition definition, ItemPropertyDefinitionUpdateDto input, CancellationToken ct, bool isNew)
+    {
+        if (!Enum.TryParse<ItemPropertyScope>(input.Scope, ignoreCase: true, out var scope))
+        {
+            return (null, "Selecciona un ámbito válido para la propiedad.");
+        }
+        if (!Enum.TryParse<ItemPropertyDataType>(input.DataType, ignoreCase: true, out var dataType))
+        {
+            return (null, "Selecciona un tipo de dato válido.");
+        }
+
+        var name = (input.Name ?? "").Trim();
+        var key = NormalizePropertyKey(input.Key, name);
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 120) return (null, "El nombre de la propiedad debe tener entre 1 y 120 caracteres.");
+        if (string.IsNullOrWhiteSpace(key) || key.Length > 80) return (null, "El identificador interno debe tener entre 1 y 80 caracteres.");
+
+        var classId = scope == ItemPropertyScope.Class ? input.ItemClassId : null;
+        var subtypeId = scope == ItemPropertyScope.Subtype ? input.ItemSubtypeId : null;
+        if (scope == ItemPropertyScope.Class && classId is not > 0) return (null, "Selecciona la clase propietaria.");
+        if (scope == ItemPropertyScope.Subtype && subtypeId is not > 0) return (null, "Selecciona el subtipo propietario.");
+        if (classId is int cid && !await db.ItemClasses.AnyAsync(row => row.Id == cid, ct)) return (null, "La clase seleccionada no existe.");
+        if (subtypeId is int sid && !await db.ItemSubtypes.AnyAsync(row => row.Id == sid, ct)) return (null, "El subtipo seleccionado no existe.");
+
+        var duplicate = await db.ItemPropertyDefinitions.AnyAsync(row =>
+            row.Id != definition.Id
+            && row.Scope == scope
+            && row.Key == key
+            && ((scope == ItemPropertyScope.Class && row.ItemClassId == classId) || (scope == ItemPropertyScope.Subtype && row.ItemSubtypeId == subtypeId)),
+            ct);
+        if (duplicate) return (null, "Ya existe una propiedad con ese identificador en ese ámbito.");
+        if (input.MinNumber is decimal min && input.MaxNumber is decimal max && min > max) return (null, "El mínimo no puede ser mayor que el máximo.");
+        if (dataType is ItemPropertyDataType.Select or ItemPropertyDataType.MultiSelect && NormalizePropertyOptions(input.Options).Count == 0)
+        {
+            return (null, "Las propiedades de tipo select necesitan al menos una opción.");
+        }
+
+        definition.Scope = scope;
+        definition.ItemClassId = classId;
+        definition.ItemSubtypeId = subtypeId;
+        definition.Key = key;
+        definition.Name = name;
+        definition.DataType = dataType;
+        definition.SortOrder = input.SortOrder;
+        definition.IsActive = input.IsActive;
+        definition.IsRequired = input.IsRequired;
+        definition.Unit = NormalizeShort(input.Unit, 32);
+        definition.Placeholder = NormalizeShort(input.Placeholder, 160);
+        definition.HelpText = NormalizeShort(input.HelpText, 500);
+        definition.MinNumber = input.MinNumber;
+        definition.MaxNumber = input.MaxNumber;
+        definition.DefaultValueJson = NormalizeShort(input.DefaultValueJson, 1000);
+        if (!isNew) definition.UpdatedAt = DateTime.UtcNow;
+        return (definition, null);
+    }
+
+    private async Task<string?> ValidatePropertyDefinitionMoveAsync(ItemPropertyDefinition definition, ItemPropertyDefinitionUpdateDto input, CancellationToken ct)
+    {
+        if (definition.DataType.ToString().Equals(input.DataType, StringComparison.OrdinalIgnoreCase)) return null;
+        var hasValues = await db.ItemPropertyValues.AnyAsync(value => value.DefinitionId == definition.Id, ct);
+        return hasValues ? "No cambies el tipo de dato de una propiedad que ya tiene valores. Desactívala y crea otra." : null;
+    }
+
+    private async Task ReplacePropertyOptionsAsync(ItemPropertyDefinition definition, List<ItemPropertyOptionUpdateDto>? input, CancellationToken ct)
+    {
+        if (definition.DataType is not (ItemPropertyDataType.Select or ItemPropertyDataType.MultiSelect))
+        {
+            db.ItemPropertyOptions.RemoveRange(definition.Options);
+            return;
+        }
+
+        var normalized = NormalizePropertyOptions(input);
+        var existing = definition.Options.ToDictionary(option => option.Value);
+        foreach (var option in definition.Options.ToList())
+        {
+            if (!normalized.ContainsKey(option.Value)) db.ItemPropertyOptions.Remove(option);
+        }
+
+        foreach (var (value, optionInput) in normalized)
+        {
+            if (!existing.TryGetValue(value, out var option))
+            {
+                option = new ItemPropertyOption { Definition = definition, Value = value };
+                definition.Options.Add(option);
+            }
+            option.Label = optionInput.Label ?? value;
+            option.SortOrder = optionInput.SortOrder;
+            option.IsActive = optionInput.IsActive;
+            option.UpdatedAt = DateTime.UtcNow;
+        }
+        await Task.CompletedTask;
+    }
+
+    private static Dictionary<string, ItemPropertyOptionUpdateDto> NormalizePropertyOptions(List<ItemPropertyOptionUpdateDto>? options)
+    {
+        return (options ?? new List<ItemPropertyOptionUpdateDto>())
+            .Select((option, index) =>
+            {
+                var label = (option.Label ?? "").Trim();
+                var value = NormalizePropertyKey(option.Value, label);
+                return string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(value)
+                    ? default(KeyValuePair<string, ItemPropertyOptionUpdateDto>?)
+                    : new KeyValuePair<string, ItemPropertyOptionUpdateDto>(value, option with { Value = value, Label = label, SortOrder = option.SortOrder == 0 ? index : option.SortOrder });
+            })
+            .Where(pair => pair is not null)
+            .Select(pair => pair!.Value)
+            .GroupBy(pair => pair.Key)
+            .ToDictionary(group => group.Key, group => group.Last().Value);
+    }
+
+    private static ItemPropertyDefinitionDto ToPropertyDefinitionDto(ItemPropertyDefinition definition)
+    {
+        return new ItemPropertyDefinitionDto(
+            definition.Id,
+            definition.Scope.ToString(),
+            definition.ItemClassId,
+            definition.ItemSubtypeId,
+            definition.Key,
+            definition.Name,
+            definition.DataType.ToString(),
+            definition.SortOrder,
+            definition.IsActive,
+            definition.IsRequired,
+            definition.Unit,
+            definition.Placeholder,
+            definition.HelpText,
+            definition.MinNumber,
+            definition.MaxNumber,
+            definition.DefaultValueJson,
+            definition.Options.OrderBy(option => option.SortOrder).ThenBy(option => option.Label)
+                .Select(option => new ItemPropertyOptionDto(option.Id, option.Value, option.Label, option.SortOrder, option.IsActive))
+                .ToList());
+    }
+
+    private static ItemPropertyValueDto ToPropertyValueDto(ItemPropertyValue value, ItemPropertyDefinition definition)
+    {
+        object? typed = definition.DataType switch
+        {
+            ItemPropertyDataType.LongText => value.LongTextValue,
+            ItemPropertyDataType.Integer => value.IntegerValue,
+            ItemPropertyDataType.Decimal => value.DecimalValue,
+            ItemPropertyDataType.Boolean => value.BooleanValue,
+            ItemPropertyDataType.Date => value.DateValue?.ToString("yyyy-MM-dd"),
+            ItemPropertyDataType.MultiSelect => string.IsNullOrWhiteSpace(value.JsonValue) ? [] : JsonSerializer.Deserialize<List<string>>(value.JsonValue, JsonOptions) ?? [],
+            _ => value.TextValue
+        };
+        return new ItemPropertyValueDto(value.DefinitionId, typed);
+    }
+
+    private static void ApplyPropertyValue(ItemPropertyValue row, ItemPropertyDefinition definition, JsonElement? value)
+    {
+        row.TextValue = null;
+        row.LongTextValue = null;
+        row.IntegerValue = null;
+        row.DecimalValue = null;
+        row.BooleanValue = null;
+        row.DateValue = null;
+        row.JsonValue = null;
+        row.UpdatedAt = DateTime.UtcNow;
+
+        switch (definition.DataType)
+        {
+            case ItemPropertyDataType.LongText:
+                row.LongTextValue = ReadString(value);
+                break;
+            case ItemPropertyDataType.Integer:
+                row.IntegerValue = ReadLong(value);
+                break;
+            case ItemPropertyDataType.Decimal:
+                row.DecimalValue = ReadDecimal(value);
+                break;
+            case ItemPropertyDataType.Boolean:
+                row.BooleanValue = ReadBool(value);
+                break;
+            case ItemPropertyDataType.Date:
+                row.DateValue = DateOnly.Parse(ReadString(value) ?? "");
+                break;
+            case ItemPropertyDataType.MultiSelect:
+                row.JsonValue = JsonSerializer.Serialize(ReadStringList(value), JsonOptions);
+                break;
+            default:
+                row.TextValue = ReadString(value);
+                break;
+        }
+    }
+
+    private static string? ValidatePropertyValue(ItemPropertyDefinition definition, JsonElement? value)
+    {
+        if (IsEmptyPropertyValue(value)) return null;
+        try
+        {
+            if (definition.DataType is ItemPropertyDataType.Integer)
+            {
+                var parsed = ReadLong(value) ?? throw new InvalidOperationException();
+                if (definition.MinNumber is decimal min && parsed < min) return $"«{definition.Name}» no puede ser menor que {min}.";
+                if (definition.MaxNumber is decimal max && parsed > max) return $"«{definition.Name}» no puede ser mayor que {max}.";
+            }
+            else if (definition.DataType is ItemPropertyDataType.Decimal)
+            {
+                var parsed = ReadDecimal(value) ?? throw new InvalidOperationException();
+                if (definition.MinNumber is decimal min && parsed < min) return $"«{definition.Name}» no puede ser menor que {min}.";
+                if (definition.MaxNumber is decimal max && parsed > max) return $"«{definition.Name}» no puede ser mayor que {max}.";
+            }
+            else if (definition.DataType is ItemPropertyDataType.Boolean)
+            {
+                _ = ReadBool(value) ?? throw new InvalidOperationException();
+            }
+            else if (definition.DataType is ItemPropertyDataType.Date)
+            {
+                _ = DateOnly.Parse(ReadString(value) ?? "");
+            }
+            else if (definition.DataType is ItemPropertyDataType.Select)
+            {
+                var selected = ReadString(value);
+                if (!definition.Options.Any(option => option.IsActive && option.Value == selected)) return $"Selecciona una opción válida para «{definition.Name}».";
+            }
+            else if (definition.DataType is ItemPropertyDataType.MultiSelect)
+            {
+                var selected = ReadStringList(value);
+                var valid = definition.Options.Where(option => option.IsActive).Select(option => option.Value).ToHashSet();
+                if (selected.Any(entry => !valid.Contains(entry))) return $"Selecciona opciones válidas para «{definition.Name}».";
+            }
+            else if (definition.DataType is ItemPropertyDataType.Url)
+            {
+                var text = ReadString(value);
+                if (!Uri.TryCreate(text, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) return $"«{definition.Name}» debe ser una URL http(s).";
+            }
+            else
+            {
+                _ = ReadString(value);
+            }
+        }
+        catch
+        {
+            return $"El valor de «{definition.Name}» no coincide con su tipo.";
+        }
+        return null;
+    }
+
+    private static bool IsEmptyPropertyValue(JsonElement? value)
+    {
+        if (value is null) return true;
+        var element = value.Value;
+        if (element.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return true;
+        if (element.ValueKind == JsonValueKind.String) return string.IsNullOrWhiteSpace(element.GetString());
+        if (element.ValueKind == JsonValueKind.Array) return !element.EnumerateArray().Any();
+        return false;
+    }
+
+    private static string NormalizePropertyKey(string? value, string fallback)
+    {
+        var source = string.IsNullOrWhiteSpace(value) ? fallback : value;
+        var normalized = SearchText.Normalize(source).Replace(" ", "_");
+        normalized = Regex.Replace(normalized, @"[^a-z0-9_]+", "_").Trim('_');
+        return Regex.Replace(normalized, "_{2,}", "_");
+    }
+
+    private static string? NormalizeShort(string? value, int maxLength)
+    {
+        var normalized = (value ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(normalized)) return null;
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+    }
+
+    private static string? ReadString(JsonElement? value)
+    {
+        if (value is null) return null;
+        var element = value.Value;
+        return element.ValueKind == JsonValueKind.String ? element.GetString()?.Trim() : element.ToString();
+    }
+
+    private static long? ReadLong(JsonElement? value)
+        => value is null ? null : value.Value.ValueKind == JsonValueKind.Number ? value.Value.GetInt64() : long.Parse(ReadString(value) ?? "");
+
+    private static decimal? ReadDecimal(JsonElement? value)
+        => value is null ? null : value.Value.ValueKind == JsonValueKind.Number ? value.Value.GetDecimal() : decimal.Parse(ReadString(value) ?? "");
+
+    private static bool? ReadBool(JsonElement? value)
+        => value is null ? null : value.Value.ValueKind == JsonValueKind.True ? true : value.Value.ValueKind == JsonValueKind.False ? false : bool.Parse(ReadString(value) ?? "");
+
+    private static List<string> ReadStringList(JsonElement? value)
+    {
+        if (value is null) return [];
+        var element = value.Value;
+        return element.ValueKind == JsonValueKind.Array
+            ? element.EnumerateArray().Select(entry => ReadString(entry)).Where(entry => !string.IsNullOrWhiteSpace(entry)).Select(entry => entry!).Distinct().ToList()
+            : [ReadString(value) ?? ""];
+    }
+
+    private static string? ReadString(JsonElement value)
+        => value.ValueKind == JsonValueKind.String ? value.GetString()?.Trim() : value.ToString();
+
     private async Task<Tag> GetOrCreateDefaultTagAsync(CancellationToken cancellationToken)
     {
         var tag = await db.Tags.FirstOrDefaultAsync(tag => tag.Name == "Otros", cancellationToken);
@@ -2993,7 +3475,9 @@ public record InventoryItemDetailDto(
     List<InventoryActionDto> Actions,
     List<InventoryActionDto> Comments,
     bool DescriptionMarkdown,
-    List<RelatedItemDto> RelatedItems);
+    List<RelatedItemDto> RelatedItems,
+    List<ItemPropertyFieldDto> PropertyFields,
+    List<ItemPropertyFieldDto> RetainedPropertyValues);
 
 public record RelatedItemDto(int Id, string Code, string Name, bool Archived);
 
@@ -3017,7 +3501,8 @@ public record InventoryItemUpdateDto(
     string? Notes,
     int? BoxId,
     bool? DescriptionMarkdown = null,
-    List<int>? RelatedItemIds = null);
+    List<int>? RelatedItemIds = null,
+    List<ItemPropertyValueUpdateDto>? PropertyValues = null);
 
 public record InventoryBulkUpdateDto(
     List<int>? ItemIds,
@@ -3377,6 +3862,55 @@ public record ItemSubtypeDto(
     int? SortOrder,
     bool IsActive,
     int ItemCount);
+
+public record ItemPropertyDefinitionsResponseDto(List<ItemPropertyDefinitionDto> Definitions);
+
+public record ItemPropertyDefinitionDto(
+    int Id,
+    string Scope,
+    int? ItemClassId,
+    int? ItemSubtypeId,
+    string Key,
+    string Name,
+    string DataType,
+    int SortOrder,
+    bool IsActive,
+    bool IsRequired,
+    string? Unit,
+    string? Placeholder,
+    string? HelpText,
+    decimal? MinNumber,
+    decimal? MaxNumber,
+    string? DefaultValueJson,
+    List<ItemPropertyOptionDto> Options);
+
+public record ItemPropertyOptionDto(int Id, string Value, string Label, int SortOrder, bool IsActive);
+
+public record ItemPropertyFieldDto(ItemPropertyDefinitionDto Definition, ItemPropertyValueDto? Value, bool Applies);
+
+public record ItemPropertyValueDto(int DefinitionId, object? Value);
+
+public record ItemPropertyDefinitionUpdateDto(
+    string? Scope,
+    int? ItemClassId,
+    int? ItemSubtypeId,
+    string? Key,
+    string? Name,
+    string? DataType,
+    int SortOrder,
+    bool IsActive,
+    bool IsRequired,
+    string? Unit,
+    string? Placeholder,
+    string? HelpText,
+    decimal? MinNumber,
+    decimal? MaxNumber,
+    string? DefaultValueJson,
+    List<ItemPropertyOptionUpdateDto>? Options);
+
+public record ItemPropertyOptionUpdateDto(string? Value, string? Label, int SortOrder, bool IsActive);
+
+public record ItemPropertyValueUpdateDto(int DefinitionId, JsonElement? Value);
 
 public record TagUpdateDto(string? Name, string? Color);
 

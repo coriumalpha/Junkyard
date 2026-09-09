@@ -1,4 +1,5 @@
 import { DescriptionEditorComponent } from './description-editor.component';
+import { ItemPropertyFieldsComponent } from './item-property-fields.component';
 import { RelatedItemsPickerComponent } from './related-items-picker.component';
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
@@ -16,7 +17,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { formatInventoryCode } from './inventory-code.pipe';
-import { InventoryApiService, InventoryItemUpdate, InventoryMode, InventoryOptionsResponse, ItemClass, ItemSubtype } from './inventory-api.service';
+import { InventoryApiService, InventoryItemUpdate, InventoryMode, InventoryOptionsResponse, ItemClass, ItemPropertyField, ItemPropertyValue, ItemSubtype } from './inventory-api.service';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
 
@@ -24,7 +25,7 @@ import { TagPickerComponent } from './tag-picker.component';
   selector: 'app-item-create-page',
   standalone: true,
   imports: [
-    DescriptionEditorComponent, RelatedItemsPickerComponent,
+    DescriptionEditorComponent, ItemPropertyFieldsComponent, RelatedItemsPickerComponent,
     CommonModule,
     FormsModule,
     RouterLink,
@@ -48,6 +49,7 @@ export class ItemCreatePageComponent {
   protected readonly options = signal<InventoryOptionsResponse>({ categories: [], tags: [], conditions: [], itemClasses: [], itemSubtypes: [], locations: [], boxes: [] });
   protected readonly itemClasses = signal<ItemClass[]>([]);
   protected readonly itemSubtypes = signal<ItemSubtype[]>([]);
+  protected readonly propertyFields = signal<ItemPropertyField[]>([]);
   protected readonly form = signal<InventoryItemUpdate>(this.emptyForm());
 
   protected readonly tagOptions = computed<SearchableSelectOption[]>(() =>
@@ -115,12 +117,19 @@ export class ItemCreatePageComponent {
 
   protected setItemClassId(value: unknown): void {
     const itemClassId = typeof value === 'number' ? value : null;
-    this.patchForm({ itemClassId, itemSubtypeId: null });
+    this.patchForm({ itemClassId, itemSubtypeId: null, propertyValues: [] });
     this.loadItemSubtypes(itemClassId);
+    this.loadItemProperties(itemClassId, null);
   }
 
   protected setItemSubtypeId(value: unknown): void {
-    this.patchForm({ itemSubtypeId: typeof value === 'number' ? value : null });
+    const itemSubtypeId = typeof value === 'number' ? value : null;
+    this.patchForm({ itemSubtypeId, propertyValues: [] });
+    this.loadItemProperties(this.form().itemClassId, itemSubtypeId);
+  }
+
+  protected setPropertyValues(values: ItemPropertyValue[]): void {
+    this.patchForm({ propertyValues: values });
   }
 
   protected createItem(): void {
@@ -184,6 +193,17 @@ export class ItemCreatePageComponent {
     ).subscribe();
   }
 
+  private loadItemProperties(itemClassId: number | null, itemSubtypeId: number | null): void {
+    this.api.fetchItemProperties(itemClassId, itemSubtypeId).pipe(
+      tap((response) => this.propertyFields.set(response.definitions.map((definition) => ({ definition, value: null, applies: true })))),
+      catchError(() => {
+        this.propertyFields.set([]);
+        return EMPTY;
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
   private primaryTagName(tagIds: number[]): string {
     const first = this.options().tags.find((tag) => tagIds.includes(tag.id));
     return first?.name ?? '';
@@ -223,6 +243,7 @@ export class ItemCreatePageComponent {
       notes: '',
       descriptionMarkdown: true,
       relatedItemIds: [],
+      propertyValues: [],
       boxId: null
     };
   }
