@@ -259,7 +259,13 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (null, classValidationError);
         }
 
-        var propertyError = await ValidateItemPropertyValuesAsync(input.ItemClassId, input.ItemSubtypeId, input.PropertyValues, requireWhenProvided: true, cancellationToken);
+        var propertyError = await ValidateItemPropertyValuesAsync(
+            input.ItemClassId,
+            input.ItemSubtypeId,
+            input.PropertyValues,
+            existingItemId: null,
+            requireRequired: true,
+            cancellationToken);
         if (propertyError is not null)
         {
             return (null, propertyError);
@@ -361,7 +367,15 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (null, classValidationError);
         }
 
-        var propertyError = await ValidateItemPropertyValuesAsync(input.ItemClassId, input.ItemSubtypeId, input.PropertyValues, requireWhenProvided: true, cancellationToken);
+        var classChanged = (item.ItemClassId ?? 0) != (input.ItemClassId ?? 0)
+            || (item.ItemSubtypeId ?? 0) != (input.ItemSubtypeId ?? 0);
+        var propertyError = await ValidateItemPropertyValuesAsync(
+            input.ItemClassId,
+            input.ItemSubtypeId,
+            input.PropertyValues,
+            existingItemId: id,
+            requireRequired: input.PropertyValues is not null || classChanged,
+            cancellationToken);
         if (propertyError is not null)
         {
             return (null, propertyError);
@@ -2536,13 +2550,21 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             .ToListAsync(ct);
     }
 
-    private async Task<string?> ValidateItemPropertyValuesAsync(int? itemClassId, int? itemSubtypeId, List<ItemPropertyValueUpdateDto>? values, bool requireWhenProvided, CancellationToken ct)
+    private async Task<string?> ValidateItemPropertyValuesAsync(
+        int? itemClassId,
+        int? itemSubtypeId,
+        List<ItemPropertyValueUpdateDto>? values,
+        int? existingItemId,
+        bool requireRequired,
+        CancellationToken ct)
     {
-        if (values is null) return null;
+        if (values is null && !requireRequired) return null;
         var definitions = await LoadEffectivePropertyDefinitionsAsync(itemClassId, itemSubtypeId, includeInactive: false, ct);
         var byId = definitions.ToDictionary(definition => definition.Id);
-        var provided = values.GroupBy(value => value.DefinitionId).ToDictionary(group => group.Key, group => group.Last());
-        foreach (var value in values)
+        var provided = (values ?? [])
+            .GroupBy(value => value.DefinitionId)
+            .ToDictionary(group => group.Key, group => group.Last());
+        foreach (var value in values ?? [])
         {
             if (!byId.TryGetValue(value.DefinitionId, out var definition))
             {
@@ -2552,11 +2574,27 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             if (error is not null) return error;
         }
 
-        if (requireWhenProvided)
+        Dictionary<int, ItemPropertyValue>? existingRequiredValues = null;
+        if (requireRequired && values is null && existingItemId is int itemId)
+        {
+            var requiredIds = definitions.Where(definition => definition.IsRequired).Select(definition => definition.Id).ToList();
+            existingRequiredValues = requiredIds.Count == 0
+                ? []
+                : await db.ItemPropertyValues.AsNoTracking()
+                    .Where(value => value.ItemId == itemId && requiredIds.Contains(value.DefinitionId))
+                    .ToDictionaryAsync(value => value.DefinitionId, ct);
+        }
+
+        if (requireRequired)
         {
             foreach (var definition in definitions.Where(definition => definition.IsRequired))
             {
-                if (!provided.TryGetValue(definition.Id, out var value) || IsEmptyPropertyValue(value.Value))
+                var providedValueIsPresent = provided.TryGetValue(definition.Id, out var value) && !IsEmptyPropertyValue(value.Value);
+                var existingValueIsPresent = values is null
+                    && existingRequiredValues is not null
+                    && existingRequiredValues.TryGetValue(definition.Id, out var stored)
+                    && HasStoredPropertyValue(stored, definition);
+                if (!providedValueIsPresent && !existingValueIsPresent)
                 {
                     return $"La propiedad «{definition.Name}» es obligatoria.";
                 }
@@ -2616,6 +2654,20 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         if (scope == ItemPropertyScope.Subtype && subtypeId is not > 0) return (null, "Selecciona el subtipo propietario.");
         if (classId is int cid && !await db.ItemClasses.AnyAsync(row => row.Id == cid, ct)) return (null, "La clase seleccionada no existe.");
         if (subtypeId is int sid && !await db.ItemSubtypes.AnyAsync(row => row.Id == sid, ct)) return (null, "El subtipo seleccionado no existe.");
+        if (scope == ItemPropertyScope.Subtype && subtypeId is int ownerSubtypeId)
+        {
+            var ownerClassId = await db.ItemSubtypes.AsNoTracking()
+                .Where(row => row.Id == ownerSubtypeId)
+                .Select(row => row.ItemClassId)
+                .FirstOrDefaultAsync(ct);
+            var inheritedCollision = await db.ItemPropertyDefinitions.AnyAsync(row =>
+                row.Id != definition.Id
+                && row.Scope == ItemPropertyScope.Class
+                && row.ItemClassId == ownerClassId
+                && row.Key == key,
+                ct);
+            if (inheritedCollision) return (null, "Ese identificador ya existe en la clase heredada por el subtipo.");
+        }
 
         var duplicate = await db.ItemPropertyDefinitions.AnyAsync(row =>
             row.Id != definition.Id
@@ -2840,6 +2892,21 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         if (element.ValueKind == JsonValueKind.String) return string.IsNullOrWhiteSpace(element.GetString());
         if (element.ValueKind == JsonValueKind.Array) return !element.EnumerateArray().Any();
         return false;
+    }
+
+    private static bool HasStoredPropertyValue(ItemPropertyValue value, ItemPropertyDefinition definition)
+    {
+        return definition.DataType switch
+        {
+            ItemPropertyDataType.LongText => !string.IsNullOrWhiteSpace(value.LongTextValue),
+            ItemPropertyDataType.Integer => value.IntegerValue is not null,
+            ItemPropertyDataType.Decimal => value.DecimalValue is not null,
+            ItemPropertyDataType.Boolean => value.BooleanValue is not null,
+            ItemPropertyDataType.Date => value.DateValue is not null,
+            ItemPropertyDataType.MultiSelect => !string.IsNullOrWhiteSpace(value.JsonValue)
+                && (JsonSerializer.Deserialize<List<string>>(value.JsonValue, JsonOptions)?.Count ?? 0) > 0,
+            _ => !string.IsNullOrWhiteSpace(value.TextValue)
+        };
     }
 
     private static string NormalizePropertyKey(string? value, string fallback)

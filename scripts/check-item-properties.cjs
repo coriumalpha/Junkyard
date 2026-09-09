@@ -91,6 +91,39 @@ async function main() {
   assert.deepEqual(setupDefinitions.definitions.map((definition) => definition.key), ['fabricante', 'ram_gb']);
 
   await assert.rejects(
+    () => json('/api/item-properties', {
+      method: 'POST',
+      body: JSON.stringify({
+        scope: 'Subtype',
+        itemClassId: null,
+        itemSubtypeId: subtype.id,
+        key: 'fabricante',
+        name: 'Fabricante duplicado',
+        dataType: 'ShortText',
+        sortOrder: 3,
+        isActive: true,
+        isRequired: false,
+        unit: '',
+        placeholder: '',
+        helpText: '',
+        minNumber: null,
+        maxNumber: null,
+        defaultValueJson: '',
+        options: []
+      })
+    }),
+    /clase heredada/
+  );
+
+  await assert.rejects(
+    () => json('/api/items', {
+      method: 'POST',
+      body: JSON.stringify(omit(baseItem(itemClass.id, subtype.id, []), 'propertyValues'))
+    }),
+    /Fabricante/
+  );
+
+  await assert.rejects(
     () => json('/api/items', {
       method: 'POST',
       body: JSON.stringify(baseItem(itemClass.id, subtype.id, []))
@@ -109,6 +142,50 @@ async function main() {
   assert.equal(created.propertyFields.find((field) => field.definition.key === 'fabricante').value.value, 'Framework');
   assert.equal(created.propertyFields.find((field) => field.definition.key === 'ram_gb').value.value, 64);
 
+  const makerlessClass = await json('/api/item-classes', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: `Clase histórica ${stamp}`,
+      inventoryMode: 'Individual',
+      description: '',
+      color: '#ffc86b',
+      icon: 'history',
+      sortOrder: 9902,
+      isActive: true
+    })
+  });
+  const historical = await json('/api/items', {
+    method: 'POST',
+    body: JSON.stringify(baseItem(makerlessClass.id, null, []))
+  });
+  const requiredLater = await json('/api/item-properties', {
+    method: 'POST',
+    body: JSON.stringify({
+      scope: 'Class',
+      itemClassId: makerlessClass.id,
+      itemSubtypeId: null,
+      key: 'serie',
+      name: 'Serie',
+      dataType: 'ShortText',
+      sortOrder: 1,
+      isActive: true,
+      isRequired: true,
+      unit: '',
+      placeholder: '',
+      helpText: '',
+      minNumber: null,
+      maxNumber: null,
+      defaultValueJson: '',
+      options: []
+    })
+  });
+  assert.equal(requiredLater.key, 'serie');
+  const historicalEdited = await json(`/api/items/${historical.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...omit(baseItem(makerlessClass.id, null, []), 'propertyValues'), code: historical.code, name: `${historical.name} editado` })
+  });
+  assert.equal(historicalEdited.name, `${historical.name} editado`);
+
   const otherClass = await json('/api/item-classes', {
     method: 'POST',
     body: JSON.stringify({
@@ -121,6 +198,13 @@ async function main() {
       isActive: true
     })
   });
+  await assert.rejects(
+    () => json(`/api/items/${historical.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ ...omit(baseItem(itemClass.id, subtype.id, []), 'propertyValues'), code: historical.code, name: historical.name })
+    }),
+    /Fabricante/
+  );
   const moved = await json(`/api/items/${created.id}`, {
     method: 'PUT',
     body: JSON.stringify({
@@ -132,7 +216,48 @@ async function main() {
   assert.equal(moved.propertyFields.length, 0);
   assert.equal(moved.retainedPropertyValues.length, 2);
 
-  console.log('PASS propiedades: herencia, validación obligatoria, persistencia tipada y conservación fuera de clase');
+  const selectClass = await json('/api/item-classes', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: `Clase select ${stamp}`,
+      inventoryMode: 'Individual',
+      description: '',
+      color: '#8ad6ff',
+      icon: 'fact_check',
+      sortOrder: 9903,
+      isActive: true
+    })
+  });
+  const selectable = await json('/api/item-properties', {
+    method: 'POST',
+    body: JSON.stringify({
+      scope: 'Class',
+      itemClassId: selectClass.id,
+      itemSubtypeId: null,
+      key: 'estado_prueba',
+      name: 'Estado prueba',
+      dataType: 'Select',
+      sortOrder: 1,
+      isActive: true,
+      isRequired: false,
+      unit: '',
+      placeholder: '',
+      helpText: '',
+      minNumber: null,
+      maxNumber: null,
+      defaultValueJson: '',
+      options: [{ value: 'ok', label: 'OK', sortOrder: 1, isActive: true }]
+    })
+  });
+  await assert.rejects(
+    () => json('/api/items', {
+      method: 'POST',
+      body: JSON.stringify(baseItem(selectClass.id, null, [{ definitionId: selectable.id, value: 'bad' }]))
+    }),
+    /opción válida/
+  );
+
+  console.log('PASS propiedades: herencia, required en alta/cambio, edición histórica sin backfill, claves estables, opciones, persistencia tipada y conservación fuera de clase');
 }
 
 function baseItem(itemClassId, itemSubtypeId, propertyValues) {
@@ -159,6 +284,12 @@ function baseItem(itemClassId, itemSubtypeId, propertyValues) {
     relatedItemIds: [],
     propertyValues
   };
+}
+
+function omit(source, key) {
+  const clone = { ...source };
+  delete clone[key];
+  return clone;
 }
 
 main().catch((error) => {
