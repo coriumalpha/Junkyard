@@ -209,7 +209,7 @@
                 <textarea
                   matInput
                   rows="2"
-                  maxlength="500"
+                  maxlength="3000"
                   placeholder="Ej.: es un repuesto, una placa, un lote, ignora el fondo…"
                   [ngModel]="aiHint()"
                   (ngModelChange)="setAiHint($event)"></textarea>
@@ -233,8 +233,10 @@
                 <mat-button-toggle-group [ngModel]="aiMode()" (ngModelChange)="setAiMode($event)" aria-label="Modo de análisis IA">
                   <mat-button-toggle value="fast">Rápido</mat-button-toggle>
                   <mat-button-toggle value="detailed">Detallado</mat-button-toggle>
+                  <mat-button-toggle value="pro">Pro</mat-button-toggle>
                 </mat-button-toggle-group>
                 <span>{{ aiModeHint() }}</span>
+                @if (aiMode() === 'pro') { <mat-checkbox [checked]="aiWebSearch()" (change)="aiWebSearch.set($event.checked)">Contrastar referencias en internet</mat-checkbox><small>Opcional: busca modelos y manuales; las fuentes consultadas se mostrarán en la propuesta.</small> }
                 @if (aiModeAutoNotice()) {
                   <span class="ai-mode-notice">Modo detallado seleccionado por la pista técnica. Implica más coste que rápido.</span>
                 } @else if (aiDetailedRecommended() && aiMode() === 'fast') {
@@ -263,6 +265,8 @@
               </div>
             }
 
+            @if (aiSuggestion()?.webSources?.length) { <section class="ai-sources"><h3>Fuentes consultadas</h3>@for(source of aiSuggestion()!.webSources;track source.url){<a [href]="source.url" target="_blank" rel="noopener noreferrer">{{source.title}} ↗</a>}</section> }
+            @if (aiMode() === 'pro' && aiSuggestion() && !aiSuggestion()!.webSearchUsed) { <p class="classification-note">Este análisis no consultó internet: la propuesta procede de las fotos y el contexto aportado.</p> }
             @if (workspaceMode() === 'detailed' && aiStep() === 'review') {
               @if (aiSuggestion()) {
                 <section class="ai-suggestion-panel">
@@ -450,7 +454,7 @@
                   <button mat-stroked-button type="button" (click)="setAiStep('analyze')">Atrás</button>
                   <button mat-stroked-button type="button" (click)="selectAllAi()">Seleccionar todo</button>
                   <button mat-stroked-button type="button" (click)="deselectAllAi()">Deseleccionar todo</button>
-                  <button mat-stroked-button type="button" (click)="suggestWithAi('detailed')" [disabled]="aiBusy()">Reintentar</button>
+                  <button mat-stroked-button type="button" (click)="suggestWithAi(aiMode())" [disabled]="aiBusy()">Reintentar</button>
                   <button mat-button type="button" (click)="discardAiSuggestion()">Descartar</button>
                   <button mat-stroked-button type="button" (click)="applySelectedAi()">Aplicar seleccionados</button>
                   <button mat-flat-button type="button" (click)="applySelectedAi()">Continuar a ficha final</button>
@@ -501,6 +505,8 @@
               <mat-label>Nombre</mat-label>
               <input #createNameInput matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" autocomplete="off" />
             </mat-form-field>
+            <app-description-editor [value]="draftNotes()" [markdown]="draftMarkdown()" (valueChange)="draftNotes.set($event)" (markdownChange)="draftMarkdown.set($event)" />
+
             <app-tag-picker
               label="Tags"
               [value]="draftTagIds()"
@@ -550,10 +556,7 @@
                 </mat-form-field>
               }
             </div>
-            <mat-form-field appearance="outline" class="final-description-field">
-              <mat-label>{{ workspaceMode() === 'detailed' ? 'Descripción final' : 'Descripción' }}</mat-label>
-              <textarea matInput [rows]="workspaceMode() === 'detailed' ? 9 : 4" [ngModel]="draftNotes()" (ngModelChange)="draftNotes.set($event)"></textarea>
-            </mat-form-field>
+            <app-related-items-picker [value]="draftRelations()" (valueChange)="draftRelations.set($event)" />
             @if (workspaceMode() === 'detailed') {
               <mat-slide-toggle [checked]="draftIsQuarantined()" (change)="draftIsQuarantined.set($event.checked)">
                 En cuarentena

@@ -1,3 +1,5 @@
+import { DescriptionEditorComponent } from './description-editor.component';
+import { RelatedItemsPickerComponent } from './related-items-picker.component';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
@@ -29,7 +31,7 @@ type AiWorkflowStep = 'analyze' | 'review' | 'final';
 @Component({
   selector: 'app-photo-review-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, MatButtonModule, MatButtonToggleModule, MatCardModule, MatCheckboxModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
+  imports: [DescriptionEditorComponent, RelatedItemsPickerComponent, CommonModule, FormsModule, RouterLink, MatButtonModule, MatButtonToggleModule, MatCardModule, MatCheckboxModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
   templateUrl: './photo-review-page.component.html',
   styleUrl: './photo-review-page.component.scss'
 })
@@ -57,6 +59,7 @@ export class PhotoReviewPageComponent {
   protected readonly aiPreviewDescription = signal('');
   protected readonly aiPreviewQuantity = signal<number | null>(null);
   protected readonly aiHint = signal('');
+  protected readonly aiWebSearch = signal(false);
   protected readonly aiMode = signal<AiAnalysisMode>('fast');
   protected readonly aiDescriptionStyle = signal<AiDescriptionStyle>('narrative');
   protected readonly aiStep = signal<AiWorkflowStep>('analyze');
@@ -68,7 +71,7 @@ export class PhotoReviewPageComponent {
   protected readonly aiHintLength = computed(() => this.aiHint().length);
   protected readonly aiDetailedRecommended = computed(() => this.looksLikeDetailedHint(this.aiHint()));
   protected readonly aiModeHint = computed(() =>
-    this.aiMode() === 'detailed'
+    this.aiMode() === 'pro' ? 'Pro: fotos en alta definición, razonamiento y una descripción más completa. Mayor tiempo y coste.' : this.aiMode() === 'detailed'
       ? 'Detallado: usa derivado grande y detail=high. Más coste, mejor para placas, etiquetas y texto pequeño.'
       : 'Rápido: usa detail=low. Coste mínimo, identificación más genérica.');
   protected readonly acceptedTechnicalFacts = computed(() => {
@@ -147,6 +150,8 @@ export class PhotoReviewPageComponent {
   protected readonly assignBoxId = signal<number | null>(null);
   protected readonly assignItemId = signal<number | null>(null);
   protected readonly draftName = signal('');
+  protected readonly draftMarkdown = signal(true);
+  protected readonly draftRelations = signal<number[]>([]);
   protected readonly draftNotes = signal('');
   protected readonly draftQuantity = signal(1);
   protected readonly draftUnit = signal('uds');
@@ -229,7 +234,7 @@ export class PhotoReviewPageComponent {
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
     this.api.fetchAiStatus().pipe(
-      tap((status) => this.aiStatus.set(status)),
+      tap((status) => { this.aiStatus.set(status); if (!this.aiModeManuallySelected()) this.aiMode.set(status.defaultMode === 'pro' ? 'pro' : status.defaultMode === 'normal' ? 'detailed' : 'fast'); }),
       catchError(() => {
         this.aiStatus.set({
           enabled: false,
@@ -327,6 +332,7 @@ export class PhotoReviewPageComponent {
       this.workspaceMode.set('quick');
       this.draftName.set('');
       this.draftNotes.set('');
+    this.draftMarkdown.set(true);this.draftRelations.set([]);
       this.draftQuantity.set(1);
       this.draftUnit.set('uds');
       this.draftBoxId.set(current.sourceBox?.id ?? null);
@@ -435,6 +441,8 @@ export class PhotoReviewPageComponent {
       boxId: this.draftBoxId(),
       name: this.draftName().trim(),
       notes: this.draftNotes().trim(),
+      descriptionMarkdown: this.draftMarkdown(),
+      relatedItemIds: this.draftRelations(),
       quantity: this.draftQuantity(),
       unit: this.draftUnit().trim(),
       itemClassId: this.draftItemClassId(),
@@ -480,7 +488,8 @@ export class PhotoReviewPageComponent {
     this.api.suggestReviewItem({
       photoIds: ids,
       mode: analysisMode,
-      detail: analysisMode === 'detailed' ? 'high' : 'low',
+      detail: analysisMode !== 'fast' ? 'high' : 'low',
+      webSearch: analysisMode === 'pro' && this.aiWebSearch(),
       userHint: this.aiHint().trim() || undefined
     }).pipe(
       tap((suggestion) => {
@@ -702,9 +711,9 @@ export class PhotoReviewPageComponent {
   }
 
   protected setAiHint(value: string): void {
-    const next = value.slice(0, 500);
+    const next = value.slice(0, 3000);
     this.aiHint.set(next);
-    if (this.looksLikeDetailedHint(next) && !this.aiModeManuallySelected() && this.aiMode() !== 'detailed') {
+    if (this.looksLikeDetailedHint(next) && !this.aiModeManuallySelected() && this.aiMode() === 'fast') {
       this.aiMode.set('detailed');
       this.aiModeAutoNotice.set(true);
       return;
@@ -716,7 +725,7 @@ export class PhotoReviewPageComponent {
   protected setAiMode(value: string): void {
     this.aiModeManuallySelected.set(true);
     this.aiModeAutoNotice.set(false);
-    this.aiMode.set(value === 'detailed' ? 'detailed' : 'fast');
+    this.aiMode.set(value === 'pro' ? 'pro' : value === 'detailed' ? 'detailed' : 'fast');
   }
 
   protected setAiDescriptionStyle(value: string): void {

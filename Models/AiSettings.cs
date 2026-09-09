@@ -7,6 +7,7 @@ public class AiSettings
     public string Provider { get; set; } = "OpenAI";
     public string Model { get; set; } = "gpt-5.4-mini";
     public string CheapModel { get; set; } = "gpt-5.4-nano";
+    public string ProModel { get; set; } = "gpt-6-astra";
     public string ImageDetail { get; set; } = "low";
     public int MaxImagesPerRequest { get; set; } = 4;
     public string DefaultMode { get; set; } = "normal";

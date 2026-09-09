@@ -1,10 +1,10 @@
 # Architecture
 
-Junkyard is a compact ASP.NET Core Razor Pages application.
+Junkyard uses Angular as its only UI and ASP.NET Core minimal APIs for domain logic and persistence.
 
 ## Stack
 
-- ASP.NET Core / Razor Pages on .NET 9
+- ASP.NET Core minimal APIs on .NET 9
 - EF Core with SQLite
 - QRCoder for box QR labels
 - Docker + Docker Compose for deployment
@@ -14,12 +14,12 @@ Junkyard is a compact ASP.NET Core Razor Pages application.
 - `Models/`: domain entities for locations, boxes, items, photos and the photo inbox.
 - `Data/InventoryDbContext.cs`: EF Core mapping and query filters.
 - `Data/SchemaUpgrader.cs`: idempotent SQLite schema updates for deployed instances without formal migrations.
-- `Pages/`: Razor Pages UI and page handlers.
+- `spikes/angular-inventory-spike/`: Angular UI (directory name retained for existing service paths).
 - `Services/PhotoStorage.cs`: upload storage, public paths and rotation normalization.
 - `Services/AiSettingsService.cs` and `Services/AiItemSuggestionService.cs`: optional OpenAI-backed item suggestions for photo review, with backend-only API key handling.
 - `Services/CsvInventoryService.cs`: CSV import/export behavior.
-- `wwwroot/`: CSS, JavaScript, favicon and safe static branding assets.
-- `docs/architecture/frontend.md`: Angular SPA conventions for the future frontend migration.
+- `wwwroot/`: safe static branding assets; no classic UI scripts or styles.
+- `docs/architecture/frontend.md`: Angular SPA conventions.
 
 ## Data Model
 

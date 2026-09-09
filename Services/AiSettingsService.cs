@@ -78,7 +78,8 @@ public sealed class AiSettingsService(
             effective.AllowSuggestedNewTags,
             apiKey,
             keySource,
-            keySource is "Stored" or "EnvironmentOverridesStored" ? MaskApiKey(storedKey) : null);
+            keySource is "Stored" or "EnvironmentOverridesStored" ? MaskApiKey(storedKey) : null,
+            NormalizeModel(stored?.ProModel, "gpt-6-astra"));
     }
 
     public async Task<AiSettingsStatusDto> UpdateSettingsAsync(AiSettingsUpdateDto input, CancellationToken cancellationToken)
@@ -88,6 +89,7 @@ public sealed class AiSettingsService(
         settings.Provider = NormalizeProvider(input.Provider);
         settings.Model = NormalizeModel(input.Model, "gpt-5.4-mini");
         settings.CheapModel = NormalizeModel(input.CheapModel, "gpt-5.4-nano");
+        if (input.ProModel is not null) settings.ProModel = NormalizeModel(input.ProModel, "gpt-6-astra");
         settings.ImageDetail = NormalizeDetail(input.ImageDetail);
         settings.MaxImagesPerRequest = NormalizeMaxImages(input.MaxImagesPerRequest);
         settings.DefaultMode = NormalizeMode(input.DefaultMode);
@@ -143,7 +145,7 @@ public sealed class AiSettingsService(
         }
 
         var mode = NormalizeMode(request.Mode ?? effective.DefaultMode);
-        var model = mode == "cheap" ? effective.CheapModel : effective.Model;
+        var model = mode == "pro" ? effective.ProModel : mode == "cheap" ? effective.CheapModel : effective.Model;
         try
         {
             await CallOpenAiTextPingAsync(effective.ApiKey, model, cancellationToken);
@@ -217,7 +219,7 @@ public sealed class AiSettingsService(
     }
 
     public static string NormalizeMode(string? value)
-        => string.Equals(value, "cheap", StringComparison.OrdinalIgnoreCase) ? "cheap" : "normal";
+        => value?.Trim().ToLowerInvariant() switch { "pro" => "pro", "cheap" or "fast" => "cheap", _ => "normal" };
 
     public static int NormalizeMaxImages(int value)
         => Math.Max(1, Math.Min(value <= 0 ? 4 : value, 8));
@@ -289,7 +291,8 @@ public sealed class AiSettingsService(
             reason,
             effective.MaxDescriptionLength,
             effective.StoreRawResponse,
-            effective.AllowSuggestedNewTags);
+            effective.AllowSuggestedNewTags,
+            effective.ProModel);
     }
 
     private static string? ResolveReason(AiEffectiveSettings effective)
@@ -366,7 +369,8 @@ public record AiEffectiveSettings(
     bool AllowSuggestedNewTags,
     string? ApiKey,
     string KeySource,
-    string? MaskedApiKey);
+    string? MaskedApiKey,
+    string ProModel = "gpt-6-astra");
 
 public record AiSettingsStatusDto(
     bool Enabled,
@@ -383,7 +387,8 @@ public record AiSettingsStatusDto(
     string? Reason,
     int MaxDescriptionLength,
     bool StoreRawResponse,
-    bool AllowSuggestedNewTags);
+    bool AllowSuggestedNewTags,
+    string ProModel = "gpt-6-astra");
 
 public record AiSettingsUpdateDto(
     bool Enabled,
@@ -392,7 +397,8 @@ public record AiSettingsUpdateDto(
     string? CheapModel,
     string? ImageDetail,
     int MaxImagesPerRequest,
-    string? DefaultMode);
+    string? DefaultMode,
+    string? ProModel = null);
 
 public record AiApiKeyUpdateDto(string? ApiKey);
 

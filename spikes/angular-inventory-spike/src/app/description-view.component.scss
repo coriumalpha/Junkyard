@@ -1,0 +1,5 @@
+:host { display:block; min-width:0; }
+.reading-toggle { color:var(--mat-sys-primary,#7fcdbc); background:none; border:0; padding:0 0 12px; cursor:pointer; font:inherit; font-size:.8rem; }
+.prose { font-size:1rem; line-height:1.75; overflow-wrap:anywhere; max-width:82ch; color:var(--mat-sys-on-surface,#e0e5e8); }
+.plain { white-space:pre-wrap; }
+:host ::ng-deep .prose { p { margin:0 0 1em; } h1,h2,h3,h4 {line-height:1.3; margin:1.3em 0 .55em;} h1{font-size:1.65rem;} h2{font-size:1.4rem;} h3{font-size:1.2rem;} a {color:#91dac8;text-decoration:underline;} ul,ol {padding-left:1.6em;} li{margin:.3em 0;} blockquote {border-left:3px solid #7fcdbc;margin:1em 0;padding:.3em 1em;background:#ffffff05;} pre {overflow-x:auto;padding:16px;border-radius:10px;background:#0005;max-width:100%;} code{font-size:.9em;background:#0003;border-radius:4px;padding:.12em .3em;} pre code{padding:0;background:none;} table{display:block;overflow-x:auto;border-collapse:collapse;max-width:100%;} td,th{padding:8px 12px;border:1px solid #ffffff25;} hr{border:0;border-top:1px solid #ffffff25;margin:1.5em 0;} }

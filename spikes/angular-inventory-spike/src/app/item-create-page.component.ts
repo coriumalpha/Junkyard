@@ -1,3 +1,5 @@
+import { DescriptionEditorComponent } from './description-editor.component';
+import { RelatedItemsPickerComponent } from './related-items-picker.component';
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -22,6 +24,7 @@ import { TagPickerComponent } from './tag-picker.component';
   selector: 'app-item-create-page',
   standalone: true,
   imports: [
+    DescriptionEditorComponent, RelatedItemsPickerComponent,
     CommonModule,
     FormsModule,
     RouterLink,
@@ -218,6 +221,8 @@ export class ItemCreatePageComponent {
       sentimental: false,
       obsolete: false,
       notes: '',
+      descriptionMarkdown: true,
+      relatedItemIds: [],
       boxId: null
     };
   }

@@ -8,6 +8,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Box> Boxes => Set<Box>();
     public DbSet<Item> Items => Set<Item>();
+    public DbSet<ItemRelation> ItemRelations => Set<ItemRelation>();
     public DbSet<ItemClass> ItemClasses => Set<ItemClass>();
     public DbSet<ItemSubtype> ItemSubtypes => Set<ItemSubtype>();
     public DbSet<Tag> Tags => Set<Tag>();
@@ -27,6 +28,13 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
             entity.HasIndex(x => x.Name).IsUnique();
         });
 
+        modelBuilder.Entity<ItemRelation>(entity =>
+        {
+            entity.HasKey(x => new { x.ItemId, x.RelatedItemId });
+            entity.HasOne(x => x.Item).WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.RelatedItem).WithMany().HasForeignKey(x => x.RelatedItemId).OnDelete(DeleteBehavior.Cascade);
+            entity.ToTable(t => t.HasCheckConstraint("CK_ItemRelations_Order", "ItemId < RelatedItemId"));
+        });
         modelBuilder.Entity<Box>(entity =>
         {
             entity.Property(x => x.Code).HasMaxLength(40).IsRequired();

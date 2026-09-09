@@ -1,3 +1,6 @@
+import { DescriptionEditorComponent } from './description-editor.component';
+import { DescriptionViewComponent } from './description-view.component';
+import { RelatedItemsPickerComponent } from './related-items-picker.component';
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -32,6 +35,7 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
   selector: 'app-detail-page',
   standalone: true,
   imports: [
+    DescriptionEditorComponent, DescriptionViewComponent, RelatedItemsPickerComponent,
     CommonModule,
     FormsModule,
     RouterLink,
@@ -285,7 +289,7 @@ export class DetailPageComponent {
     ).subscribe();
   }
 
-  protected startItemEdit(): void {
+  protected startItemEdit(section: 'general' | 'description' | 'relations' = 'general'): void {
     const item = this.item();
     if (!item) {
       return;
@@ -309,12 +313,20 @@ export class DetailPageComponent {
       sentimental: item.sentimental,
       obsolete: item.obsolete,
       notes: item.notes ?? '',
+      descriptionMarkdown: item.descriptionMarkdown,
+      relatedItemIds: item.relatedItems.map(i=>i.id),
       boxId: item.box?.id ?? null
     });
     this.loadItemSubtypes(item.itemClassId);
     this.formError.set(null);
     this.saveMessage.set(null);
     this.editingItem.set(true);
+    setTimeout(() => {
+      const selector = section === 'description' ? 'app-description-editor textarea' : section === 'relations' ? 'app-related-items-picker input[type=search]' : '.edit-card';
+      const target = document.querySelector<HTMLElement>(selector);
+      target?.scrollIntoView({block: 'center', behavior: 'smooth'});
+      if (section !== 'general') target?.focus({preventScroll: true});
+    });
   }
 
   protected cancelItemEdit(): void {
@@ -422,6 +434,8 @@ export class DetailPageComponent {
           sentimental: updated.sentimental,
           obsolete: updated.obsolete,
           notes: updated.notes ?? '',
+          descriptionMarkdown: updated.descriptionMarkdown,
+          relatedItemIds: updated.relatedItems.map(i=>i.id),
           boxId: updated.box?.id ?? null
         });
         this.editingItem.set(false);
@@ -1274,6 +1288,8 @@ export class DetailPageComponent {
       sentimental: false,
       obsolete: false,
       notes: '',
+      descriptionMarkdown: true,
+      relatedItemIds: [],
       boxId: null
     };
   }

@@ -775,3 +775,6 @@
     min-height: 320px;
   }
 }
+
+.description-card { grid-column:1 / -1; padding:28px; }
+.description-card h2,.related-card h2{margin:0;font-size:1.2rem}.description-card .section-head{margin-bottom:20px}.related-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr));gap:10px}.related-links a{display:grid;gap:6px;padding:14px;border:1px solid #ffffff20;border-radius:10px;text-decoration:none;color:inherit}.related-links small{font-family:monospace;color:#7fcdbc}.related-links a:hover{border-color:#7fcdbc}.related-links strong{overflow-wrap:anywhere}@media(max-width:650px){.description-card{padding:18px}.description-card .section-head,.related-card .section-head{flex-wrap:wrap;gap:12px}}

@@ -19,7 +19,6 @@ Directory.CreateDirectory(DataPaths.ImportRoot(builder.Environment, builder.Conf
 var keyRoot = Path.Combine(dataRoot, "keys");
 Directory.CreateDirectory(keyRoot);
 
-builder.Services.AddRazorPages();
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(keyRoot))
     .SetApplicationName("Inventario");
@@ -43,8 +42,7 @@ builder.Services.AddScoped<InventoryLiveQueryService>();
 builder.Services.Configure<AiOptions>(builder.Configuration.GetSection("AI"));
 builder.Services.AddScoped<AiSettingsService>();
 builder.Services.AddScoped<AiItemSuggestionService>();
-builder.Services.AddHttpClient("openai");
-builder.Services.AddSingleton<QrCodeService>();
+builder.Services.AddHttpClient("openai", client => client.Timeout = TimeSpan.FromMinutes(4));
 
 var app = builder.Build();
 
@@ -92,11 +90,6 @@ app.Use(async (context, next) =>
     }
 });
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error");
-}
-
 app.UseStaticFiles();
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -111,7 +104,6 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseRouting();
-app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", app = "Inventario" }));
 app.MapGet("/api/ai/settings/status", async (
@@ -669,6 +661,10 @@ app.MapDelete("/api/locations/{id:int}", async (
     await db.SaveChangesAsync(cancellationToken);
     return Results.Json(new { movedBoxes });
 });
+app.MapGet("/api/items/related-options", async (InventoryDbContext db, CancellationToken ct) =>
+    Results.Json(await db.Items.IgnoreQueryFilters().AsNoTracking().OrderBy(i => i.Name)
+        .Select(i => new RelatedItemDto(i.Id, i.Code, i.Name, i.ArchivedAt != null)).ToListAsync(ct)));
+
 app.MapGet("/api/items/{id:int}", async (
     int id,
     InventoryLiveQueryService queryService,
@@ -1357,7 +1353,6 @@ app.MapPost("/api/csv/confirm", async (
         return Results.BadRequest(new { error = ex.Message });
     }
 });
-app.MapRazorPages();
 
 app.Run();
 

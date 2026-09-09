@@ -7,6 +7,37 @@ namespace Inventario.Services;
 
 public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorage photoStorage)
 {
+    public async Task<List<RelatedItemDto>> GetRelatedItemsAsync(int id, CancellationToken ct)
+    {
+        var ids = await db.ItemRelations.Where(r => r.ItemId == id || r.RelatedItemId == id)
+            .Select(r => r.ItemId == id ? r.RelatedItemId : r.ItemId).ToListAsync(ct);
+        return await db.Items.IgnoreQueryFilters().AsNoTracking().Where(i => ids.Contains(i.Id)).OrderBy(i => i.Name)
+            .Select(i => new RelatedItemDto(i.Id, i.Code, i.Name, i.ArchivedAt != null)).ToListAsync(ct);
+    }
+
+    private async Task<string?> ValidateRelatedItemsAsync(List<int>? values, int self, CancellationToken ct)
+    {
+        if (values is null) return null; // An omitted relationship field does not change existing links.
+        if (values.Count > 100) return "Selecciona como máximo 100 elementos relacionados.";
+        if (values.Any(id => id <= 0 || id == self)) return "Un ítem no puede relacionarse consigo mismo ni con una referencia inválida.";
+        var ids = values.Distinct().ToList();
+        return await db.Items.IgnoreQueryFilters().CountAsync(i => ids.Contains(i.Id), ct) == ids.Count
+            ? null : "Algún elemento relacionado ya no existe. Revisa la selección.";
+    }
+
+    private async Task SetRelatedItemsAsync(int self, List<int>? values, CancellationToken ct)
+    {
+        if (values is null) return;
+        var wanted = values.Distinct().ToHashSet();
+        var current = await db.ItemRelations.Where(r => r.ItemId == self || r.RelatedItemId == self).ToListAsync(ct);
+        foreach (var edge in current)
+        {
+            var other = edge.ItemId == self ? edge.RelatedItemId : edge.ItemId;
+            if (!wanted.Remove(other)) db.ItemRelations.Remove(edge);
+        }
+        foreach (var other in wanted) db.ItemRelations.Add(new ItemRelation { ItemId = Math.Min(self, other), RelatedItemId = Math.Max(self, other) });
+    }
+
     public async Task<InventoryItemDetailDto?> GetItemDetailAsync(int id, CancellationToken cancellationToken)
     {
         var item = await db.Items.IgnoreQueryFilters().AsNoTracking()
@@ -70,10 +101,12 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 locationSourceLabel,
                 item.Box.ContainerTypeLabel,
                 await BuildHierarchyNodesAsync(item.Box, item.Name, "category", "item", locationLookup, cancellationToken)),
-            $"/Items/Edit?id={item.Id}",
+            $"/item/{item.Id}",
             ToPhotoDtos(photos, photoStates),
             linkedRows.Actions,
-            linkedRows.Comments);
+            linkedRows.Comments,
+            item.DescriptionMarkdown,
+            await GetRelatedItemsAsync(item.Id, cancellationToken));
     }
 
     public async Task<ArchiveDto> GetArchiveAsync(CancellationToken cancellationToken)
@@ -121,7 +154,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 box.ArchivedAt,
                 ThumbUrl(photoStates, box.CoverPhoto),
                 RotationFor(photoStates, box.CoverPhoto),
-                $"/Boxes/Details?code={Uri.EscapeDataString(box.Code)}")).ToList(),
+                $"/boxes/{Uri.EscapeDataString(box.Code)}")).ToList(),
             items.Select(item => new ArchiveItemDto(
                 item.Id,
                 item.Code,
@@ -132,7 +165,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 item.ArchivedAt,
                 ThumbUrl(photoStates, item.CoverPhoto),
                 RotationFor(photoStates, item.CoverPhoto),
-                $"/Items/Edit?id={item.Id}")).ToList(),
+                $"/item/{item.Id}")).ToList(),
             photos.Select(photo => new ArchivePhotoDto(
                 photo.Id,
                 photo.EntityType.ToString(),
@@ -147,6 +180,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         InventoryItemUpdateDto input,
         CancellationToken cancellationToken)
     {
+        var relationError = await ValidateRelatedItemsAsync(input.RelatedItemIds, 0, cancellationToken);
+        if (relationError is not null) return (null, relationError);
         var name = (input.Name ?? "").Trim();
         var tagIds = input.TagIds?.Where(tagId => tagId > 0).Distinct().ToList() ?? [];
         if (string.IsNullOrWhiteSpace(name))
@@ -207,7 +242,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             NeedsReview = input.NeedsReview,
             Sentimental = input.Sentimental,
             Obsolete = input.Obsolete,
-            Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim()
+            Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim(),
+            DescriptionMarkdown = input.DescriptionMarkdown ?? false
         };
 
         foreach (var tag in tags.OrderBy(tag => tag.Name))
@@ -215,8 +251,12 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.ItemTags.Add(new ItemTag { Item = item, TagId = tag.Id });
         }
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         db.Items.Add(item);
         await db.SaveChangesAsync(cancellationToken);
+        await SetRelatedItemsAsync(item.Id, input.RelatedItemIds, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return (await GetItemDetailAsync(item.Id, cancellationToken), null);
     }
 
@@ -235,6 +275,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (null, null);
         }
 
+        var relationError = await ValidateRelatedItemsAsync(input.RelatedItemIds, id, cancellationToken);
+        if (relationError is not null) return (null, relationError);
         var name = (input.Name ?? "").Trim();
         var tagIds = input.TagIds?.Where(tagId => tagId > 0).Distinct().ToList() ?? [];
         if (string.IsNullOrWhiteSpace(name))
@@ -296,6 +338,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         item.Sentimental = input.Sentimental;
         item.Obsolete = input.Obsolete;
         item.Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim();
+        item.DescriptionMarkdown = input.DescriptionMarkdown ?? item.DescriptionMarkdown;
+        await SetRelatedItemsAsync(id, input.RelatedItemIds, cancellationToken);
         item.UpdatedAt = DateTime.UtcNow;
         item.ItemTags.Clear();
         foreach (var tag in tags.OrderBy(tag => tag.Name))
@@ -827,13 +871,14 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return null;
         }
 
+        var equivalentCodes = Box.EquivalentPublicCodes(normalizedCode);
         var boxesQuery = includeArchived ? db.Boxes.IgnoreQueryFilters() : db.Boxes;
         var box = await boxesQuery.AsNoTracking()
             .Include(b => b.Location)
             .Include(b => b.ParentBox)
             .Include(b => b.ChildBoxes)
             .Include(b => b.Items).ThenInclude(item => item.ItemTags).ThenInclude(itemTag => itemTag.Tag)
-            .FirstOrDefaultAsync(b => b.Code == normalizedCode, cancellationToken);
+            .FirstOrDefaultAsync(b => equivalentCodes.Contains(b.Code), cancellationToken);
 
         if (box is null)
         {
@@ -884,7 +929,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             box.Items.OrderBy(item => item.Category).ThenBy(item => item.Name)
                 .Select(item => ToItemDto(item, locationLookup, itemPhotoCounts, photoStates))
                 .ToList(),
-            $"/Boxes/Details?code={Uri.EscapeDataString(box.Code)}",
+            $"/boxes/{Uri.EscapeDataString(box.Code)}",
             ToPhotoDtos(photos, photoStates),
             linkedRows.Actions,
             linkedRows.Comments,
@@ -1164,7 +1209,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 photo.ProcessedAt,
                 photo.SourceBox is null ? null : new InventoryBoxLinkDto(photo.SourceBox.Id, photo.SourceBox.Code, photo.SourceBox.Name),
                 photo.Notes,
-                $"/Photos/Review?id={photo.Id}"))
+                $"/photos/review?id={photo.Id}"))
                 .ToList());
     }
 
@@ -1181,7 +1226,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
 
         if (photo.Status == PhotoInboxStatus.Assigned && status == PhotoInboxStatus.Pending)
         {
-            return (null, "Una foto ya asignada debe gestionarse desde revisión legacy.");
+            return (null, "Devuelve la foto a la bandeja desde la ficha del ítem o contenedor al que está asignada.");
         }
 
         photo.Status = status;
@@ -1199,7 +1244,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             photo.ProcessedAt,
             photo.SourceBox is null ? null : new InventoryBoxLinkDto(photo.SourceBox.Id, photo.SourceBox.Code, photo.SourceBox.Name),
             photo.Notes,
-            $"/Photos/Review?id={photo.Id}"), null);
+            $"/photos/review?id={photo.Id}"), null);
     }
 
     public async Task<PhotoReviewDto> GetPhotoReviewAsync(int? id, CancellationToken cancellationToken)
@@ -1321,6 +1366,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         PhotoReviewCreateItemDto input,
         CancellationToken cancellationToken)
     {
+        var relationError = await ValidateRelatedItemsAsync(input.RelatedItemIds, 0, cancellationToken);
+        if (relationError is not null) return (await GetPhotoReviewAsync(currentId, cancellationToken), [], relationError);
         var name = (input.Name ?? "").Trim();
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -1359,16 +1406,19 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             Unit = string.IsNullOrWhiteSpace(input.Unit) ? "uds" : input.Unit.Trim(),
             IsQuarantined = input.IsQuarantined,
             NeedsReview = input.NeedsReview,
-            Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim()
+            Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim(),
+            DescriptionMarkdown = input.DescriptionMarkdown ?? false
         };
         foreach (var tag in tags.OrderBy(tag => tag.Name))
         {
             item.ItemTags.Add(new ItemTag { TagId = tag.Id });
         }
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         db.Items.Add(item);
         await db.SaveChangesAsync(cancellationToken);
 
+        await SetRelatedItemsAsync(item.Id, input.RelatedItemIds, cancellationToken);
         var photos = await db.PhotoInboxes.Where(photo => ids.Contains(photo.Id) && photo.Status == PhotoInboxStatus.Pending).ToListAsync(cancellationToken);
         var now = DateTime.UtcNow;
         foreach (var inbox in photos)
@@ -1381,6 +1431,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return (await GetPhotoReviewAsync(null, cancellationToken), photos.Select(photo => photo.Id).ToList(), null);
     }
 
@@ -1583,7 +1634,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 box.Id,
                 box.Code,
                 box.Name,
-                $"/Boxes/Details?code={Uri.EscapeDataString(box.Code)}",
+                $"/boxes/{Uri.EscapeDataString(box.Code)}",
                 box.ContainerTypeLabel,
                 box.Status.ToString(),
                 box.Location?.Name,
@@ -1593,7 +1644,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             lowStockItems.Select(item => new DashboardItemDto(
                 item.Id,
                 item.Name,
-                $"/Items/Edit?id={item.Id}",
+                $"/item/{item.Id}",
                 item.Box?.Code,
                 item.Category,
                 item.Quantity,
@@ -1987,10 +2038,11 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         }
         else if (!string.IsNullOrWhiteSpace(boxCode))
         {
+            var equivalentCodes = Box.EquivalentPublicCodes(boxCode);
             selectedBox = await db.Boxes.AsNoTracking()
                 .Include(b => b.Location)
                 .Include(b => b.ParentBox)
-                .FirstOrDefaultAsync(b => b.Code == boxCode, cancellationToken);
+                .FirstOrDefaultAsync(b => equivalentCodes.Contains(b.Code), cancellationToken);
             if (selectedBox is not null)
             {
                 selectedBoxIds.Add(selectedBox.Id);
@@ -2161,7 +2213,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                     boxEntity?.Id,
                     boxEntity?.Code ?? "SIN-CAJA",
                     boxEntity?.Name ?? "Sin caja",
-                    $"/Boxes/Details?code={Uri.EscapeDataString(boxEntity?.Code ?? "SIN-CAJA")}",
+                    $"/boxes/{Uri.EscapeDataString(boxEntity?.Code ?? "SIN-CAJA")}",
                     ThumbUrl(photoStates, boxEntity?.CoverPhoto),
                     RotationFor(photoStates, boxEntity?.CoverPhoto),
                     locationName,
@@ -2243,7 +2295,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.Id,
             item.Code,
             item.Name,
-            $"/Items/Edit?id={item.Id}",
+            $"/item/{item.Id}",
             ThumbUrl(photoStates, item.CoverPhoto),
             RotationFor(photoStates, item.CoverPhoto),
             item.Box?.Code,
@@ -2730,12 +2782,6 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             InventoryActionLinkedEntityType.Item when action.LinkedEntityId is int itemId && items.ContainsKey(itemId) => $"/item/{itemId}",
             _ => null
         };
-        var legacyUrl = action.LinkedEntityType switch
-        {
-            InventoryActionLinkedEntityType.Box when action.LinkedEntityId is int boxId && boxes.TryGetValue(boxId, out var box) => $"/Boxes/Details?code={Uri.EscapeDataString(box.Code)}",
-            InventoryActionLinkedEntityType.Item when action.LinkedEntityId is int itemId && items.ContainsKey(itemId) => $"/Items/Edit?id={itemId}",
-            _ => null
-        };
 
         return new InventoryActionDto(
             action.Id,
@@ -2746,7 +2792,6 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             action.Status.ToString(),
             linkedLabel,
             spaUrl,
-            legacyUrl,
             action.CreatedAt,
             action.CompletedAt);
     }
@@ -2884,7 +2929,7 @@ public record ArchiveBoxDto(
     DateTime? ArchivedAt,
     string? CoverUrl,
     int RotationDegrees,
-    string LegacyUrl);
+    string Url);
 
 public record ArchiveItemDto(
     int Id,
@@ -2896,7 +2941,7 @@ public record ArchiveItemDto(
     DateTime? ArchivedAt,
     string? CoverUrl,
     int RotationDegrees,
-    string LegacyUrl);
+    string Url);
 
 public record ArchivePhotoDto(
     int Id,
@@ -2943,10 +2988,14 @@ public record InventoryItemDetailDto(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     InventoryItemBoxDto? Box,
-    string LegacyUrl,
+    string Url,
     List<InventoryPhotoDto> Photos,
     List<InventoryActionDto> Actions,
-    List<InventoryActionDto> Comments);
+    List<InventoryActionDto> Comments,
+    bool DescriptionMarkdown,
+    List<RelatedItemDto> RelatedItems);
+
+public record RelatedItemDto(int Id, string Code, string Name, bool Archived);
 
 public record InventoryItemUpdateDto(
     string? Code,
@@ -2966,7 +3015,9 @@ public record InventoryItemUpdateDto(
     bool Sentimental,
     bool Obsolete,
     string? Notes,
-    int? BoxId);
+    int? BoxId,
+    bool? DescriptionMarkdown = null,
+    List<int>? RelatedItemIds = null);
 
 public record InventoryBulkUpdateDto(
     List<int>? ItemIds,
@@ -3002,7 +3053,7 @@ public record InventoryBoxDetailDto(
     InventoryBoxLinkDto? Parent,
     List<InventoryBoxLinkDto> Children,
     List<InventoryItemDto> Items,
-    string LegacyUrl,
+    string Url,
     List<InventoryPhotoDto> Photos,
     List<InventoryActionDto> Actions,
     List<InventoryActionDto> Comments,
@@ -3053,7 +3104,7 @@ public record PhotoInboxItemDto(
     DateTime? ProcessedAt,
     InventoryBoxLinkDto? SourceBox,
     string? Notes,
-    string LegacyReviewUrl);
+    string ReviewUrl);
 
 public record PhotoReviewDto(
     int PendingCount,
@@ -3091,7 +3142,9 @@ public record PhotoReviewCreateItemDto(
     string? Unit,
     bool IsQuarantined,
     bool NeedsReview,
-    List<int>? TagIds);
+    List<int>? TagIds,
+    bool? DescriptionMarkdown = null,
+    List<int>? RelatedItemIds = null);
 
 public record PhotoReviewUndoDto(List<int>? Ids);
 
@@ -3158,7 +3211,6 @@ public record InventoryActionDto(
     string Status,
     string LinkedLabel,
     string? SpaUrl,
-    string? LegacyUrl,
     DateTime CreatedAt,
     DateTime? CompletedAt);
 

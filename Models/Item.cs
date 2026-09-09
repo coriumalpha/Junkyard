@@ -25,6 +25,7 @@ public class Item
     public decimal? MinQuantity { get; set; }
     public string? Unit { get; set; }
     public string? Notes { get; set; }
+    public bool DescriptionMarkdown { get; set; }
     public string? CoverPhoto { get; set; }
     public DateTime? ArchivedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

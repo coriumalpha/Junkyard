@@ -194,14 +194,16 @@
       </mat-card>
 
       <mat-card class="info-card item-side-wide description-card">
-        <p class="eyebrow">Descripción</p>
+        <div class="section-head"><h2>Descripción</h2>@if (!item()!.archived) { <button mat-stroked-button type="button" (click)="startItemEdit('description')">Editar descripción</button> }</div>
         @if (item()!.notes) {
-          <p class="notes">{{ item()!.notes }}</p>
+          <app-description-view [text]="item()!.notes!" [markdown]="item()!.descriptionMarkdown" />
         } @else {
           <p class="empty-note">Sin descripción todavía.</p>
         }
       </mat-card>
 
+      <mat-card class="info-card item-side-wide related-card"><div class="section-head"><h2>Elementos relacionados</h2>@if (!item()!.archived) { <button mat-stroked-button type="button" (click)="startItemEdit('relations')">Vincular elementos</button> }</div>
+      <div class="related-links">@for (related of item()!.relatedItems; track related.id) { <a [routerLink]="['/item',related.id]"><small>{{ related.code | inventoryCode }}</small><strong>{{ related.name }}</strong>@if(related.archived){<span>Archivado</span>}<span aria-hidden="true">↗</span></a> }@empty{<p class="empty-note">Conecta esta ficha con sus accesorios, componentes u otros objetos.</p>}</div></mat-card>
       @if (editingItem()) {
         <mat-card class="edit-card">
           <div class="section-head">
@@ -228,6 +230,8 @@
               <mat-label>Nombre</mat-label>
               <input matInput [ngModel]="itemForm().name" (ngModelChange)="patchItemForm({ name: $event })" />
             </mat-form-field>
+
+            <app-description-editor class="wide" [value]="itemForm().notes" [markdown]="itemForm().descriptionMarkdown ?? false" (valueChange)="patchItemForm({ notes: $event })" (markdownChange)="patchItemForm({ descriptionMarkdown: $event })" />
 
             <app-tag-picker
               label="Tags"
@@ -301,10 +305,7 @@
               <input matInput [ngModel]="itemForm().retention" (ngModelChange)="patchItemForm({ retention: $event })" />
             </mat-form-field>
 
-            <mat-form-field appearance="outline" class="wide">
-              <mat-label>Descripción</mat-label>
-              <textarea matInput rows="4" [ngModel]="itemForm().notes" (ngModelChange)="patchItemForm({ notes: $event })"></textarea>
-            </mat-form-field>
+<app-related-items-picker class="wide" [value]="itemForm().relatedItemIds ?? []" [selfId]="item()!.id" (valueChange)="patchItemForm({ relatedItemIds: $event })" />
 
             <div class="toggle-row wide">
               <mat-slide-toggle [checked]="itemForm().consumable" (change)="patchItemForm({ consumable: $event.checked })">Consumible</mat-slide-toggle>

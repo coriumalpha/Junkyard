@@ -442,7 +442,7 @@ High-level stack:
 - Docker and Docker Compose for deployment.
 - Persistent runtime data under `/data`.
 
-The older Razor/classic backend remains part of the codebase during the transition, but new product work is focused on the SPA experience.
+Angular is the only UI. The backend exposes JSON APIs and photo assets; server-rendered pages, handlers and Bootstrap/jQuery have been removed. Port 8089 has no inventory UI; use Angular on port 8088.
 
 ---
 
@@ -462,7 +462,7 @@ Check that the backend is running:
 curl http://localhost:8089/health
 ```
 
-Open the backend/classic application endpoint:
+The backend is API-only (its root returns 404):
 
 ```text
 http://localhost:8089
@@ -562,7 +562,7 @@ Available documentation:
 - [AI item suggestions](docs/AI-ITEM-SUGGESTIONS.md)
 - [Privacy and Data Handling](docs/PRIVACY.md)
 
-The documentation is evolving alongside the SPA and data model. Some older notes may still refer to the classic Razor interface where the SPA has already become the primary workflow.
+See docs/ANGULAR-ONLY.md for supported runtime surfaces and removal verification.
 
 ---
 

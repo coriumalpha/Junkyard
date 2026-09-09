@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-This document defines the frontend contract for the planned Angular SPA that will replace the current server-rendered inventory surfaces in later issues such as #24 and #25.
+This document defines conventions for Angular, the only Junkyard frontend.
 
 ## Purpose
 
@@ -339,7 +339,7 @@ Focus tests on the surfaces that are hardest to reason about by inspection.
 
 ## Relationship to the Current App
 
-This document is a forward-looking contract for the SPA migration. It does not change the current Razor Pages implementation.
+Angular is the only frontend; ASP.NET Core provides APIs and photo resources. Folder-organization recommendations remain aspirational.
 
 The current app remains the source of truth for:
 

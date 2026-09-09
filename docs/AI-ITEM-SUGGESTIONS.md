@@ -105,3 +105,11 @@ Technical facts are not tags. They are shown separately in the suggestion panel 
 7. Save the item manually.
 
 The suggestion is stored as `AiItemSuggestion` for debugging and accept/reject tracing.
+
+## Pro mode (2026-09-08)
+
+The optional `pro` mode has its own configurable `ProModel` (default `gpt-6-astra`), high-detail photos, high reasoning for GPT-5/6 models, a 16,000 output-token budget and up to 6,000 description characters. Existing fast/detailed defaults are preserved. The prompt uses the current classes, subtypes, tags and user context (up to 3,000 characters), separates observed evidence from hypotheses and asks for a specific next photo when identification is uncertain.
+
+Optional `webSearch` is effective only in Pro. Responses API `web_search` is limited to five tool calls; the UI shows returned sources and distinguishes runs without a web search. Product references, manuals and manufacturer information are preferred. Web evidence remains a proposal, not authoritative inventory data. Structured output and high-resolution images do not guarantee correct identification. No fields, classes or relations are applied automatically.
+
+References verified 2026-09-08: https://developers.openai.com/api/docs/models/gpt-6-astra and https://developers.openai.com/api/docs/guides/tools-web-search . Model availability still depends on the configured API account.

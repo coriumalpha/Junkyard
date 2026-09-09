@@ -18,3 +18,6 @@ wwwroot/uploads/
 .env
 .env.*
 *.log
+
+spikes/**/node_modules/
+spikes/**/dist/

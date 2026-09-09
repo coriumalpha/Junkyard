@@ -70,6 +70,8 @@ public class Box
 
     public static string FormatCtCode(int sequence) => $"{CtPrefix}{sequence:000000}";
 
+    public static string FormatGroupedCtCode(int sequence) => $"{CtPrefix}{sequence / 1000:000}-{sequence % 1000:000}";
+
     public static bool TryParseCtSequence(string? value, out int sequence)
     {
         sequence = 0;
@@ -92,7 +94,11 @@ public class Box
             }
         }
 
-        return int.TryParse(compact, out sequence) && sequence > 0;
+        compact = compact.Replace("-", "");
+        return compact.Length > 0
+            && compact.All(char.IsDigit)
+            && int.TryParse(compact, out sequence)
+            && sequence > 0;
     }
 
     public static bool TryParseCanonicalCtSequence(string? value, out int sequence)
@@ -130,6 +136,22 @@ public class Box
         }
 
         return compact;
+    }
+
+    public static IReadOnlyList<string> EquivalentPublicCodes(string? value)
+    {
+        var normalized = NormalizePublicCode(value);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return [];
+        }
+
+        if (!TryParseCtSequence(normalized, out var sequence))
+        {
+            return [normalized];
+        }
+
+        return [FormatCtCode(sequence), FormatGroupedCtCode(sequence)];
     }
 
     [NotMapped]

@@ -9,8 +9,6 @@ public static class SeedData
     {
         if (db.Locations.Any())
         {
-            NormalizeLabels(db);
-            EnsureItemClassifications(db);
             return;
         }
 
@@ -121,39 +119,4 @@ public static class SeedData
         });
     }
 
-    private static void NormalizeLabels(InventoryDbContext db)
-    {
-        foreach (var box in db.Boxes.IgnoreQueryFilters())
-        {
-            box.Name = box.Name
-                .Replace("Video", "Vídeo")
-                .Replace("Alimentacion", "Alimentación")
-                .Replace("Tornilleria", "Tornillería");
-            box.Description = box.Description?
-                .Replace("video", "vídeo")
-                .Replace("pequenas", "pequeñas")
-                .Replace("impresion", "impresión")
-                .Replace("electronica", "electrónica");
-        }
-
-        foreach (var item in db.Items.IgnoreQueryFilters())
-        {
-            item.Category = item.Category
-                .Replace("Tecnologia", "Tecnología")
-                .Replace("Tornilleria", "Tornillería")
-                .Replace("Documentacion", "Documentación");
-            item.Notes = item.Notes?.Replace("mas", "más");
-        }
-
-        foreach (var location in db.Locations)
-        {
-            location.Description = location.Description?
-                .Replace("electronica", "electrónica")
-                .Replace("Informatica", "Informática")
-                .Replace("documentacion", "documentación")
-                .Replace("pequenas", "pequeñas");
-        }
-
-        db.SaveChanges();
-    }
 }

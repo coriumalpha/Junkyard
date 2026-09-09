@@ -3,7 +3,7 @@
     <div>
       <p class="eyebrow">Configuración</p>
       <h1>IA</h1>
-      <p>Sugerencias asistidas para crear ítems desde fotos pendientes.</p>
+      <p>Tres niveles para identificar objetos: rápido, detallado y Pro. Los resultados siempre se revisan antes de guardar.</p>
     </div>
     <button mat-flat-button type="button" (click)="testConnection()" [disabled]="testing() || loading()">
       @if (testing()) {
@@ -106,7 +106,8 @@
           <mat-form-field appearance="outline">
             <mat-label>Modo por defecto</mat-label>
             <mat-select [ngModel]="defaultMode()" (ngModelChange)="defaultMode.set($event)">
-              <mat-option value="normal">Normal</mat-option>
+              <mat-option value="normal">Detallado</mat-option>
+              <mat-option value="pro">Pro · mayor capacidad</mat-option>
               <mat-option value="cheap">Barato</mat-option>
             </mat-select>
           </mat-form-field>
@@ -121,6 +122,7 @@
             <input matInput [ngModel]="cheapModel()" (ngModelChange)="cheapModel.set($event)" list="ai-model-presets" />
           </mat-form-field>
 
+          <mat-form-field appearance="outline"><mat-label>Modelo Pro</mat-label><input matInput [ngModel]="proModel()" (ngModelChange)="proModel.set($event)" list="ai-model-presets" /><mat-hint>Mayor detalle y razonamiento. Requiere acceso al modelo en tu cuenta.</mat-hint></mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Detalle imagen</mat-label>
             <mat-select [ngModel]="imageDetail()" (ngModelChange)="imageDetail.set($event)">
@@ -137,6 +139,10 @@
         </div>
 
         <datalist id="ai-model-presets">
+          <option value="gpt-6-astra">Máxima capacidad</option>
+          <option value="gpt-5.6-terra">Equilibrado</option>
+          <option value="gpt-5.6-luna">Ágil</option>
+          <option value="gpt-5.5">Alta capacidad</option>
           <option value="gpt-5.4-mini"></option>
           <option value="gpt-5.4-nano"></option>
         </datalist>

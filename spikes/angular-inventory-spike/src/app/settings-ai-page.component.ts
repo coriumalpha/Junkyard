@@ -16,7 +16,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AiConnectionTestResponse, AiSettingsUpdate, AiStatus, InventoryApiService } from './inventory-api.service';
 
 type ImageDetail = 'low' | 'high' | 'auto';
-type AiMode = 'normal' | 'cheap';
+type AiMode = 'normal' | 'cheap' | 'pro';
 
 @Component({
   selector: 'app-settings-ai-page',
@@ -50,6 +50,7 @@ export class SettingsAiPageComponent {
   protected readonly enabled = signal(false);
   protected readonly provider = signal('OpenAI');
   protected readonly model = signal('gpt-5.4-mini');
+  protected readonly proModel = signal('gpt-6-astra');
   protected readonly cheapModel = signal('gpt-5.4-nano');
   protected readonly imageDetail = signal<ImageDetail>('low');
   protected readonly maxImagesPerRequest = signal(4);
@@ -98,6 +99,7 @@ export class SettingsAiPageComponent {
       provider: this.provider(),
       model: this.model().trim(),
       cheapModel: this.cheapModel().trim(),
+      proModel: this.proModel().trim(),
       imageDetail: this.imageDetail(),
       maxImagesPerRequest: Number(this.maxImagesPerRequest()),
       defaultMode: this.defaultMode()
@@ -211,6 +213,7 @@ export class SettingsAiPageComponent {
     this.provider.set(status.provider);
     this.model.set(status.model);
     this.cheapModel.set(status.cheapModel);
+    this.proModel.set(status.proModel ?? 'gpt-6-astra');
     this.imageDetail.set(status.imageDetail);
     this.maxImagesPerRequest.set(status.maxImagesPerRequest);
     this.defaultMode.set(status.defaultMode);

@@ -25,6 +25,17 @@ public static class SchemaUpgrader
         EnsureItemConditions(db);
         EnsureItemClassifications(db);
         EnsureInventoryActions(db);
+        AddColumn(db, "Items", "DescriptionMarkdown", "INTEGER NOT NULL DEFAULT 0");
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "ItemRelations" (
+                "ItemId" INTEGER NOT NULL REFERENCES "Items"("Id") ON DELETE CASCADE,
+                "RelatedItemId" INTEGER NOT NULL REFERENCES "Items"("Id") ON DELETE CASCADE,
+                "CreatedAt" TEXT NOT NULL,
+                PRIMARY KEY ("ItemId", "RelatedItemId"),
+                CONSTRAINT "CK_ItemRelations_Order" CHECK ("ItemId" < "RelatedItemId")
+            );
+            CREATE INDEX IF NOT EXISTS "IX_ItemRelations_RelatedItemId" ON "ItemRelations" ("RelatedItemId");
+            """);
         AddColumn(db, "Items", "ItemClassId", "INTEGER NULL");
         AddColumn(db, "Items", "ItemSubtypeId", "INTEGER NULL");
         AddColumn(db, "Items", "IsQuarantined", "INTEGER NOT NULL DEFAULT 0");
@@ -33,7 +44,7 @@ public static class SchemaUpgrader
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_ItemSubtypeId" ON "Items" ("ItemSubtypeId");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_IsQuarantined" ON "Items" ("IsQuarantined");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_Items_NeedsReview" ON "Items" ("NeedsReview");""");
-        AddColumn(db, "InventoryActions", "Kind", "TEXT NOT NULL DEFAULT 'Task'");
+        db.Database.ExecuteSqlRaw("REINDEX IX_InventoryActions_Kind;");
         EnsurePhotoInbox(db);
         AddColumn(db, "PhotoInboxes", "RotationDegrees", "INTEGER NOT NULL DEFAULT 0");
         AddColumn(db, "PhotoInboxes", "UpdatedAt", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'");
@@ -46,12 +57,10 @@ public static class SchemaUpgrader
         AddColumn(db, "AiItemSuggestions", "InputTokens", "INTEGER NULL");
         AddColumn(db, "AiItemSuggestions", "OutputTokens", "INTEGER NULL");
         EnsureAiSettings(db);
+        AddColumn(db, "AiSettings", "ProModel", "TEXT NOT NULL DEFAULT 'gpt-6-astra'");
         BackfillItemCodes(db);
         db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Items_Code_Active" ON "Items" ("Code") WHERE "ArchivedAt" IS NULL AND "Code" IS NOT NULL AND trim("Code") <> '';""");
         NormalizeContainerTypes(db);
-        BackfillCategoryTags(db);
-        BackfillQuarantineFlag(db);
-        CleanupItemClassificationTestData(db);
         BackfillItemConditions(db);
         BackfillTimestamps(db);
         BackfillBoxCoverPhotos(db);
@@ -106,6 +115,7 @@ public static class SchemaUpgrader
                 CONSTRAINT "CK_InventoryActions_Priority" CHECK ("Priority" BETWEEN 1 AND 5)
             );
             """);
+        AddColumn(db, "InventoryActions", "Kind", "TEXT NOT NULL DEFAULT 'Task'");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_Status" ON "InventoryActions" ("Status");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_Kind" ON "InventoryActions" ("Kind");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_InventoryActions_LinkedEntityType_LinkedEntityId" ON "InventoryActions" ("LinkedEntityType", "LinkedEntityId");""");
@@ -234,95 +244,6 @@ public static class SchemaUpgrader
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_ItemClasses_IsActive_SortOrder_Name" ON "ItemClasses" ("IsActive", "SortOrder", "Name");""");
         db.Database.ExecuteSqlRaw("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemSubtypes_ItemClassId_Name" ON "ItemSubtypes" ("ItemClassId", "Name");""");
         db.Database.ExecuteSqlRaw("""CREATE INDEX IF NOT EXISTS "IX_ItemSubtypes_ItemClassId_IsActive_SortOrder_Name" ON "ItemSubtypes" ("ItemClassId", "IsActive", "SortOrder", "Name");""");
-    }
-
-    private static void BackfillCategoryTags(InventoryDbContext db)
-    {
-        db.Database.ExecuteSqlRaw("""
-            INSERT OR IGNORE INTO "Tags" ("Name", "Color", "CreatedAt", "UpdatedAt")
-            SELECT DISTINCT trim("Category"), '#48ffb0', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-            FROM "Items"
-            WHERE "Category" IS NOT NULL AND trim("Category") <> '';
-            """);
-        db.Database.ExecuteSqlRaw("""
-            INSERT OR IGNORE INTO "ItemTags" ("ItemId", "TagId")
-            SELECT i."Id", t."Id"
-            FROM "Items" i
-            JOIN "Tags" t ON t."Name" = trim(i."Category")
-            WHERE i."Category" IS NOT NULL AND trim(i."Category") <> '';
-            """);
-    }
-
-    private static void BackfillQuarantineFlag(InventoryDbContext db)
-    {
-        db.Database.ExecuteSqlRaw("""
-            UPDATE "Items"
-            SET "IsQuarantined" = 1
-            WHERE "Id" IN (
-                SELECT it."ItemId"
-                FROM "ItemTags" it
-                JOIN "Tags" t ON t."Id" = it."TagId"
-                WHERE t."Name" = 'Cuarentena'
-            )
-            OR "Code" IN ('IT-000-045', 'IT-000-154', 'IT-000-278');
-            """);
-
-        db.Database.ExecuteSqlRaw("""
-            DELETE FROM "ItemTags"
-            WHERE "TagId" IN (SELECT "Id" FROM "Tags" WHERE "Name" = 'Cuarentena')
-            AND "ItemId" IN (SELECT "Id" FROM "Items" WHERE "IsQuarantined" = 1);
-            """);
-    }
-
-    private static void CleanupItemClassificationTestData(InventoryDbContext db)
-    {
-        db.Database.ExecuteSqlRaw("""
-            UPDATE "Items"
-            SET "ItemSubtypeId" = NULL
-            WHERE "ItemSubtypeId" IN (
-                SELECT s."Id"
-                FROM "ItemSubtypes" s
-                JOIN "ItemClasses" c ON c."Id" = s."ItemClassId"
-                WHERE c."Name" = 'Prueba' OR s."Name" = 'Subtipo prueba'
-            );
-            """);
-
-        db.Database.ExecuteSqlRaw("""
-            UPDATE "Items"
-            SET "ItemClassId" = NULL
-            WHERE "ItemClassId" IN (SELECT "Id" FROM "ItemClasses" WHERE "Name" = 'Prueba');
-            """);
-
-        db.Database.ExecuteSqlRaw("""
-            DELETE FROM "ItemTags"
-            WHERE "ItemId" = (SELECT "Id" FROM "Items" WHERE "Code" = 'IT-000-190')
-            AND "TagId" = (SELECT "Id" FROM "Tags" WHERE "Name" = 'Lote / Kit (temporal)');
-            """);
-
-        db.Database.ExecuteSqlRaw("""
-            DELETE FROM "ItemSubtypes"
-            WHERE ("Name" = 'Subtipo prueba' OR "ItemClassId" IN (SELECT "Id" FROM "ItemClasses" WHERE "Name" = 'Prueba'))
-            AND "Id" NOT IN (SELECT DISTINCT "ItemSubtypeId" FROM "Items" WHERE "ItemSubtypeId" IS NOT NULL);
-            """);
-
-        db.Database.ExecuteSqlRaw("""
-            DELETE FROM "ItemClasses"
-            WHERE "Name" = 'Prueba'
-            AND "Id" NOT IN (SELECT DISTINCT "ItemClassId" FROM "Items" WHERE "ItemClassId" IS NOT NULL)
-            AND "Id" NOT IN (SELECT DISTINCT "ItemClassId" FROM "ItemSubtypes");
-            """);
-
-        db.Database.ExecuteSqlRaw("""
-            UPDATE "ItemClasses"
-            SET "IsActive" = 0
-            WHERE "Name" = 'Prueba';
-            """);
-
-        db.Database.ExecuteSqlRaw("""
-            UPDATE "ItemSubtypes"
-            SET "IsActive" = 0
-            WHERE "Name" = 'Subtipo prueba';
-            """);
     }
 
     private static void BackfillItemConditions(InventoryDbContext db)

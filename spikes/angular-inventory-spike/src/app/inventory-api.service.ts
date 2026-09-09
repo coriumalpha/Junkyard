@@ -363,7 +363,7 @@ export interface ArchiveBox {
   archivedAt: string | null;
   coverUrl: string | null;
   rotationDegrees: number;
-  legacyUrl: string;
+  url: string;
 }
 
 export interface ArchiveItem {
@@ -376,7 +376,7 @@ export interface ArchiveItem {
   archivedAt: string | null;
   coverUrl: string | null;
   rotationDegrees: number;
-  legacyUrl: string;
+  url: string;
 }
 
 export interface ArchivePhoto {
@@ -414,12 +414,15 @@ export interface InventoryAction {
   status: string;
   linkedLabel: string;
   spaUrl: string | null;
-  legacyUrl: string | null;
   createdAt: string;
   completedAt: string | null;
 }
 
+export interface RelatedItem { id: number; code: string; name: string; archived: boolean; }
+
 export interface InventoryItemDetail {
+  descriptionMarkdown: boolean;
+  relatedItems: RelatedItem[];
   id: number;
   code: string;
   name: string;
@@ -448,13 +451,15 @@ export interface InventoryItemDetail {
   createdAt: string;
   updatedAt: string;
   box: InventoryItemBox | null;
-  legacyUrl: string;
+  url: string;
   photos: InventoryPhoto[];
   actions: InventoryAction[];
   comments: InventoryAction[];
 }
 
 export interface InventoryItemUpdate {
+  descriptionMarkdown?: boolean;
+  relatedItemIds?: number[];
   code: string;
   name: string;
   category: string;
@@ -518,7 +523,7 @@ export interface InventoryBoxDetail {
   parent: InventoryBoxLink | null;
   children: InventoryBoxLink[];
   items: InventoryItem[];
-  legacyUrl: string;
+  url: string;
   photos: InventoryPhoto[];
   createdAt: string;
   updatedAt: string;
@@ -609,7 +614,7 @@ export interface PhotoInboxItem {
   processedAt: string | null;
   sourceBox: InventoryBoxLink | null;
   notes: string | null;
-  legacyReviewUrl: string;
+  reviewUrl: string;
 }
 
 export interface PhotoReviewResponse {
@@ -639,6 +644,8 @@ export interface PhotoReviewPhoto {
 }
 
 export interface PhotoReviewCreateItem {
+  descriptionMarkdown?: boolean;
+  relatedItemIds?: number[];
   ids: number[];
   boxId: number | null;
   itemClassId?: number | null;
@@ -653,13 +660,14 @@ export interface PhotoReviewCreateItem {
 }
 
 export interface AiStatus {
+  proModel?: string;
   enabled: boolean;
   provider: string;
   model: string;
   cheapModel: string;
   imageDetail: 'low' | 'high' | 'auto';
   maxImagesPerRequest: number;
-  defaultMode: 'normal' | 'cheap';
+  defaultMode: 'normal' | 'cheap' | 'pro';
   hasApiKey: boolean;
   keySource: 'None' | 'Environment' | 'Stored' | 'EnvironmentOverridesStored';
   maskedApiKey: string | null;
@@ -671,16 +679,17 @@ export interface AiStatus {
 }
 
 export interface AiSettingsUpdate {
+  proModel?: string;
   enabled: boolean;
   provider: string;
   model: string;
   cheapModel: string;
   imageDetail: 'low' | 'high' | 'auto';
   maxImagesPerRequest: number;
-  defaultMode: 'normal' | 'cheap';
+  defaultMode: 'normal' | 'cheap' | 'pro';
 }
 
-export type AiAnalysisMode = 'fast' | 'detailed';
+export type AiAnalysisMode = 'fast' | 'detailed' | 'pro';
 
 export interface AiConnectionTestResponse {
   ok: boolean;
@@ -691,6 +700,7 @@ export interface AiConnectionTestResponse {
 }
 
 export interface AiSuggestItemRequest {
+  webSearch?: boolean;
   photoIds: number[];
   mode: AiAnalysisMode | 'cheap' | 'normal';
   detail: 'low' | 'high' | 'auto';
@@ -698,6 +708,8 @@ export interface AiSuggestItemRequest {
 }
 
 export interface AiSuggestItemResponse {
+  webSources?: {url:string;title:string}[];
+  webSearchUsed?: boolean;
   suggestionId: number | null;
   identification: AiIdentificationInfo;
   technicalFacts: AiTechnicalFact[];
@@ -989,6 +1001,10 @@ export class InventoryApiService {
     return this.http.post<InventoryAction>(`/api/boxes/${id}/comments`, input);
   }
 
+  fetchRelatedItemOptions(): Observable<RelatedItem[]> {
+    return this.http.get<RelatedItem[]>('/api/items/related-options');
+  }
+
   fetchItem(id: number): Observable<InventoryItemDetail> {
     return this.http.get<InventoryItemDetail>(`/api/items/${id}`);
   }
@@ -1152,7 +1168,7 @@ export class InventoryApiService {
     return this.http.delete<AiStatus>('/api/ai/settings/api-key');
   }
 
-  testAiConnection(mode: 'normal' | 'cheap'): Observable<AiConnectionTestResponse> {
+  testAiConnection(mode: 'normal' | 'cheap' | 'pro'): Observable<AiConnectionTestResponse> {
     return this.http.post<AiConnectionTestResponse>('/api/ai/settings/test', { mode });
   }
 

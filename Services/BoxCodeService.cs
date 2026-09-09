@@ -16,7 +16,7 @@ public static class BoxCodeService
         var usedSequences = new HashSet<int>();
         foreach (var code in codes)
         {
-            if (Box.TryParseCanonicalCtSequence(code, out var sequence))
+            if (Box.TryParseCtSequence(code, out var sequence))
             {
                 usedSequences.Add(sequence);
             }
