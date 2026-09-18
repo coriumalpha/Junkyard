@@ -24,7 +24,7 @@
 
 ## Acceso y pérdidas aceptadas
 
-Única UI: http://10.0.0.76:8088/. Backend :8089 solo API/recursos; raíz y rutas Razor 404, sin redirecciones. La antigua impresión/QR renderizada por Razor deja de existir; no se ha añadido una sustitución Angular ni una capa de compatibilidad de enlaces.
+Única UI: http://10.0.66.10:8088/. Backend :8089 solo API/recursos; raíz y rutas Razor 404, sin redirecciones. La antigua impresión/QR renderizada por Razor deja de existir; no se ha añadido una sustitución Angular ni una capa de compatibilidad de enlaces.
 
 ## Verificación
 

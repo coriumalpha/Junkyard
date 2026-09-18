@@ -7,4 +7,4 @@
 - `node ../../scripts/check-inventory-codes.cjs`: verificación de formato.
 - Proxy: `/api`, `/uploads`, `/photo-derivatives` hacia `127.0.0.1:8089`.
 - Backend :8089: solo API y recursos, `/health` para comprobar salud; raíz 404 intencional.
-- Acceso LAN: http://10.0.0.76:8088/
+- Acceso LAN: http://10.0.66.10:8088/
