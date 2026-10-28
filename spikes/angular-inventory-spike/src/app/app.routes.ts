@@ -23,16 +23,19 @@ export const routes: Routes = [
   },
   {
     path: 'item/new',
+    canDeactivate: [(component: {hasUnsavedChanges: () => boolean}) => !component.hasUnsavedChanges() || confirm('Hay un objeto sin guardar. ¿Salir y descartar el borrador?')],
     title: 'Nuevo ítem · Junkyard',
     loadComponent: () => import('./item-create-page.component').then((m) => m.ItemCreatePageComponent)
   },
   {
     path: 'item/:id',
+    canDeactivate: [(component: {hasUnsavedChanges: () => boolean}) => !component.hasUnsavedChanges() || confirm('Hay cambios sin guardar. ¿Salir de la ficha?')],
     title: 'Ítem · Junkyard',
     loadComponent: () => import('./detail-page.component').then((m) => m.DetailPageComponent)
   },
   {
     path: 'boxes/:code',
+    canDeactivate: [(component: {hasUnsavedChanges: () => boolean}) => !component.hasUnsavedChanges() || confirm('Hay cambios sin guardar. ¿Salir del contenedor?')],
     title: 'Contenedor · Junkyard',
     loadComponent: () => import('./detail-page.component').then((m) => m.DetailPageComponent)
   },
@@ -43,6 +46,7 @@ export const routes: Routes = [
   },
   {
     path: 'photos/review',
+    canDeactivate: [(component: {hasUnsavedChanges: () => boolean}) => !component.hasUnsavedChanges() || confirm('Hay una propuesta sin guardar. ¿Salir de la revisión?')],
     title: 'Revisión de fotos · Junkyard',
     loadComponent: () => import('./photo-review-page.component').then((m) => m.PhotoReviewPageComponent)
   },

@@ -86,3 +86,5 @@ a.hierarchy-node:hover {
   margin-left: 21px;
   background: linear-gradient(180deg, rgba(72, 255, 176, 0.5), rgba(255, 79, 216, 0.35));
 }
+
+.compact{gap:0}.compact .hierarchy-node{padding:8px 0;border:0;border-radius:0;background:transparent;grid-template-columns:24px minmax(0,1fr);gap:10px}.compact .node-marker{width:24px;height:24px;background:none}.compact .node-cover,.compact .hierarchy-connector{display:none}.compact .hierarchy-node strong{font-size:14px;font-weight:500;line-height:1.5}.compact .hierarchy-node small{font-size:12px}.compact .tone-item:last-child{display:none}.compact a:hover strong{text-decoration:underline;color:var(--app-accent)}

@@ -1,4 +1,4 @@
-<div class="hierarchy-trail">
+<div class="hierarchy-trail" [class.compact]="compact">
   @for (node of nodes; track $index) {
     @if ($index > 0) {
       <span class="hierarchy-connector" aria-hidden="true"></span>

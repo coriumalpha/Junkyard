@@ -1,234 +1,28 @@
-<main class="review-shell">
-  <header class="review-header">
-    <div>
-      <p class="eyebrow">Fotos</p>
-      <h1>Revisión</h1>
-      <p>{{ review()?.pendingCount ?? 0 }} pendientes · {{ review()?.processedCount ?? 0 }} procesadas</p>
-    </div>
-    <div class="shortcut-bar">
-      <span>Q/E girar</span>
-      <span>A ítem</span>
-      <span>B caja</span>
-      <span>N nuevo</span>
-      <span>D descartar</span>
-      <span>Espacio seleccionar</span>
-      <span>S saltar</span>
-    </div>
-  </header>
-
-  @if (message()) {
-    <section class="state-panel success">
-      <mat-icon>check_circle</mat-icon>
-      <span>{{ message() }}</span>
-      @if (lastAffectedIds().length) {
-        <button mat-button type="button" (click)="undo()" [disabled]="busy()">Deshacer</button>
-      }
-    </section>
-  }
-
-  @if (error()) {
-    <section class="state-panel error">
-      <mat-icon>warning</mat-icon>
-      <span>{{ error() }}</span>
-    </section>
-  }
-
-  @if (loading()) {
-    <section class="state-panel">
-      <mat-progress-spinner mode="indeterminate" diameter="48" />
-      <span>Cargando revisión...</span>
-    </section>
-  } @else if (!current()) {
-    <section class="state-panel empty">
-      <mat-icon>task_alt</mat-icon>
-      <span>No hay fotos pendientes.</span>
-    </section>
-  } @else {
-    <section class="review-grid" [class.detailed-layout]="panel() === 'create' && workspaceMode() === 'detailed'">
-      <mat-card class="review-photo-card">
-        <div class="review-photo-frame">
-          <div class="review-photo-zoom">
-            <img [src]="assetUrl(current()!.previewUrl)!" [style.transform]="'rotate(' + current()!.rotationDegrees + 'deg)'" [alt]="current()!.originalFilename" />
-          </div>
-        </div>
-        <div class="photo-caption">
-          <div>
-            <strong>{{ current()!.originalFilename }}</strong>
-            <small>{{ current()!.importedAt | date:'short' }}</small>
-            @if (current()!.sourceBox) {
-              <span>{{ current()!.sourceBox!.code | inventoryCode }} · {{ current()!.sourceBox!.name }}</span>
-            }
-          </div>
-          <button mat-stroked-button type="button" (click)="toggleSelected(current()!)" [class.selected-action]="isSelected(current()!)">
-            <span class="keycap">Espacio</span>
-            {{ isSelected(current()!) ? 'Seleccionada' : 'Seleccionar' }}
-          </button>
-        </div>
-        <section class="filmstrip" aria-label="Fotos pendientes cercanas">
-          @for (photo of review()!.pending; track photo.id) {
-            <button
-              type="button"
-              class="film"
-              [class.current]="photo.id === current()!.id"
-              [class.selected]="isSelected(photo)"
-              [attr.aria-current]="photo.id === current()!.id ? 'true' : null"
-              [attr.aria-pressed]="isSelected(photo)"
-              (click)="onFilmClick(photo, $event)">
-              <img [src]="assetUrl(photo.thumbUrl)!" [style.transform]="'rotate(' + photo.rotationDegrees + 'deg)'" [alt]="photo.originalFilename" />
-              <span class="film-state active-state" aria-hidden="true">
-                <mat-icon>visibility</mat-icon>
-              </span>
-              <span class="film-check" (click)="toggleSelected(photo); $event.stopPropagation()" [matTooltip]="isSelected(photo) ? 'Quitar de la acción' : 'Añadir a la acción'">
-                <mat-icon>{{ isSelected(photo) ? 'check' : 'add' }}</mat-icon>
-              </span>
-            </button>
-          }
-        </section>
-      </mat-card>
-
-      <aside class="review-actions">
-        <mat-card class="action-card">
-          <p class="selection-summary">
-            {{ selectionSummary() }}
-          </p>
-          <div class="split-actions">
-            <button mat-button type="button" (click)="selectAllPending()" [disabled]="busy() || !review()?.pending?.length">
-              <mat-icon>select_all</mat-icon>
-              Todas
-            </button>
-            <button mat-button type="button" (click)="clearSelection()" [disabled]="busy() || !selectedIds().length">
-              <mat-icon>close</mat-icon>
-              Limpiar
-            </button>
-          </div>
-          <button mat-flat-button type="button" (click)="openPanel('create')" [disabled]="busy()">
-            <mat-icon>add_box</mat-icon>
-            <span class="keycap">N</span>
-            Crear ítem
-            @if (actionSelectionSize() > 1) {
-              <span>({{ actionSelectionSize() }})</span>
-            }
-          </button>
-          <button mat-stroked-button type="button" (click)="openPanel('assignItem')" [disabled]="busy()">
-            <mat-icon>category</mat-icon>
-            <span class="keycap">A</span>
-            Asociar a ítem
-            @if (actionSelectionSize() > 1) {
-              <span>({{ actionSelectionSize() }})</span>
-            }
-          </button>
-          <button mat-stroked-button type="button" (click)="openPanel('assignBox')" [disabled]="busy()">
-            <mat-icon>inventory_2</mat-icon>
-            <span class="keycap">B</span>
-            Asociar a caja
-            @if (actionSelectionSize() > 1) {
-              <span>({{ actionSelectionSize() }})</span>
-            }
-          </button>
-          <div class="split-actions">
-            <button mat-stroked-button type="button" (click)="rotate(-90)" [disabled]="busy()">
-              <mat-icon>rotate_left</mat-icon>
-              <span class="keycap">Q</span>
-            </button>
-            <button mat-stroked-button type="button" (click)="rotate(90)" [disabled]="busy()">
-              <mat-icon>rotate_right</mat-icon>
-              <span class="keycap">E</span>
-            </button>
-          </div>
-          <button mat-stroked-button type="button" (click)="discard()" [disabled]="busy()">
-            <mat-icon>delete</mat-icon>
-            <span class="keycap">D</span>
-            Descartar
-            @if (actionSelectionSize() > 1) {
-              <span>({{ actionSelectionSize() }})</span>
-            }
-          </button>
-          <div class="split-actions">
-            <button mat-button type="button" (click)="skip(-1)" [disabled]="!review()?.previousId">
-              <mat-icon>arrow_back</mat-icon>
-              <span class="keycap">←</span>
-            </button>
-            <button mat-button type="button" (click)="skip(1)" [disabled]="!review()?.nextId">
-              <mat-icon>arrow_forward</mat-icon>
-              <span class="keycap">S/→</span>
-            </button>
-          </div>
-        </mat-card>
-
-        @if (panel() === 'assignBox') {
-          <mat-card class="action-card">
-            <app-searchable-select
-              #assignBoxSelect
-              label="Contenedor"
-              [value]="assignBoxId()"
-              [options]="boxOptions()"
-              placeholder="Buscar contenedor..."
-              (valueChange)="assignBoxId.set($any($event))" />
-            <button mat-flat-button type="button" (click)="assignBox()" [disabled]="busy()">Asignar</button>
-          </mat-card>
-        }
-
-        @if (panel() === 'assignItem') {
-          <mat-card class="action-card">
-            <app-searchable-select
-              #assignItemSelect
-              label="Ítem"
-              [value]="assignItemId()"
-              [options]="itemOptions()"
-              placeholder="Buscar ítem..."
-              (valueChange)="assignItemId.set($any($event))" />
-            <button mat-flat-button type="button" (click)="assignItem()" [disabled]="busy()">Asignar</button>
-          </mat-card>
-        }
-
-        @if (panel() === 'create') {
-          <mat-card class="action-card create-item-card" (keydown.control.enter)="createItem(); $event.preventDefault()" (keydown.escape)="closePanel()">
-            <div class="panel-title-row">
-              <strong>{{ workspaceMode() === 'detailed' ? 'Nuevo ítem detallado' : 'Nuevo ítem rápido' }}</strong>
-              <span>Ctrl+Enter crea · Esc cierra</span>
-            </div>
-            <div class="workspace-mode-row">
-              <mat-button-toggle-group [ngModel]="workspaceMode()" (ngModelChange)="setWorkspaceMode($event)" aria-label="Modo de creación">
-                <mat-button-toggle value="quick">Rápido</mat-button-toggle>
-                <mat-button-toggle value="detailed">Detallado</mat-button-toggle>
-              </mat-button-toggle-group>
-              <span>{{ workspaceMode() === 'detailed' ? 'Ficha completa, IA y validación técnica.' : 'Campos mínimos para crear y seguir.' }}</span>
-            </div>
-
-            @if (workspaceMode() === 'detailed') {
-              <nav class="detail-stepper" aria-label="Flujo detallado">
-                <button type="button" [class.active]="aiStep() === 'analyze'" (click)="setAiStep('analyze')">1. Analizar</button>
-                <button type="button" [class.active]="aiStep() === 'review'" [disabled]="!aiSuggestion()" (click)="setAiStep('review')">2. Revisar propuesta</button>
-                <button type="button" [class.active]="aiStep() === 'final'" (click)="setAiStep('final')">3. Ficha final</button>
-              </nav>
-            }
-
-            @if (workspaceMode() === 'detailed' && aiStep() === 'analyze') {
-              <mat-form-field appearance="outline" class="ai-hint-field">
+<main class="review-shell"><header class="review-header"><div><a routerLink="/photos/inbox" class="back-link">← Bandeja de fotos</a><h1>Convertir fotos en inventario</h1><p>{{review()?.pendingCount ?? 0}} pendientes · una decisión cada vez</p></div><details class="keyboard-help"><summary>Atajos</summary><p>N nuevo · A asociar a ítem · B a contenedor · Q/E girar · Espacio seleccionar · S siguiente · Ctrl+Z deshacer</p></details></header>
+@if(message()){<section class="state-panel success" role="status"><mat-icon>check_circle</mat-icon><span>{{message()}}</span>@if(lastAffectedIds().length){<button mat-button (click)="undo()" [disabled]="busy()">Deshacer</button>}</section>}
+@if(error()){<section class="state-panel error" role="alert"><mat-icon>warning</mat-icon><span>{{error()}}</span></section>}
+@if(loading()){<section class="state-panel"><mat-progress-spinner diameter="36"/><span>Cargando fotos…</span></section>}@else if(!current()){<section class="state-panel"><mat-icon>task_alt</mat-icon><div><h2>No quedan fotos pendientes</h2><a mat-button routerLink="/photos/inbox">Volver a la bandeja</a></div></section>}@else{
+<section class="review-workspace"><aside class="photo-evidence" [class.condensed]="panel()!=='none' && !photoExpanded()"><div class="evidence-heading"><span>{{panel()==='none'?'1 · Selecciona las fotos de un objeto':'Fotos de este objeto'}}</span><strong>{{actionSelectionSize()}} {{actionSelectionSize()===1?'foto':'fotos'}}</strong></div>@if(panel()!=='none'){<button mat-button class="photo-expand" (click)="photoExpanded.set(!photoExpanded())">{{photoExpanded()?'Reducir foto':'Ver foto ampliada'}}</button>}<div class="review-photo-frame"><app-fitted-photo [src]="assetUrl(current()!.previewUrl)!" [rotation]="current()!.rotationDegrees" [alt]="current()!.originalFilename" [hoverZoom]="true"/></div><p class="photo-filename">{{current()!.originalFilename}}</p>
+@if(panel()==='none'){<div class="photo-tools"><button mat-icon-button (click)="rotate(-90)" [disabled]="busy()" aria-label="Girar izquierda"><mat-icon>rotate_left</mat-icon></button><button mat-icon-button (click)="rotate(90)" [disabled]="busy()" aria-label="Girar derecha"><mat-icon>rotate_right</mat-icon></button><button mat-stroked-button (click)="toggleSelected(current()!)" [disabled]="busy()">{{isSelected(current()!)?'Quitar selección':'Seleccionar foto'}}</button></div>}
+<div class="filmstrip" aria-label="Fotografías"><div class="filmstrip-inner">@for(photo of visiblePhotos();track photo.id){<button class="film" [class.current]="photo.id===current()!.id" [class.selected]="isSelected(photo)" [attr.aria-label]="photo.originalFilename" [attr.aria-pressed]="isSelected(photo)" (click)="onFilmClick(photo,$event)"><img [src]="assetUrl(photo.thumbUrl)!" [style.transform]="'rotate('+photo.rotationDegrees+'deg)'" [alt]="photo.originalFilename"/>@if(isSelected(photo)){<span class="film-check">✓</span>}</button>}</div></div>
+@if(panel()==='none'){<div class="selection-tools"><button mat-button (click)="selectAllPending()" [disabled]="busy()">Seleccionar todas</button><button mat-button (click)="clearSelection()" [disabled]="busy()">Limpiar</button></div><p class="step-help">Ctrl/clic añade fotos. Sin selección se usará la foto visible. Varias fotos crearán <strong>un único objeto</strong>.</p><div class="queue-navigation"><button mat-button (click)="skip(-1)" [disabled]="busy() || !review()?.previousId">← Anterior</button><button mat-button (click)="skip(1)" [disabled]="busy() || !review()?.nextId">Siguiente →</button></div>}@else{<p class="step-help">Selección fijada para esta operación. Vuelve a las fotos para cambiarla.</p>}</aside>
+<section class="workflow-panel">
+@if(panel()==='none'){<div class="workflow-intro"><p class="eyebrow">2 · Decide el destino</p><h2>¿Qué hay en estas fotos?</h2><p>Crea una ficha o añade imágenes a algo que ya existe.</p></div><div class="destination-list"><button class="destination" (click)="openDetailedMode()" [disabled]="busy()"><mat-icon>auto_awesome</mat-icon><span><strong>Crear un objeto con ayuda de IA</strong><small>Identificar, revisar la propuesta y confirmar.</small></span><mat-icon>arrow_forward</mat-icon></button><button class="destination" (click)="openPanel('create')" [disabled]="busy()"><mat-icon>edit_note</mat-icon><span><strong>Crear un objeto manualmente</strong><small>Nombre, ubicación y datos que ya conoces.</small></span><mat-icon>arrow_forward</mat-icon></button><button class="destination" (click)="openPanel('assignItem')" [disabled]="busy()"><mat-icon>add_photo_alternate</mat-icon><span><strong>Añadir a un objeto existente</strong><small>No crea otra ficha.</small></span><mat-icon>arrow_forward</mat-icon></button><button class="destination" (click)="openPanel('assignBox')" [disabled]="busy()"><mat-icon>warehouse</mat-icon><span><strong>Añadir a un contenedor</strong><small>Fotografiar la caja o su contenido.</small></span><mat-icon>arrow_forward</mat-icon></button></div><div class="discard-action"><button mat-button (click)="discard()" [disabled]="busy()">Descartar {{actionSelectionSize()===1?'esta foto':'estas fotos'}}</button><small>Se pueden recuperar desde la bandeja.</small></div>}
+@else{<div class="workflow-heading"><button mat-button (click)="closePanel()" [disabled]="busy() || aiBusy()">← Volver a las fotos</button><span>{{actionSelectionSize()}} fotos · {{panel()==='create'?'nuevo objeto':'asociar'}}</span></div>
+@if(panel()==='assignItem' || panel()==='assignBox'){<h2>{{panel()==='assignItem'?'Selecciona el objeto':'Selecciona el contenedor'}}</h2><p class="step-help">Se añadirán las fotos seleccionadas. Los demás datos no cambian.</p>@if(panel()==='assignItem'){<app-searchable-select #assignItemSelect label="Objeto existente" [value]="assignItemId()" [options]="itemOptions()" (valueChange)="assignItemId.set($any($event))"/><button mat-flat-button (click)="assignItem()" [disabled]="busy() || !assignItemId()">Añadir {{actionSelectionSize()}} fotos</button>}@else{<app-searchable-select #assignBoxSelect label="Contenedor" [value]="assignBoxId()" [options]="boxOptions()" (valueChange)="assignBoxId.set($any($event))"/><button mat-flat-button (click)="assignBox()" [disabled]="busy() || !assignBoxId()">Añadir {{actionSelectionSize()}} fotos</button>}}
+@if(panel()==='create'){<div class="create-workflow" (keydown.control.enter)="createItem();$event.preventDefault()">
+@if(workspaceMode()==='detailed'){<nav class="workflow-steps" aria-label="Crear con IA"><button [class.active]="aiStep()==='analyze'" (click)="setAiStep('analyze')" [disabled]="aiBusy()">1 Preparar</button><button [class.active]="aiStep()==='review'" (click)="setAiStep('review')" [disabled]="!aiSuggestion() || aiBusy()">2 Revisar</button><button [class.active]="aiStep()==='final'" (click)="setAiStep('final')" [disabled]="aiBusy()">3 Completar</button></nav>}
+@if(workspaceMode()==='detailed' && aiStep()==='analyze'){<h2>Ayuda a identificar el objeto</h2><p class="step-help">Añade lo que sabes. El análisis enviará estas fotos al proveedor de IA configurado.</p>              <mat-form-field appearance="outline" class="ai-hint-field">
                 <mat-label>Pista para IA</mat-label>
                 <textarea
                   matInput
                   rows="2"
-                  maxlength="3000"
+                  maxlength="500"
                   placeholder="Ej.: es un repuesto, una placa, un lote, ignora el fondo…"
                   [ngModel]="aiHint()"
                   (ngModelChange)="setAiHint($event)"></textarea>
                 <mat-hint align="end">{{ aiHintLength() }}/500</mat-hint>
               </mat-form-field>
-              <div class="ai-tool">
-                <div>
-                  <strong>Varita IA</strong>
-                  <span>{{ aiUnavailableReason() ?? 'Lista para analizar las fotos seleccionadas.' }}</span>
-                </div>
-                <button mat-stroked-button type="button" (click)="suggestWithAi()" [disabled]="busy() || aiBusy() || !!aiUnavailableReason()" [matTooltip]="aiUnavailableReason() ?? ''">
-                  @if (aiBusy()) {
-                    <mat-progress-spinner mode="indeterminate" diameter="18" />
-                  } @else {
-                    <mat-icon>auto_fix_high</mat-icon>
-                  }
-                  {{ workspaceMode() === 'detailed' ? 'Analizar fotografías' : 'Sugerir con IA' }}
-                </button>
-              </div>
               <div class="ai-mode-row">
                 <mat-button-toggle-group [ngModel]="aiMode()" (ngModelChange)="setAiMode($event)" aria-label="Modo de análisis IA">
                   <mat-button-toggle value="fast">Rápido</mat-button-toggle>
@@ -259,71 +53,34 @@
                   <strong>{{ aiSuggestion()!.model }} · {{ aiSuggestion()!.analysisMode }} · detail={{ aiSuggestion()!.imageDetail }}</strong>
                 </div>
               }
-              <div class="detail-sticky-actions">
-                <button mat-stroked-button type="button" (click)="setWorkspaceMode('quick')">Volver a rápido</button>
-                <button mat-flat-button type="button" (click)="setAiStep('review')" [disabled]="!aiSuggestion()">Revisar propuesta</button>
-              </div>
-            }
-
-            @if (aiSuggestion()?.webSources?.length) { <section class="ai-sources"><h3>Fuentes consultadas</h3>@for(source of aiSuggestion()!.webSources;track source.url){<a [href]="source.url" target="_blank" rel="noopener noreferrer">{{source.title}} ↗</a>}</section> }
-            @if (aiMode() === 'pro' && aiSuggestion() && !aiSuggestion()!.webSearchUsed) { <p class="classification-note">Este análisis no consultó internet: la propuesta procede de las fotos y el contexto aportado.</p> }
-            @if (workspaceMode() === 'detailed' && aiStep() === 'review') {
-              @if (aiSuggestion()) {
-                <section class="ai-suggestion-panel">
-                <div class="panel-title-row">
-                  <strong>Propuesta IA</strong>
-                  <span>{{ aiSuggestion()!.model }} · {{ aiSuggestion()!.analysisMode }} · detail={{ aiSuggestion()!.imageDetail }}</span>
+              <div class="ai-tool">
+                <div>
+                  <strong>Identificar este objeto</strong>
+                  <span>{{ aiUnavailableReason() ?? 'Lista para analizar las fotos seleccionadas.' }}</span>
                 </div>
-                @if (aiSelectionMismatch()) {
+                <button mat-stroked-button type="button" (click)="suggestWithAi()" [disabled]="busy() || aiBusy() || !!aiUnavailableReason()" [matTooltip]="aiUnavailableReason() ?? ''">
+                  @if (aiBusy()) {
+                    <mat-progress-spinner mode="indeterminate" diameter="18" />
+                  } @else {
+                    <mat-icon>auto_fix_high</mat-icon>
+                  }
+                  {{ workspaceMode() === 'detailed' ? 'Analizar fotografías' : 'Sugerir con IA' }}
+                </button>
+              </div>
+<button mat-button (click)="setAiStep('final')" [disabled]="aiBusy()">Continuar sin IA</button>}
+@if(workspaceMode()==='detailed' && aiStep()==='review' && aiSuggestion()){<h2>Revisa antes de incorporar</h2><nav class="proposal-tabs" aria-label="Revisar propuesta"><button type="button" [class.active]="proposalSection()==='identity'" (click)="proposalSection.set('identity')">Nombre y descripción</button><button type="button" [class.active]="proposalSection()==='classification'" (click)="proposalSection.set('classification')">Clasificación</button><button type="button" [class.active]="proposalSection()==='facts'" (click)="proposalSection.set('facts')">Datos y evidencias</button></nav><p class="step-help">Marca lo que quieres incorporar. La IA no guarda cambios en el inventario.</p><div [hidden]="proposalSection()!=='identity'">                @if (aiSelectionMismatch()) {
                   <div class="ai-sync-warning">
                     <mat-icon>sync_problem</mat-icon>
                     <span>La selección cambió desde el análisis. No apliques esta propuesta sobre otra selección.</span>
                     <button mat-button type="button" (click)="restoreAiSelection()">Restaurar selección IA</button>
                   </div>
                 }
-                @if (aiSuggestion()!.inputTokens || aiSuggestion()!.outputTokens) {
-                  <p class="ai-token-line">Tokens: entrada {{ aiSuggestion()!.inputTokens ?? '?' }} · salida {{ aiSuggestion()!.outputTokens ?? '?' }}</p>
-                }
-                @if (aiSuggestion()!.userHint) {
-                  <details class="ai-used-hint">
-                    <summary>Pista usada</summary>
-                    <p>{{ aiSuggestion()!.userHint }}</p>
-                  </details>
-                }
-
-                @if (aiSuggestion()!.identification) {
-                  <details class="ai-identification ai-used-hint" open>
-                    <summary>Identificación · {{ confidenceLabel(aiSuggestion()!.identification.confidence) }}</summary>
-                    <span>Identificación · {{ confidenceLabel(aiSuggestion()!.identification.confidence) }}</span>
-                    <strong>{{ aiSuggestion()!.identification.genericName }}</strong>
-                    <p>
-                      @if (aiSuggestion()!.identification.manufacturer) {
-                        Fabricante probable: {{ aiSuggestion()!.identification.manufacturer }}.
-                      }
-                      @if (aiSuggestion()!.identification.model) {
-                        Modelo probable: {{ aiSuggestion()!.identification.model }}.
-                      }
-                      @if (aiSuggestion()!.identification.family) {
-                        Familia: {{ aiSuggestion()!.identification.family }}.
-                      }
-                    </p>
-                    @if (aiSuggestion()!.identification.alternatives.length) {
-                      <div class="ai-alternatives">
-                        <span>Alternativas</span>
-                        @for (alternative of aiSuggestion()!.identification.alternatives; track alternative.name) {
-                          <p>{{ alternative.name }} · {{ confidenceLabel(alternative.confidence) }} · {{ alternative.reason }}</p>
-                        }
-                      </div>
-                    }
-                  </details>
-                }
-
                 <section class="proposal-primary-fields">
                   <div class="proposal-field proposal-name-field">
                     <mat-checkbox [checked]="aiUseName()" (change)="setAiFieldSelected('name', $event.checked)" [disabled]="!aiSuggestion()!.proposedName">Nombre</mat-checkbox>
                     <mat-form-field appearance="outline">
                       <mat-label>Nombre propuesto</mat-label>
-                      <input matInput [ngModel]="aiPreviewName()" (ngModelChange)="aiPreviewName.set($event)" />
+                      <input matInput [ngModel]="aiPreviewName()" (ngModelChange)="aiPreviewName.set($event);aiNameEdited.set(true)" />
                     </mat-form-field>
                   </div>
                   <div class="proposal-field proposal-description-field">
@@ -331,7 +88,7 @@
                     <span class="confidence-badge">IA</span>
                     <mat-form-field appearance="outline">
                       <mat-label>Descripción propuesta</mat-label>
-                      <textarea matInput rows="8" [ngModel]="aiPreviewDescription()" (ngModelChange)="aiPreviewDescription.set($event)"></textarea>
+                      <textarea matInput rows="8" [ngModel]="aiPreviewDescription()" (ngModelChange)="aiPreviewDescription.set($event);aiDescriptionEdited.set(true)"></textarea>
                     </mat-form-field>
                   </div>
                   <div class="proposal-field proposal-quantity-field">
@@ -344,7 +101,7 @@
                   </div>
                 </section>
 
-                @if (aiSuggestion()!.suggestedTags.length || aiSuggestion()!.suggestedClass) {
+</div><div [hidden]="proposalSection()!=='classification'">                @if (aiSuggestion()!.suggestedTags.length || aiSuggestion()!.suggestedClass) {
                   <details class="ai-used-hint" open>
                     <summary>Clasificación y tags</summary>
                   @if (aiSuggestion()!.suggestedTags.length) {
@@ -395,9 +152,36 @@
                   </div>
                 }
 
+</div><div [hidden]="proposalSection()!=='facts'">                @if (aiSuggestion()!.identification) {
+                  <details class="ai-identification ai-used-hint">
+                    <summary>Identificación · {{ confidenceLabel(aiSuggestion()!.identification.confidence) }}</summary>
+                    <span>Identificación · {{ confidenceLabel(aiSuggestion()!.identification.confidence) }}</span>
+                    <strong>{{ aiSuggestion()!.identification.genericName }}</strong>
+                    <p>
+                      @if (aiSuggestion()!.identification.manufacturer) {
+                        Fabricante probable: {{ aiSuggestion()!.identification.manufacturer }}.
+                      }
+                      @if (aiSuggestion()!.identification.model) {
+                        Modelo probable: {{ aiSuggestion()!.identification.model }}.
+                      }
+                      @if (aiSuggestion()!.identification.family) {
+                        Familia: {{ aiSuggestion()!.identification.family }}.
+                      }
+                    </p>
+                    @if (aiSuggestion()!.identification.alternatives.length) {
+                      <div class="ai-alternatives">
+                        <span>Alternativas</span>
+                        @for (alternative of aiSuggestion()!.identification.alternatives; track alternative.name) {
+                          <p>{{ alternative.name }} · {{ confidenceLabel(alternative.confidence) }} · {{ alternative.reason }}</p>
+                        }
+                      </div>
+                    }
+                  </details>
+                }
+
                 @if (aiSuggestion()!.technicalFacts.length) {
                   <details class="ai-facts ai-used-hint" open>
-                    <summary>Datos técnicos</summary>
+                    <summary>Datos técnicos</summary><p>Conserva los datos que consideres útiles. Marca «En descripción» para añadirlos al texto al incorporar la propuesta.</p><mat-button-toggle-group [ngModel]="aiDescriptionStyle()" (ngModelChange)="setAiDescriptionStyle($event)" aria-label="Presentación de datos técnicos"><mat-button-toggle value="narrative">En párrafo</mat-button-toggle><mat-button-toggle value="technicalSheet">Como lista técnica</mat-button-toggle></mat-button-toggle-group>
                     <div class="ai-section-title">
                       <span>Datos técnicos</span>
                       <span>{{ includedTechnicalFacts().length }} incluidos · {{ acceptedTechnicalFacts().length }} en descripción</span>
@@ -450,199 +234,18 @@
                   </details>
                 }
 
-                <div class="detail-sticky-actions">
-                  <button mat-stroked-button type="button" (click)="setAiStep('analyze')">Atrás</button>
-                  <button mat-stroked-button type="button" (click)="selectAllAi()">Seleccionar todo</button>
-                  <button mat-stroked-button type="button" (click)="deselectAllAi()">Deseleccionar todo</button>
-                  <button mat-stroked-button type="button" (click)="suggestWithAi(aiMode())" [disabled]="aiBusy()">Reintentar</button>
-                  <button mat-button type="button" (click)="discardAiSuggestion()">Descartar</button>
-                  <button mat-stroked-button type="button" (click)="applySelectedAi()">Aplicar seleccionados</button>
-                  <button mat-flat-button type="button" (click)="applySelectedAi()">Continuar a ficha final</button>
-                </div>
-                </section>
-              }
-            }
-            @if (workspaceMode() === 'detailed' && aiStep() === 'final') {
-              <div class="ai-preview">
-                <div class="ai-section-title">
-                  <span>Ficha final</span>
-                  <span>Editable antes de crear</span>
-                </div>
-                <div class="description-style-row">
-                  <span>Estilo de descripción</span>
-                  <mat-button-toggle-group [ngModel]="aiDescriptionStyle()" (ngModelChange)="setAiDescriptionStyle($event)" aria-label="Estilo de descripción">
-                    <mat-button-toggle value="narrative">Narrativa</mat-button-toggle>
-                    <mat-button-toggle value="technicalSheet">Ficha técnica</mat-button-toggle>
-                  </mat-button-toggle-group>
-                </div>
-                <div class="ai-preview-summary">
-                  <div>
-                    <span>Clasificación final</span>
-                    <strong>{{ aiPreviewClassification() || 'Sin clase' }}</strong>
-                  </div>
-                  <div>
-                    <span>Tags finales</span>
-                    <strong>{{ aiPreviewTagNames().length ? aiPreviewTagNames().join(', ') : 'Sin tags' }}</strong>
-                  </div>
-                  <div>
-                    <span>Datos técnicos en descripción</span>
-                    @if (acceptedTechnicalFacts().length) {
-                      <ul>
-                        @for (fact of acceptedTechnicalFacts(); track technicalFactKey(fact)) {
-                          <li>{{ fact.label }}: {{ fact.value }}</li>
-                        }
-                      </ul>
-                    } @else {
-                      <strong>Ninguno</strong>
-                    }
-                  </div>
-                </div>
-              </div>
-            }
-
-            @if (workspaceMode() === 'quick' || aiStep() === 'final') {
-            <mat-form-field appearance="outline" class="final-name-field">
-              <mat-label>Nombre</mat-label>
-              <input #createNameInput matInput [ngModel]="draftName()" (ngModelChange)="draftName.set($event)" autocomplete="off" />
-            </mat-form-field>
-            <app-description-editor [value]="draftNotes()" [markdown]="draftMarkdown()" (valueChange)="draftNotes.set($event)" (markdownChange)="draftMarkdown.set($event)" />
-
-            <app-tag-picker
-              label="Tags"
-              [value]="draftTagIds()"
-              [tags]="options().tags"
-              [compact]="true"
-              (valueChange)="draftTagIds.set($any($event))" />
-            @if (workspaceMode() === 'detailed') {
-              <div class="classification-row">
-                <app-searchable-select
-                  label="Clase"
-                  [value]="draftItemClassId()"
-                  [options]="itemClassOptions()"
-                  noneLabel="Sin clase"
-                  placeholder="Buscar clase..."
-                  (valueChange)="setDraftItemClassId($event)" />
-                @if (draftItemClassId() && itemSubtypeOptions().length) {
-                  <app-searchable-select
-                    label="Subtipo"
-                    [value]="draftItemSubtypeId()"
-                    [options]="itemSubtypeOptions()"
-                    noneLabel="Sin subtipo"
-                    placeholder="Buscar subtipo..."
-                    (valueChange)="setDraftItemSubtypeId($event)" />
-                } @else {
-                  <div class="classification-note">
-                    <span>{{ selectedItemClass() ? inventoryModeLabel(selectedItemClass()!.inventoryMode) : 'Sin clase' }}</span>
-                  </div>
+@if(aiSuggestion()?.webSources?.length){<section class="ai-sources"><h3>Fuentes consultadas</h3>@for(source of aiSuggestion()!.webSources;track source.url){<a [href]="source.url" target="_blank" rel="noopener noreferrer">{{source.title}} ↗</a>}</section>}<details><summary>Información del análisis</summary>                @if (aiSuggestion()!.inputTokens || aiSuggestion()!.outputTokens) {
+                  <p class="ai-token-line">Tokens: entrada {{ aiSuggestion()!.inputTokens ?? '?' }} · salida {{ aiSuggestion()!.outputTokens ?? '?' }}</p>
                 }
-              </div>
-            }
-            <app-searchable-select
-              label="Contenedor"
-              [value]="draftBoxId()"
-              [options]="boxOptions()"
-              noneLabel="Sin caja"
-              placeholder="Buscar contenedor..."
-              (valueChange)="draftBoxId.set($any($event))" />
-            <div class="two-cols" [class.single-col]="workspaceMode() === 'quick'">
-              <mat-form-field appearance="outline">
-                <mat-label>Cantidad</mat-label>
-                <input matInput type="number" [ngModel]="draftQuantity()" (ngModelChange)="draftQuantity.set(+$event)" />
-              </mat-form-field>
-              @if (workspaceMode() === 'detailed') {
-                <mat-form-field appearance="outline">
-                  <mat-label>Unidad</mat-label>
-                  <input matInput [ngModel]="draftUnit()" (ngModelChange)="draftUnit.set($event)" />
-                </mat-form-field>
-              }
-            </div>
-            <app-related-items-picker [value]="draftRelations()" (valueChange)="draftRelations.set($event)" />
-            @if (workspaceMode() === 'detailed') {
-              <mat-slide-toggle [checked]="draftIsQuarantined()" (change)="draftIsQuarantined.set($event.checked)">
-                En cuarentena
-              </mat-slide-toggle>
-            }
-            <mat-slide-toggle [checked]="draftNeedsReview()" (change)="draftNeedsReview.set($event.checked)">
-              Requiere revisión detallada
-            </mat-slide-toggle>
-            @if (workspaceMode() === 'quick') {
-              <button mat-stroked-button type="button" (click)="openDetailedMode()">
-                <mat-icon>open_in_full</mat-icon>
-                Abrir en modo detallado
-              </button>
-            }
-            <div class="split-actions final-actions">
-              @if (workspaceMode() === 'detailed') {
-                <button mat-stroked-button type="button" (click)="setAiStep(aiSuggestion() ? 'review' : 'analyze')">Atrás</button>
-                <button mat-stroked-button type="button" (click)="createItem()" [disabled]="busy()">Crear ítem</button>
-              }
-              <button mat-flat-button type="button" (click)="createItem()" [disabled]="busy()">Crear y siguiente</button>
-              <button mat-stroked-button type="button" (click)="createItemNeedsReview()" [disabled]="busy()">Guardar pendiente</button>
-            </div>
-            }
-          </mat-card>
-        }
-      </aside>
-
-      @if (panel() === 'create' && workspaceMode() === 'detailed' && aiSuggestion()) {
-        <section class="final-preview-board" aria-label="Vista previa de la ficha final">
-          <div class="final-preview-title">
-            <strong>Vista previa de la ficha final</strong>
-            <span>
-              <mat-icon>check_circle</mat-icon>
-              {{ aiStep() === 'final' ? 'Borrador aplicado' : 'Vista según selección actual' }}
-            </span>
-          </div>
-          <div class="final-preview-grid">
-            <div class="final-preview-cell identity">
-              <span>Nombre</span>
-              <strong>{{ finalPreviewName() || 'Sin nombre' }}</strong>
-              <span>Cantidad</span>
-              <strong>{{ finalPreviewQuantity() ?? 1 }} {{ draftUnit() || 'uds' }}</strong>
-            </div>
-            <div class="final-preview-cell description">
-              <div>
-                <span>Descripción final</span>
-                <button mat-button type="button" (click)="applySelectedAi()">
-                  <mat-icon>edit</mat-icon>
-                  Editar
-                </button>
-              </div>
-              <p>{{ finalPreviewDescription() || 'Sin descripción' }}</p>
-              @if (acceptedTechnicalFacts().length) {
-                <div class="fact-chips">
-                  @for (fact of acceptedTechnicalFacts(); track technicalFactKey(fact)) {
-                    <span>{{ fact.label }}</span>
-                  }
-                </div>
-              }
-            </div>
-            <div class="final-preview-cell compact">
-              <span>Clasificación</span>
-              <strong>{{ aiPreviewClassification() || 'Sin clase' }}</strong>
-              <span>Tags finales</span>
-              <div class="fact-chips">
-                @if (aiPreviewTagNames().length) {
-                  @for (tag of aiPreviewTagNames(); track tag) {
-                    <span>{{ tag }}</span>
-                  }
-                } @else {
-                  <span>Sin tags</span>
+                @if (aiSuggestion()!.userHint) {
+                  <details class="ai-used-hint">
+                    <summary>Pista usada</summary>
+                    <p>{{ aiSuggestion()!.userHint }}</p>
+                  </details>
                 }
-              </div>
-            </div>
-            <div class="final-preview-cell compact">
-              <span>Contenedor</span>
-              <strong>{{ draftBoxLabel() }}</strong>
-              <span>Estado</span>
-              <label class="preview-check">
-                <input type="checkbox" [checked]="draftNeedsReview()" disabled />
-                Pendiente de completar
-              </label>
-            </div>
-          </div>
-        </section>
-      }
-    </section>
-  }
+
+<p>{{aiSuggestion()!.model}} · {{aiSuggestion()!.analysisMode}}</p></details></div><details class="proposal-tools"><summary>Opciones de propuesta</summary><button mat-button (click)="selectAllAi()">Seleccionar todo</button><button mat-button (click)="deselectAllAi()">No seleccionar nada</button><button mat-button (click)="setAiStep('analyze')">Preparar otro análisis</button><button mat-button (click)="discardAiSuggestion()">Descartar propuesta</button></details><div class="workflow-footer"><span>Nada se guardará todavía.</span><button mat-flat-button (click)="applySelectedAi()" [disabled]="aiBusy() || aiSelectionMismatch()">Incorporar y completar →</button></div>}
+@if(workspaceMode()==='quick' || aiStep()==='final'){<h2>Completa la ficha</h2><p class="step-help">Un objeto con {{actionSelectionSize()}} fotos. Revisa sus datos antes de crearlo.</p><app-item-editor [photoCapture]="true" [value]="photoEditorValue()" [options]="options()" [classOptions]="itemClassOptions()" [subtypeOptions]="itemSubtypeOptions()" [boxes]="boxOptions()" [fields]="photoPropertyFields()" [classLabel]="selectedItemClass() ? inventoryModeLabel(selectedItemClass()!.inventoryMode) : ''" (patch)="patchPhotoEditor($event)" (classChange)="setDraftItemClassId($event)" (subtypeChange)="setDraftItemSubtypeId($event)"/><div class="workflow-footer"><button mat-button (click)="createItemNeedsReview()" [disabled]="busy() || !draftName().trim()">Crear pendiente de completar</button><button mat-flat-button (click)="createItem()" [disabled]="busy() || !draftName().trim()">{{busy()?'Creando…':'Crear objeto y continuar'}}</button></div>}
+</div>}}
+</section></section>}
 </main>

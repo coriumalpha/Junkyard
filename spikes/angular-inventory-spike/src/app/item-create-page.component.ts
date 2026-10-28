@@ -1,8 +1,9 @@
+import {ItemEditorComponent} from './item-editor.component';
 import { DescriptionEditorComponent } from './description-editor.component';
 import { ItemPropertyFieldsComponent } from './item-property-fields.component';
 import { RelatedItemsPickerComponent } from './related-items-picker.component';
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -24,8 +25,8 @@ import { TagPickerComponent } from './tag-picker.component';
 @Component({
   selector: 'app-item-create-page',
   standalone: true,
-  imports: [
-    DescriptionEditorComponent, ItemPropertyFieldsComponent, RelatedItemsPickerComponent,
+  imports: [ItemEditorComponent,
+
     CommonModule,
     FormsModule,
     RouterLink,
@@ -36,8 +37,8 @@ import { TagPickerComponent } from './tag-picker.component';
     MatInputModule,
     MatProgressSpinnerModule,
     MatSlideToggleModule,
-    SearchableSelectComponent,
-    TagPickerComponent
+
+
   ],
   templateUrl: './item-create-page.component.html',
   styleUrl: './item-create-page.component.scss'
@@ -82,6 +83,9 @@ export class ItemCreatePageComponent {
       placeholder: formatInventoryCode(box.code)
     })));
 
+  private baseline='';
+  hasUnsavedChanges():boolean{return JSON.stringify(this.form())!==this.baseline;}
+  @HostListener('window:beforeunload',['$event']) protected protectDraft(event:BeforeUnloadEvent){if(this.hasUnsavedChanges()){event.preventDefault();event.returnValue='';}}
   private readonly api = inject(InventoryApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -93,6 +97,7 @@ export class ItemCreatePageComponent {
       this.patchForm({ boxId: queryBoxId });
     }
 
+    this.baseline=JSON.stringify(this.form());
     forkJoin({
       options: this.api.fetchOptions(),
       classes: this.api.fetchItemClasses()
@@ -151,6 +156,7 @@ export class ItemCreatePageComponent {
     this.error.set(null);
     this.api.createItem(input).pipe(
       tap((item) => {
+        this.baseline=JSON.stringify(this.form());
         this.router.navigate(['/item', item.id]);
       }),
       catchError((error: unknown) => {

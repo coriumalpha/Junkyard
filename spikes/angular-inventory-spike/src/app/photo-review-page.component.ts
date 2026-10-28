@@ -1,3 +1,5 @@
+import { FittedPhotoComponent } from './fitted-photo.component';
+import {ItemEditorComponent} from './item-editor.component';
 import { DescriptionEditorComponent } from './description-editor.component';
 import { RelatedItemsPickerComponent } from './related-items-picker.component';
 import { CommonModule } from '@angular/common';
@@ -18,7 +20,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
-import { AiAnalysisMode, AiStatus, AiSuggestItemResponse, AiSuggestedTag, AiTechnicalFact, InventoryApiService, InventoryItem, InventoryMode, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse, ItemClass, ItemSubtype } from './inventory-api.service';
+import { InventoryItemUpdate, ItemPropertyField, ItemPropertyValue, AiAnalysisMode, AiStatus, AiSuggestItemResponse, AiSuggestedTag, AiTechnicalFact, InventoryApiService, InventoryItem, InventoryMode, InventoryOptionsResponse, PhotoReviewPhoto, PhotoReviewResponse, ItemClass, ItemSubtype } from './inventory-api.service';
 import { InventoryCodePipe, formatInventoryCode } from './inventory-code.pipe';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
@@ -31,7 +33,7 @@ type AiWorkflowStep = 'analyze' | 'review' | 'final';
 @Component({
   selector: 'app-photo-review-page',
   standalone: true,
-  imports: [DescriptionEditorComponent, RelatedItemsPickerComponent, CommonModule, FormsModule, RouterLink, MatButtonModule, MatButtonToggleModule, MatCardModule, MatCheckboxModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule, InventoryCodePipe, SearchableSelectComponent, TagPickerComponent],
+  imports: [FittedPhotoComponent, ItemEditorComponent,  CommonModule, FormsModule, RouterLink, MatButtonModule, MatButtonToggleModule, MatCardModule, MatCheckboxModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule,  SearchableSelectComponent],
   templateUrl: './photo-review-page.component.html',
   styleUrl: './photo-review-page.component.scss'
 })
@@ -56,6 +58,8 @@ export class PhotoReviewPageComponent {
   protected readonly aiIncludedTechnicalFactKeys = signal<string[]>([]);
   protected readonly aiSelectedTechnicalFactKeys = signal<string[]>([]);
   protected readonly aiPreviewName = signal('');
+  protected readonly aiNameEdited=signal(false);
+  protected readonly aiDescriptionEdited=signal(false);
   protected readonly aiPreviewDescription = signal('');
   protected readonly aiPreviewQuantity = signal<number | null>(null);
   protected readonly aiHint = signal('');
@@ -72,8 +76,8 @@ export class PhotoReviewPageComponent {
   protected readonly aiDetailedRecommended = computed(() => this.looksLikeDetailedHint(this.aiHint()));
   protected readonly aiModeHint = computed(() =>
     this.aiMode() === 'pro' ? 'Pro: fotos en alta definición, razonamiento y una descripción más completa. Mayor tiempo y coste.' : this.aiMode() === 'detailed'
-      ? 'Detallado: usa derivado grande y detail=high. Más coste, mejor para placas, etiquetas y texto pequeño.'
-      : 'Rápido: usa detail=low. Coste mínimo, identificación más genérica.');
+      ? 'Detallado: lee mejor placas, etiquetas y texto pequeño. Mayor coste que el análisis rápido.'
+      : 'Rápido: identifica el tipo de objeto con menor coste.');
   protected readonly acceptedTechnicalFacts = computed(() => {
     const selected = new Set(this.aiSelectedTechnicalFactKeys());
     const dismissed = new Set(this.dismissedTechnicalFactKeys());
@@ -146,6 +150,37 @@ export class PhotoReviewPageComponent {
     return !this.sameIdSet(this.aiSuggestionPhotoIds(), this.selection(this.current()?.id ?? 0));
   });
   protected readonly panel = signal<ReviewPanel>('none');
+  protected readonly proposalSection=signal('identity');
+  protected readonly photoExpanded=signal(false);
+  protected readonly photoPropertyFields=signal<ItemPropertyField[]>([]);
+  protected readonly photoPropertyValues=signal<ItemPropertyValue[]>([]);
+  protected readonly photoEditorValue=computed<InventoryItemUpdate>(()=>({code:'',name:this.draftName(),notes:this.draftNotes(),descriptionMarkdown:this.draftMarkdown(),relatedItemIds:this.draftRelations(),category:'',itemClassId:this.draftItemClassId(),itemSubtypeId:this.draftItemSubtypeId(),boxId:this.draftBoxId(),quantity:this.draftQuantity(),unit:this.draftUnit(),tagIds:this.draftTagIds(),isQuarantined:this.draftIsQuarantined(),needsReview:this.draftNeedsReview(),propertyValues:this.photoPropertyValues(),condition:'',retention:'',minQuantity:null,consumable:false,sentimental:false,obsolete:false}));
+  protected patchPhotoEditor(patch:Partial<InventoryItemUpdate>):void{
+    if(patch.name!==undefined)this.draftName.set(patch.name);
+    if(patch.notes!==undefined)this.draftNotes.set(patch.notes);
+    if(patch.descriptionMarkdown!==undefined)this.draftMarkdown.set(patch.descriptionMarkdown);
+    if(patch.relatedItemIds!==undefined)this.draftRelations.set(patch.relatedItemIds);
+    if(patch.quantity!==undefined)this.draftQuantity.set(patch.quantity);
+    if(patch.unit!==undefined)this.draftUnit.set(patch.unit);
+    if(patch.boxId!==undefined)this.draftBoxId.set(patch.boxId);
+    if(patch.tagIds!==undefined)this.draftTagIds.set(patch.tagIds);
+    if(patch.isQuarantined!==undefined)this.draftIsQuarantined.set(patch.isQuarantined);
+    if(patch.needsReview!==undefined)this.draftNeedsReview.set(patch.needsReview);
+    if(patch.propertyValues!==undefined)this.photoPropertyValues.set(patch.propertyValues);
+  }
+  private loadPhotoProperties():void{
+    const itemClassId=this.draftItemClassId(),subtypeId=this.draftItemSubtypeId();
+    this.api.fetchItemProperties(itemClassId,subtypeId).pipe(tap(response=>{
+      if(this.draftItemClassId()===itemClassId && this.draftItemSubtypeId()===subtypeId)this.photoPropertyFields.set(response.definitions.map(definition=>({definition,value:null,applies:true})));
+    }),catchError(()=>{this.error.set('No se pudieron cargar las propiedades de la clase. Vuelve a seleccionarla antes de guardar.');return EMPTY;}),takeUntilDestroyed(this.destroyRef)).subscribe();
+  }
+
+  protected readonly visiblePhotos=computed(()=>this.panel()==='none' ? this.review()?.pending ?? [] : (this.review()?.pending ?? []).filter(p=>this.selectedIds().includes(p.id)));
+  private draftBaseline='';
+  private draftSnapshot():string {return JSON.stringify([this.draftName(),this.draftNotes(),this.draftQuantity(),this.draftUnit(),this.draftBoxId(),this.draftTagIds(),this.draftItemClassId(),this.draftItemSubtypeId(),this.draftRelations(),this.draftIsQuarantined(),this.draftNeedsReview(),this.aiHint(),this.photoPropertyValues(),this.aiSuggestion()?.suggestionId]);}
+  hasUnsavedChanges():boolean{return this.aiBusy() || (this.panel()==='create' && this.draftSnapshot()!==this.draftBaseline);}
+  @HostListener('window:beforeunload',['$event']) protected protectDraft(event:BeforeUnloadEvent):void{if(this.hasUnsavedChanges()){event.preventDefault();event.returnValue='';}}
+
   protected readonly lastAffectedIds = signal<number[]>([]);
   protected readonly assignBoxId = signal<number | null>(null);
   protected readonly assignItemId = signal<number | null>(null);
@@ -297,6 +332,7 @@ export class PhotoReviewPageComponent {
   }
 
   protected toggleSelected(photo: PhotoReviewPhoto): void {
+    if(this.panel()!=='none' || this.busy())return;
     this.selectedIds.update((current) => current.includes(photo.id) ? current.filter((id) => id !== photo.id) : [...current, photo.id]);
   }
 
@@ -323,6 +359,9 @@ export class PhotoReviewPageComponent {
   }
 
   protected openPanel(panel: ReviewPanel): void {
+    if(this.busy() || this.aiBusy() || this.panel()===panel)return;
+    if(this.hasUnsavedChanges() && !confirm('Hay un borrador sin crear. ¿Descartarlo para cambiar de tarea?'))return;
+
     const current = this.current();
     if (!current) {
       return;
@@ -330,6 +369,7 @@ export class PhotoReviewPageComponent {
 
     if (panel === 'create') {
       this.workspaceMode.set('quick');
+      this.photoPropertyFields.set([]);this.photoPropertyValues.set([]);
       this.draftName.set('');
       this.draftNotes.set('');
     this.draftMarkdown.set(true);this.draftRelations.set([]);
@@ -350,11 +390,15 @@ export class PhotoReviewPageComponent {
       this.assignBoxId.set(current.sourceBox?.id ?? null);
     }
 
+    this.selectedIds.set(this.selection(current.id));
     this.panel.set(panel);
+    this.draftBaseline=this.draftSnapshot();
     this.focusPanel(panel);
   }
 
   protected closePanel(): void {
+    if(this.aiBusy() || this.busy())return;
+    if(this.hasUnsavedChanges() && !confirm('El objeto aún no se ha creado. ¿Descartar este borrador y volver a las fotos?'))return;
     this.panel.set('none');
   }
 
@@ -374,6 +418,7 @@ export class PhotoReviewPageComponent {
     if (this.panel() !== 'create') {
       this.openPanel('create');
     }
+    if(this.panel()!=='create')return;
     this.setWorkspaceMode('detailed');
     this.focusPanel('create');
   }
@@ -424,12 +469,15 @@ export class PhotoReviewPageComponent {
   }
 
   protected createItem(): void {
+    if(this.aiBusy() || this.busy() || (this.workspaceMode()==='detailed' && this.aiStep()!=='final'))return;
+
     const current = this.current();
     if (!current || !this.draftName().trim()) {
       this.error.set('El nombre es obligatorio.');
       return;
     }
 
+    if(!Number.isFinite(this.draftQuantity()) || this.draftQuantity()<=0){this.error.set('La cantidad debe ser mayor que cero.');return;}
     const subtypeId = this.draftItemSubtypeId();
     if (subtypeId !== null && !this.itemSubtypes().some((subtype) => subtype.id === subtypeId)) {
       this.error.set('El subtipo no pertenece a la clase seleccionada.');
@@ -449,6 +497,7 @@ export class PhotoReviewPageComponent {
       itemSubtypeId: this.draftItemSubtypeId(),
       isQuarantined: this.draftIsQuarantined(),
       needsReview: this.draftNeedsReview(),
+      propertyValues: this.photoPropertyValues(),
       tagIds: this.draftTagIds()
     }), 'Ítem creado desde foto.');
   }
@@ -493,6 +542,7 @@ export class PhotoReviewPageComponent {
       userHint: this.aiHint().trim() || undefined
     }).pipe(
       tap((suggestion) => {
+        this.proposalSection.set('identity');
         this.aiSuggestion.set(suggestion);
         this.aiSuggestionPhotoIds.set(ids);
         this.initializeAiSelection(suggestion);
@@ -553,6 +603,7 @@ export class PhotoReviewPageComponent {
     this.setDraftItemClassId(suggestion.suggestedClass.id);
     if (suggestion.suggestedSubtype) {
       this.draftItemSubtypeId.set(suggestion.suggestedSubtype.id);
+      this.loadPhotoProperties();
     }
   }
 
@@ -570,7 +621,7 @@ export class PhotoReviewPageComponent {
       this.draftName.set(this.aiPreviewName().trim());
     }
     if (this.aiUseDescription() && this.aiPreviewDescription().trim()) {
-      this.draftNotes.set(this.aiPreviewDescription().trim());
+      this.draftNotes.set(this.descriptionWithTechnicalFacts(this.aiPreviewDescription().trim(),this.acceptedTechnicalFacts()));
     }
     if (this.aiUseQuantity() && this.aiPreviewQuantity() !== null) {
       this.draftQuantity.set(this.aiPreviewQuantity()!);
@@ -711,7 +762,7 @@ export class PhotoReviewPageComponent {
   }
 
   protected setAiHint(value: string): void {
-    const next = value.slice(0, 3000);
+    const next = value.slice(0, 500);
     this.aiHint.set(next);
     if (this.looksLikeDetailedHint(next) && !this.aiModeManuallySelected() && this.aiMode() === 'fast') {
       this.aiMode.set('detailed');
@@ -814,6 +865,7 @@ export class PhotoReviewPageComponent {
     this.draftItemClassId.set(itemClassId);
     this.draftItemSubtypeId.set(null);
     this.loadItemSubtypes(itemClassId);
+    this.loadPhotoProperties();
   }
 
   protected setDraftItemSubtypeId(value: number | string | null | (number | string | null)[]): void {
@@ -824,6 +876,7 @@ export class PhotoReviewPageComponent {
     }
 
     this.draftItemSubtypeId.set(itemSubtypeId);
+    this.loadPhotoProperties();
   }
 
   protected inventoryModeLabel(mode: InventoryMode | null): string {
@@ -878,6 +931,7 @@ export class PhotoReviewPageComponent {
       return;
     }
 
+    if(this.panel()!=='none' || this.aiBusy() || this.busy())return;
     const key = event.key.toLowerCase();
     if (event.ctrlKey && key === 'z') {
       event.preventDefault();
@@ -950,6 +1004,7 @@ export class PhotoReviewPageComponent {
   }
 
   private initializeAiSelection(suggestion: AiSuggestItemResponse): void {
+    this.aiNameEdited.set(false);this.aiDescriptionEdited.set(false);
     this.aiUseName.set(!!suggestion.proposedName);
     this.aiUseDescription.set(!!suggestion.proposedDescription);
     this.aiUseQuantity.set(suggestion.proposedQuantity !== null && suggestion.proposedQuantity !== undefined && suggestion.quantityConfidence >= 0.65);
@@ -972,9 +1027,9 @@ export class PhotoReviewPageComponent {
     const baseDescription = this.aiUseDescription()
       ? suggestion.proposedDescription
       : this.draftNotes();
-    this.aiPreviewName.set(this.aiUseName() ? suggestion.proposedName : this.draftName());
+    if(!this.aiNameEdited())this.aiPreviewName.set(this.aiUseName() ? suggestion.proposedName : this.draftName());
     this.aiPreviewQuantity.set(this.aiUseQuantity() ? suggestion.proposedQuantity : this.draftQuantity());
-    this.aiPreviewDescription.set(this.descriptionWithTechnicalFacts(baseDescription, this.acceptedTechnicalFacts()));
+    if(!this.aiDescriptionEdited())this.aiPreviewDescription.set(baseDescription);
   }
 
   private toggleKey(target: { update: (updater: (current: string[]) => string[]) => void }, key: string, checked: boolean): void {
@@ -1003,7 +1058,7 @@ export class PhotoReviewPageComponent {
         this.clearAiSuggestion(false);
       }),
       catchError((error: unknown) => {
-        this.error.set(error instanceof Error ? error.message : 'No se pudo completar la acción.');
+        this.error.set(this.errorMessage(error, 'No se pudo completar la acción.'));
         return EMPTY;
       }),
       finalize(() => this.busy.set(false)),

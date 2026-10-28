@@ -3,9 +3,10 @@
     <div>
       <p class="eyebrow">Inventario</p>
       <h1>Nuevo ítem</h1>
-      <p>Ponle nombre, cuenta su historia y conecta sus piezas. Podrás añadir fotos desde la ficha.</p>
+      <p>Crea una ficha manual. Solo el nombre es obligatorio; completa los demás datos cuando los necesites.</p>
     </div>
-    <a mat-stroked-button routerLink="/inventory">
+    <a mat-stroked-button routerLink="/photos/inbox"><mat-icon>photo_camera</mat-icon>Crear desde fotografías</a>
+    <a mat-button routerLink="/inventory">
       <mat-icon>arrow_back</mat-icon>
       Inventario
     </a>
@@ -25,113 +26,9 @@
     }
 
     <mat-card class="create-card">
-      <div class="section-head">
-        <div>
-          <p class="eyebrow">Ficha</p>
-          <h2>Datos del ítem</h2>
-        </div>
-        <button mat-flat-button type="button" (click)="createItem()" [disabled]="saving()">
-          <mat-icon>save</mat-icon>
-          {{ saving() ? 'Creando...' : 'Crear ítem' }}
-        </button>
-      </div>
-
-      <div class="form-grid">
-        <mat-form-field appearance="outline">
-          <mat-label>IT público</mat-label>
-          <input matInput [ngModel]="form().code" (ngModelChange)="patchForm({ code: $event })" placeholder="Vacío = automático" />
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>Nombre</mat-label>
-          <input matInput [ngModel]="form().name" (ngModelChange)="patchForm({ name: $event })" />
-        </mat-form-field>
-
-        <app-description-editor class="wide" [value]="form().notes" [markdown]="form().descriptionMarkdown ?? false" (valueChange)="patchForm({ notes: $event })" (markdownChange)="patchForm({ descriptionMarkdown: $event })" />
-
-        <app-tag-picker
-          label="Tags"
-          [value]="form().tagIds"
-          [tags]="options().tags"
-          (valueChange)="patchForm({ tagIds: $any($event) })" />
-
-        <app-searchable-select
-          label="Clase"
-          [value]="form().itemClassId"
-          [options]="itemClassOptions()"
-          noneLabel="Sin clase"
-          placeholder="Buscar clase..."
-          (valueChange)="setItemClassId($event)" />
-
-        @if (form().itemClassId && itemSubtypeOptions().length) {
-          <app-searchable-select
-            label="Subtipo"
-            [value]="form().itemSubtypeId"
-            [options]="itemSubtypeOptions()"
-            noneLabel="Sin subtipo"
-            placeholder="Buscar subtipo..."
-            (valueChange)="setItemSubtypeId($event)" />
-        } @else {
-          <div class="classification-note">
-            <span>{{ selectedItemClass() ? inventoryModeLabel(selectedItemClass()!.inventoryMode) : 'Sin clase' }}</span>
-          </div>
-        }
-
-        <app-item-property-fields
-          class="wide"
-          [fields]="propertyFields()"
-          [values]="form().propertyValues ?? []"
-          (valuesChange)="setPropertyValues($event)" />
-
-        <app-searchable-select
-          label="Contenedor"
-          [value]="form().boxId"
-          [options]="boxOptions()"
-          noneLabel="Sin caja"
-          placeholder="Buscar contenedor..."
-          (valueChange)="patchForm({ boxId: $any($event) })" />
-
-        <mat-form-field appearance="outline">
-          <mat-label>Cantidad</mat-label>
-          <input matInput type="number" [ngModel]="form().quantity" (ngModelChange)="patchForm({ quantity: +$event })" />
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>Unidad</mat-label>
-          <input matInput [ngModel]="form().unit" (ngModelChange)="patchForm({ unit: $event })" />
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>Mínimo</mat-label>
-          <input matInput type="number" [ngModel]="form().minQuantity" (ngModelChange)="patchForm({ minQuantity: $event === '' ? null : +$event })" />
-        </mat-form-field>
-
-        <app-searchable-select
-          label="Estado"
-          [value]="form().condition"
-          [options]="conditionOptions()"
-          noneLabel="Sin estado"
-          placeholder="Buscar estado..."
-          (valueChange)="patchForm({ condition: $any($event) ?? '' })" />
-
-        <mat-form-field appearance="outline">
-          <mat-label>Retención</mat-label>
-          <input matInput [ngModel]="form().retention" (ngModelChange)="patchForm({ retention: $event })" />
-        </mat-form-field>
-
-<app-related-items-picker class="wide" [value]="form().relatedItemIds ?? []" (valueChange)="patchForm({ relatedItemIds: $event })" />
-
-        <div class="toggle-row wide">
-          <mat-slide-toggle [checked]="form().consumable" (change)="patchForm({ consumable: $event.checked })">Consumible</mat-slide-toggle>
-          <mat-slide-toggle [checked]="form().isQuarantined" (change)="patchForm({ isQuarantined: $event.checked })">En cuarentena</mat-slide-toggle>
-          <mat-slide-toggle [checked]="form().needsReview" (change)="patchForm({ needsReview: $event.checked })">Pendiente de completar</mat-slide-toggle>
-          <mat-slide-toggle [checked]="form().sentimental" (change)="patchForm({ sentimental: $event.checked })">Sentimental</mat-slide-toggle>
-          <mat-slide-toggle [checked]="form().obsolete" (change)="patchForm({ obsolete: $event.checked })">Obsoleto</mat-slide-toggle>
-        </div>
-      </div>
-
+<app-item-editor [value]="form()" [options]="options()" [classOptions]="itemClassOptions()" [subtypeOptions]="itemSubtypeOptions()" [boxes]="boxOptions()" [conditions]="conditionOptions()" [fields]="propertyFields()" [classLabel]="selectedItemClass() ? inventoryModeLabel(selectedItemClass()!.inventoryMode) : ''" (patch)="patchForm($event)" (classChange)="setItemClassId($event)" (subtypeChange)="setItemSubtypeId($event)"  />
       <div class="form-actions">
-        <a mat-stroked-button routerLink="/inventory">Cancelar</a>
+        <a mat-button routerLink="/inventory">Cancelar</a>
         <button mat-flat-button type="button" (click)="createItem()" [disabled]="saving()">
           <mat-icon>save</mat-icon>
           {{ saving() ? 'Creando...' : 'Crear ítem' }}

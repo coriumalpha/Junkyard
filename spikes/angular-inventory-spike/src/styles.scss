@@ -129,3 +129,28 @@ app-root {
 .settings-header h1 {
   letter-spacing: 0;
 }
+
+/* Operational surfaces: shared rhythm, restrained accents and less visual fragmentation. */
+:root {
+  --app-radius-xs: 4px; --app-radius-sm: 6px; --app-radius-md: 8px; --app-radius-lg: 10px;
+  --app-shadow-sm: none; --app-shadow-md: none;
+  --app-page-gutter: clamp(14px, 1.6vw, 28px);
+  --app-bg: #101718; --app-surface: #151e20; --app-surface-raised: #1a2527;
+  --app-border: rgba(210,235,225,.12); --app-muted: #adbfba;
+}
+body { background: var(--app-bg); }
+.app-page-header, .workspace-header, .detail-header, .dashboard-header, .photo-header, .actions-header, .locations-header, .settings-header {
+  background: transparent !important; border: 0 !important; border-bottom: 1px solid var(--app-border-strong) !important;
+  border-radius: 0 !important; box-shadow: none !important; padding-inline: 0 !important;
+}
+.app-page-header::before, .workspace-header::before, .detail-header::before, .dashboard-header::before, .photo-header::before, .actions-header::before, .locations-header::before, .settings-header::before { display: none; }
+.mat-mdc-card { --mdc-elevated-card-container-shape: 6px; border-radius: 6px !important; box-shadow: none !important; }
+app-dashboard-page .overview-grid, app-dashboard-page .stats-grid { gap: 1px; background: var(--app-border); border: 1px solid var(--app-border); border-radius: 6px; overflow: hidden; }
+app-dashboard-page .stat-card { border: 0; border-radius: 0 !important; }
+app-inventory-page .workspace { gap: 12px; }
+button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 3px; }
+
+/* V2: shared interaction tokens and primary action hierarchy. */
+:root{--app-accent-soft:rgba(72,255,176,.09);--app-surface-2:#1b2829}
+.mat-mdc-unelevated-button:not(:disabled){--mdc-filled-button-container-color:var(--app-accent);--mdc-filled-button-label-text-color:#10271e;--mat-button-filled-container-color:var(--app-accent);--mat-button-filled-label-text-color:#10271e}
+.mat-mdc-button,.mat-mdc-outlined-button,.mat-mdc-unelevated-button{letter-spacing:.1px!important;font-family:inherit!important}

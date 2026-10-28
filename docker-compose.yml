@@ -3,7 +3,10 @@ services:
     build: .
     container_name: inventario
     ports:
-      - "8089:8080"
+      - "127.0.0.1:8089:8080"
+    environment:
+      Access__Enabled: "${JUNKYARD_ACCESS_ENABLED:-true}"
+      Access__RequireHttps: "${JUNKYARD_REQUIRE_HTTPS:-true}"
     volumes:
       - inventario-data:/data
     restart: unless-stopped

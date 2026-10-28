@@ -26,6 +26,7 @@ public static class SchemaUpgrader
         EnsureItemClassifications(db);
         EnsureItemProperties(db);
         EnsureInventoryActions(db);
+        AddColumn(db, "InventoryActions", "IsDeleted", "INTEGER NOT NULL DEFAULT 0");
         AddColumn(db, "Items", "DescriptionMarkdown", "INTEGER NOT NULL DEFAULT 0");
         db.Database.ExecuteSqlRaw("""
             CREATE TABLE IF NOT EXISTS "ItemRelations" (

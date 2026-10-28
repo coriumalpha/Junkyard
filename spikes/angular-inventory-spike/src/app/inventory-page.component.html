@@ -22,51 +22,13 @@
           </a>
           <button mat-stroked-button type="button" (click)="toggleEditMode()" [class.active-action]="editMode()">
             <mat-icon>{{ editMode() ? 'close' : 'edit' }}</mat-icon>
-            {{ editMode() ? 'Cerrar edición' : 'Editar' }}
+            {{ editMode() ? 'Terminar selección' : 'Seleccionar varios' }}
           </button>
         }
       </div>
     </header>
 
-    <section class="focus-strip" aria-label="Muestras visuales">
-      @if (focusVisuals().length) {
-        @for (visual of focusVisuals(); track trackByFocusVisual($index, visual)) {
-          <article class="focus-card" [class.summary]="visual.kind === 'summary'">
-            @if (visual.imageUrl) {
-              <img
-                class="focus-image"
-                [src]="visual.imageUrl"
-                [style.transform]="'rotate(' + visual.rotationDegrees + 'deg)'"
-                [alt]="visual.title"
-              />
-            } @else {
-              <div class="focus-image placeholder">
-                <span>{{ visual.fallback }}</span>
-              </div>
-            }
-
-            <div class="focus-copy">
-              <span>
-                @if (visual.kind === 'group') { Contenedor }
-                @else if (visual.kind === 'item') { Ítem }
-                @else { Resumen }
-              </span>
-              <strong>{{ visual.title }}</strong>
-              <p>{{ visual.subtitle }}</p>
-            </div>
-          </article>
-        }
-      } @else {
-        <div class="focus-empty">
-          <mat-icon>photo_library</mat-icon>
-          <div>
-            <strong>Sin miniaturas todavía</strong>
-            <p>Los resultados aparecerán aquí cuando tengan imagen asociada.</p>
-          </div>
-        </div>
-      }
-    </section>
-
+    @if(!isContainersPage()){<nav class="inventory-scopes" aria-label="Ámbito de inventario"><a routerLink="/inventory" [class.active]="!state().onlyConsumable && !state().onlyOrphans">Todos los objetos</a><a routerLink="/inventory" [queryParams]="{onlyConsumable:'true',layout:'flat',view:'flat'}" [class.active]="state().onlyConsumable">Consumibles</a><a routerLink="/inventory" [queryParams]="{onlyOrphans:'true',layout:'grouped',view:'grouped'}" [class.active]="state().onlyOrphans">Sin contenedor</a></nav>}
     <mat-card class="filters-card" id="filters">
       <div class="filters-head">
         <div>

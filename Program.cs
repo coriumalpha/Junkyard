@@ -9,6 +9,18 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
+if (args.Contains("--configure-access", StringComparer.OrdinalIgnoreCase))
+{
+    await new AccessSecurity(builder.Configuration).ConfigureInteractiveAsync();
+    return;
+}
+builder.Services.AddInventoryAccess(builder.Configuration);
+// Only the loopback-bound API and the local TLS proxy may assert HTTPS.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options => {
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    options.KnownProxies.Add(System.Net.IPAddress.Parse("172.17.0.1"));
+    options.KnownProxies.Add(System.Net.IPAddress.Parse("172.19.0.1"));
+});
 var dataRoot = DataPaths.DataRoot(builder.Environment, builder.Configuration);
 var databasePath = DataPaths.DatabasePath(builder.Environment, builder.Configuration);
 const long photoUploadLimit = 2L * 1024 * 1024 * 1024;
@@ -90,6 +102,8 @@ app.Use(async (context, next) =>
     }
 });
 
+app.UseForwardedHeaders();
+app.UseInventoryAccess();
 app.UseStaticFiles();
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -1306,6 +1320,20 @@ app.MapPut("/api/comments/{id:int}", async (
 
     return comment is null ? Results.NotFound() : Results.Json(comment);
 });
+foreach (var (route, kind) in new[] { ("actions", InventoryActionKind.Task), ("comments", InventoryActionKind.Comment) })
+{
+    var expectedKind = kind;
+    app.MapDelete($"/api/{route}/{{id:int}}", async (int id, InventoryDbContext db, CancellationToken ct) =>
+    {
+        var row = await db.InventoryActions.FirstOrDefaultAsync(x => x.Id == id && x.Kind == expectedKind, ct);
+        if (row is null) return Results.NotFound();
+        row.IsDeleted = true;
+        row.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return Results.NoContent();
+    });
+}
+
 app.MapPost("/api/actions/{id:int}/complete", async (
     int id,
     InventoryLiveQueryService queryService,

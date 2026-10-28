@@ -21,3 +21,21 @@ wwwroot/uploads/
 
 spikes/**/node_modules/
 spikes/**/dist/
+
+# Private operational evidence and authentication material.
+/docs/ui-access-*/
+/docs/ui-activity-*/
+/docs/ui-pending-*/
+/docs/ui-session-*/
+/docs/ui-v2/
+access/
+secrets/
+tls/
+exports/
+artifacts/
+*.pem
+*.key
+*.pfx
+*.p12
+*.har
+*.trace

@@ -1478,7 +1478,12 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (await GetPhotoReviewAsync(currentId, cancellationToken), [], classValidationError);
         }
 
+        var propertyError = await ValidateItemPropertyValuesAsync(input.ItemClassId, input.ItemSubtypeId, input.PropertyValues,
+            existingItemId: null, requireRequired: true, cancellationToken);
+        if (propertyError is not null) return (await GetPhotoReviewAsync(currentId, cancellationToken), [], propertyError);
         var ids = ReviewSelectedIds(currentId, input.Ids);
+        if (!await db.PhotoInboxes.AnyAsync(photo => ids.Contains(photo.Id) && photo.Status == PhotoInboxStatus.Pending, cancellationToken))
+            return (await GetPhotoReviewAsync(currentId, cancellationToken), [], "Estas fotos ya no están pendientes. Actualiza la bandeja.");
         var item = new Item
         {
             BoxId = input.BoxId is > 0 ? input.BoxId : null,
@@ -1503,6 +1508,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         await db.SaveChangesAsync(cancellationToken);
 
         await SetRelatedItemsAsync(item.Id, input.RelatedItemIds, cancellationToken);
+        await SetItemPropertyValuesAsync(item.Id, input.ItemClassId, input.ItemSubtypeId, input.PropertyValues, cancellationToken);
         var photos = await db.PhotoInboxes.Where(photo => ids.Contains(photo.Id) && photo.Status == PhotoInboxStatus.Pending).ToListAsync(cancellationToken);
         var now = DateTime.UtcNow;
         foreach (var inbox in photos)
@@ -3696,7 +3702,8 @@ public record PhotoReviewCreateItemDto(
     bool NeedsReview,
     List<int>? TagIds,
     bool? DescriptionMarkdown = null,
-    List<int>? RelatedItemIds = null);
+    List<int>? RelatedItemIds = null,
+    List<ItemPropertyValueUpdateDto>? PropertyValues = null);
 
 public record PhotoReviewUndoDto(List<int>? Ids);
 

@@ -84,7 +84,7 @@
           "options": {
             "proxyConfig": "proxy.conf.json",
             "allowedHosts": [
-              "inventario.urdugrid.com"
+              "localhost"
             ]
           },
           "configurations": {

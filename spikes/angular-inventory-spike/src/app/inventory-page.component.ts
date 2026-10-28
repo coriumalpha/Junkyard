@@ -22,14 +22,7 @@ import { AppPaginatorComponent } from './app-paginator.component';
 import { SearchableSelectComponent, SearchableSelectOption } from './searchable-select.component';
 import { TagPickerComponent } from './tag-picker.component';
 
-interface FocusVisual {
-  kind: 'group' | 'item' | 'summary';
-  title: string;
-  subtitle: string;
-  imageUrl: string | null;
-  rotationDegrees: number;
-  fallback: string;
-}
+
 
 interface LayoutOption {
   value: InventoryLayoutMode;
@@ -205,7 +198,6 @@ export class InventoryPageComponent {
         .some((value) => value!.toLocaleLowerCase().includes(query));
     });
   });
-  protected readonly focusVisuals = computed(() => this.buildFocusVisuals());
   protected readonly fungibleConsumableGroups = computed(() => this.buildFungibleConsumableGroups());
   protected readonly untypedConsumables = computed(() => this.items()
     .filter((item) => item.consumable && !(item.inventoryMode === 'Fungible' && item.itemClassId !== null && item.itemSubtypeId !== null)));
@@ -573,9 +565,7 @@ export class InventoryPageComponent {
     return item.id;
   }
 
-  protected trackByFocusVisual(_index: number, visual: FocusVisual): string {
-    return `${visual.kind}:${visual.title}:${visual.subtitle}`;
-  }
+
 
   protected previewItems(group: InventoryGroup): InventoryItem[] {
     return group.items.slice(0, 2);
@@ -901,65 +891,7 @@ export class InventoryPageComponent {
     };
   }
 
-  private buildFocusVisuals(): FocusVisual[] {
-    const data = this.data();
-    if (!data) {
-      return [];
-    }
 
-    const visuals: FocusVisual[] = [];
-
-    for (const group of data.groups) {
-      if (!group.coverUrl) {
-        continue;
-      }
-
-      visuals.push({
-        kind: 'group',
-        title: formatInventoryCode(group.code),
-        subtitle: group.name,
-        imageUrl: this.assetUrl(group.coverUrl),
-        rotationDegrees: group.rotationDegrees,
-        fallback: group.generatedLabel || group.code.slice(0, 1)
-      });
-
-      if (visuals.length >= 2) {
-        break;
-      }
-    }
-
-    if (visuals.length < 2) {
-      for (const item of data.items) {
-        if (!item.coverUrl) {
-          continue;
-        }
-
-        visuals.push({
-          kind: 'item',
-          title: `${formatInventoryCode(item.code)} · ${item.name}`,
-          subtitle: formatInventoryCode(item.boxCode) || this.tagSummary(item),
-          imageUrl: this.assetUrl(item.coverUrl),
-          rotationDegrees: item.rotationDegrees,
-          fallback: item.generatedLabel || item.name.slice(0, 1)
-        });
-
-        if (visuals.length >= 3) {
-          break;
-        }
-      }
-    }
-
-    visuals.push({
-      kind: 'summary',
-      title: `${data.itemsCount} ítems`,
-      subtitle: `${data.groupsCount} grupos · ${data.selectedBoxes.length} contenedores`,
-      imageUrl: null,
-      rotationDegrees: 0,
-      fallback: data.viewMode === 'flat' ? 'PLANO' : 'GRP'
-    });
-
-    return visuals.slice(0, 4);
-  }
 
   protected selectedTagLabel(tagId: number): string {
     return this.options().tags.find((tag) => tag.id === tagId)?.name ?? `tag ${tagId}`;

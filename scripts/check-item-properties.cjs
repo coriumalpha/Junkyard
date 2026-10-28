@@ -142,6 +142,22 @@ async function main() {
   assert.equal(created.propertyFields.find((field) => field.definition.key === 'fabricante').value.value, 'Framework');
   assert.equal(created.propertyFields.find((field) => field.definition.key === 'ram_gb').value.value, 64);
 
+  // The photo workflow must enforce the SAME required/inherited property contract.
+  const review = await json('/api/photos/review');
+  assert(review.current, 'Isolated fixture needs one pending photograph');
+  const photoInput={ids:[review.current.id],boxId:null,name:`Photo properties ${stamp}`,notes:'QA only',quantity:1,unit:'uds',itemClassId:itemClass.id,itemSubtypeId:subtype.id,isQuarantined:false,needsReview:true,tagIds:[]};
+  await assert.rejects(()=>json(`/api/photos/review/${review.current.id}/create-item`,{method:'POST',body:JSON.stringify(photoInput)}),/Fabricante/);
+  const photoCreated=await json(`/api/photos/review/${review.current.id}/create-item`,{method:'POST',body:JSON.stringify({...photoInput,propertyValues:[{definitionId:maker.id,value:'Photo maker'},{definitionId:ram.id,value:32}]})});
+  assert.deepEqual(photoCreated.affectedIds,[review.current.id]);
+  const matching=await json('/api/inventory/live?view=flat&q='+encodeURIComponent(photoInput.name));
+  const photoItem=matching.items.find(i=>i.name===photoInput.name);assert(photoItem);
+  const photoDetail=await json('/api/items/'+photoItem.id);
+  assert.equal(photoDetail.propertyFields.find(f=>f.definition.id===maker.id).value.value,'Photo maker');
+  assert.equal(photoDetail.propertyFields.find(f=>f.definition.id===ram.id).value.value,32);
+  await assert.rejects(()=>json(`/api/photos/review/${review.current.id}/create-item`,{method:'POST',body:JSON.stringify({...photoInput,propertyValues:[{definitionId:maker.id,value:'Photo maker'}]})}),/ya no están pendientes/);
+  await json('/api/photos/review/undo',{method:'POST',body:JSON.stringify({ids:[review.current.id]})});
+  console.log('PASS: photo creation required properties, inheritance, persistence, stale selection rejected, undo');
+
   const makerlessClass = await json('/api/item-classes', {
     method: 'POST',
     body: JSON.stringify({

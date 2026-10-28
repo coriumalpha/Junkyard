@@ -21,5 +21,6 @@ export interface HierarchyTrailNode {
   styleUrl: './hierarchy-trail.component.scss'
 })
 export class HierarchyTrailComponent {
+  @Input() compact = false;
   @Input() nodes: HierarchyTrailNode[] = [];
 }

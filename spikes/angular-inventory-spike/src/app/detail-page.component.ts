@@ -1,9 +1,12 @@
+import { FittedPhotoComponent } from './fitted-photo.component';
+import { A11yModule } from '@angular/cdk/a11y';
+import {ItemEditorComponent} from './item-editor.component';
 import { DescriptionEditorComponent } from './description-editor.component';
 import { DescriptionViewComponent } from './description-view.component';
 import { ItemPropertyFieldsComponent } from './item-property-fields.component';
 import { RelatedItemsPickerComponent } from './related-items-picker.component';
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -35,8 +38,8 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
 @Component({
   selector: 'app-detail-page',
   standalone: true,
-  imports: [
-    DescriptionEditorComponent, DescriptionViewComponent, ItemPropertyFieldsComponent, RelatedItemsPickerComponent,
+  imports: [FittedPhotoComponent, A11yModule, ItemEditorComponent,
+     DescriptionViewComponent, ItemPropertyFieldsComponent,
     CommonModule,
     FormsModule,
     RouterLink,
@@ -52,7 +55,7 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
     MatSlideToggleModule,
     ColorPickerComponent,
     InventoryCodePipe,
-    TagPickerComponent,
+
     SearchableSelectComponent,
     EntityMiniCardComponent,
     HierarchyTrailComponent
@@ -61,6 +64,20 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
   styleUrl: './detail-page.component.scss'
 })
 export class DetailPageComponent {
+  protected readonly editSection = signal('general');
+  protected readonly editSections = [
+    {key:'general',label:'Identidad y descripción'}, {key:'classification',label:'Clasificación y propiedades'},
+    {key:'placement',label:'Ubicación y estado'}, {key:'relations',label:'Relaciones'}
+  ];
+  private editBaseline = '';
+  private boxEditBaseline='';
+  public hasUnsavedChanges(): boolean {
+    return (this.editingItem() && JSON.stringify(this.itemForm()) !== this.editBaseline) || (this.editingBox() && JSON.stringify(this.boxForm())!==this.boxEditBaseline);
+  }
+  @HostListener('window:beforeunload', ['$event'])
+  public warnBeforeUnload(event: BeforeUnloadEvent): void {
+    if(this.hasUnsavedChanges()) event.preventDefault();
+  }
   protected readonly kind = signal<DetailKind>('item');
   protected readonly item = signal<InventoryItemDetail | null>(null);
   protected readonly box = signal<InventoryBoxDetail | null>(null);
@@ -96,9 +113,6 @@ export class DetailPageComponent {
   protected readonly editingActionPriority = signal(3);
   protected readonly editingCommentId = signal<number | null>(null);
   protected readonly editingCommentText = signal('');
-  protected readonly zooming = signal(false);
-  protected readonly zoomOriginX = signal('50%');
-  protected readonly zoomOriginY = signal('50%');
   protected readonly containerTypes = [
     { value: 'box', label: 'Caja' },
     { value: 'subbox', label: 'Subcaja' },
@@ -202,7 +216,7 @@ export class DetailPageComponent {
   protected readonly subtitle = computed(() => {
     const item = this.item();
     if (item) {
-      return item.box ? `${formatInventoryCode(item.box.code)} · ${item.box.path}` : 'Ítem sin caja';
+      return `${formatInventoryCode(item.code)} · ${item.quantityLabel}`;
     }
 
     const box = this.box();
@@ -229,7 +243,7 @@ export class DetailPageComponent {
         this.box.set(null);
         this.activePhotoIndex.set(0);
         this.modalPhoto.set(null);
-        this.zooming.set(false);
+
         this.editingItem.set(false);
         this.editingBox.set(false);
         this.saveMessage.set(null);
@@ -293,9 +307,7 @@ export class DetailPageComponent {
 
   protected startItemEdit(section: 'general' | 'description' | 'relations' = 'general'): void {
     const item = this.item();
-    if (!item) {
-      return;
-    }
+    if (!item || this.editingItem()) return;
 
     this.itemForm.set({
       name: item.name,
@@ -324,6 +336,8 @@ export class DetailPageComponent {
     this.loadItemSubtypes(item.itemClassId);
     this.formError.set(null);
     this.saveMessage.set(null);
+    this.editBaseline = JSON.stringify(this.itemForm());
+    this.editSection.set(section === 'relations' ? 'relations' : 'general');
     this.editingItem.set(true);
     setTimeout(() => {
       const selector = section === 'description' ? 'app-description-editor textarea' : section === 'relations' ? 'app-related-items-picker input[type=search]' : '.edit-card';
@@ -334,6 +348,7 @@ export class DetailPageComponent {
   }
 
   protected cancelItemEdit(): void {
+    if(this.hasUnsavedChanges() && !confirm('¿Descartar los cambios de la ficha sin guardar?')) return;
     this.editingItem.set(false);
     this.formError.set(null);
   }
@@ -355,10 +370,12 @@ export class DetailPageComponent {
     });
     this.formError.set(null);
     this.saveMessage.set(null);
+    this.boxEditBaseline=JSON.stringify(this.boxForm());
     this.editingBox.set(true);
   }
 
   protected cancelBoxEdit(): void {
+    if(this.hasUnsavedChanges() && !confirm('¿Descartar los cambios del contenedor?'))return;
     this.editingBox.set(false);
     this.formError.set(null);
   }
@@ -754,6 +771,21 @@ export class DetailPageComponent {
     ).subscribe();
   }
 
+  protected deleteLinkedRow(row: InventoryAction, comment: boolean): void {
+    if(this.saving() || !confirm(`¿Eliminar ${comment ? 'este comentario' : 'esta tarea'}? Desaparecerá de la ficha; se conserva una copia interna.`)) return;
+    this.saving.set(true);
+    this.api.deleteActivity(row.id, comment).pipe(
+      tap(() => {
+        const remove = (rows: InventoryAction[]) => rows.filter(x => x.id !== row.id);
+        this.item.update(x => x ? {...x, actions: comment ? x.actions : remove(x.actions), comments: comment ? remove(x.comments) : x.comments} : x);
+        this.box.update(x => x ? {...x, actions: comment ? x.actions : remove(x.actions), comments: comment ? remove(x.comments) : x.comments} : x);
+        this.saveMessage.set(comment ? 'Comentario eliminado.' : 'Tarea eliminada.');
+      }),
+      catchError(() => {this.formError.set('No se pudo eliminar. Inténtalo de nuevo.'); return EMPTY;}),
+      finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
   protected startCommentEdit(comment: InventoryAction): void {
     this.editingCommentId.set(comment.id);
     this.editingCommentText.set(comment.description ?? '');
@@ -859,9 +891,21 @@ export class DetailPageComponent {
     return photo.id;
   }
 
+  protected jumpToActivity(id:string):void {
+    const target=document.getElementById(id);
+    if(!target)return;
+    // scrollIntoView can also scroll Material's clipped horizontal containers.
+    // Move only the actual vertical scroller; leave the drawer geometry untouched.
+    let parent=target.parentElement;
+    while(parent && !(parent.scrollHeight>parent.clientHeight+1 && /auto|scroll/.test(getComputedStyle(parent).overflowY)))parent=parent.parentElement;
+    if(parent)parent.scrollTo({top:parent.scrollTop+target.getBoundingClientRect().top-parent.getBoundingClientRect().top-85,behavior:'instant'});
+    else window.scrollTo({top:window.scrollY+target.getBoundingClientRect().top-85,behavior:'instant'});
+    target.focus({preventScroll:true});
+  }
+
   protected selectPhoto(index: number): void {
     this.activePhotoIndex.set(index);
-    this.zooming.set(false);
+
   }
 
   protected isItemCover(photo: InventoryPhoto): boolean {
@@ -1158,40 +1202,16 @@ export class DetailPageComponent {
     this.box.update((box) => box ? { ...box, comments: replace(box.comments) } : box);
   }
 
-  protected activePhotoTransform(photo: InventoryPhoto): string {
-    const scale = this.zooming() ? 1.85 : 1;
-    return `rotate(${photo.rotationDegrees}deg) scale(${scale})`;
-  }
-
-  protected updateZoomOrigin(event: MouseEvent): void {
-    const target = event.currentTarget as HTMLElement | null;
-    if (!target) {
-      return;
-    }
-
-    const rect = target.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 100;
-    const y = ((event.clientY - rect.top) / rect.height) * 100;
-    this.zoomOriginX.set(`${Math.max(0, Math.min(100, x))}%`);
-    this.zoomOriginY.set(`${Math.max(0, Math.min(100, y))}%`);
-    this.zooming.set(true);
-  }
-
-  protected stopZoom(): void {
-    this.zooming.set(false);
-    this.zoomOriginX.set('50%');
-    this.zoomOriginY.set('50%');
-  }
-
   protected openPhotoModal(photo: InventoryPhoto | null): void {
     if (!photo) {
       return;
     }
 
     this.modalPhoto.set(photo);
-    this.zooming.set(false);
+
   }
 
+  @HostListener('document:keydown.escape')
   protected closePhotoModal(): void {
     this.modalPhoto.set(null);
   }

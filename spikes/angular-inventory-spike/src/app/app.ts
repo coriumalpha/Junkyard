@@ -1,3 +1,5 @@
+import { AccessService } from './access.service';
+import { AccessLoginComponent } from './access-login.component';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -17,7 +19,7 @@ import { InventoryCodePipe } from './inventory-code.pipe';
 
 @Component({
   selector: 'app-root',
-  imports: [
+  imports: [AccessLoginComponent,
     FormsModule,
     MatButtonModule,
     MatDividerModule,
@@ -35,6 +37,7 @@ import { InventoryCodePipe } from './inventory-code.pipe';
   styleUrl: './app.scss'
 })
 export class App {
+  protected readonly access = inject(AccessService);
   protected readonly drawerCollapsed = signal(false);
   protected readonly drawerOpen = signal(true);
   protected readonly handset = signal(false);
@@ -56,6 +59,7 @@ export class App {
   @ViewChild('quickSearchInput') private readonly quickSearchInput?: ElementRef<HTMLInputElement>;
 
   constructor() {
+    void this.access.refresh();
     this.currentUrl.set(this.router.url);
 
     this.breakpointObserver.observe(['(max-width: 1024px)']).pipe(
@@ -166,11 +170,11 @@ export class App {
 
   protected isInventorySection(): boolean {
     const path = this.currentUrl().split('?')[0];
-    if (path.startsWith('/item/')) {
+    if (path.startsWith('/item/') && path!=='/item/new') {
       return true;
     }
 
-    return path.startsWith('/inventory') && !this.hasQueryFlag('onlyConsumable') && !this.hasQueryFlag('onlyOrphans');
+    return path.startsWith('/inventory');
   }
 
   protected isContainersSection(): boolean {

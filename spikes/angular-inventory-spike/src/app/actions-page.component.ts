@@ -39,6 +39,10 @@ type LinkMode = 'none' | 'box' | 'item';
 })
 export class ActionsPageComponent {
   protected readonly loading = signal(true);
+  protected readonly createOpen=signal(false);
+  protected readonly taskView=signal<'open'|'completed'>('open');
+  protected readonly taskQuery=signal('');
+  protected readonly visibleActions=computed(()=>(this.taskView()==='open'?this.openActions():this.completedActions()).filter(a=>(a.title+' '+(a.description??'')+' '+(a.linkedLabel??'')).toLocaleLowerCase().includes(this.taskQuery().toLocaleLowerCase())));
   protected readonly error = signal<string | null>(null);
   protected readonly busyId = signal<number | null>(null);
   protected readonly data = signal<InventoryActionsResponse | null>(null);
@@ -156,6 +160,16 @@ export class ActionsPageComponent {
       }),
       finalize(() => this.busyId.set(null)),
       takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+  }
+
+  protected deleteAction(action: InventoryAction): void {
+    if(this.busyId() || !confirm('¿Eliminar esta tarea? Se conserva una copia interna.')) return;
+    this.busyId.set(action.id);
+    this.api.deleteActivity(action.id).pipe(
+      tap(() => this.load()),
+      catchError(() => {this.error.set('No se pudo eliminar la tarea.'); return EMPTY;}),
+      finalize(() => this.busyId.set(null)), takeUntilDestroyed(this.destroyRef)
     ).subscribe();
   }
 

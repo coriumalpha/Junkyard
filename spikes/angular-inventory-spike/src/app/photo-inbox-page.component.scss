@@ -263,3 +263,5 @@
     grid-template-columns: 1fr;
   }
 }
+
+.upload-disclosure{border-top:1px solid var(--app-border);border-bottom:1px solid var(--app-border);margin:20px 0;padding:12px 0}.upload-disclosure summary{font-weight:600;cursor:pointer;padding:8px}.upload-disclosure .upload-card{border:0;border-radius:0;box-shadow:none;background:none;padding:16px 0}.photo-inbox-header{border:0;background:none;box-shadow:none;padding:0}.stats-grid{display:flex;overflow:auto;gap:0;border-bottom:1px solid var(--app-border);margin:22px 0}.stat-card{display:flex;align-items:center;gap:8px;border:0;border-bottom:2px solid transparent;border-radius:0!important;background:none;box-shadow:none;padding:12px 18px;white-space:nowrap}.stat-card.active{border-bottom-color:var(--app-accent);background:none}.stat-card strong{font-size:14px}.stat-card mat-icon{display:none}.photo-card{border-radius:6px;box-shadow:none}

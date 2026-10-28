@@ -24,6 +24,7 @@ public enum InventoryActionLinkedEntityType
 public class InventoryAction
 {
     public int Id { get; set; }
+    public bool IsDeleted { get; set; }
     public string Title { get; set; } = "";
     public string? Description { get; set; }
     public InventoryActionKind Kind { get; set; } = InventoryActionKind.Task;

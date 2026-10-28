@@ -3,18 +3,18 @@
     <div>
       <p class="eyebrow">Fotos</p>
       <h1>Bandeja de fotos</h1>
-      <p>Lectura rápida de imágenes pendientes, asignadas y descartadas.</p>
+      <p>Importa fotos, convierte las pendientes en fichas y consulta las que ya has organizado.</p>
     </div>
 
     <nav class="header-actions" aria-label="Acciones de fotos">
       <a mat-flat-button routerLink="/photos/review">
         <mat-icon>rate_review</mat-icon>
-        Revisar
+        Procesar pendientes
       </a>
     </nav>
   </header>
 
-  <mat-card class="upload-card">
+  <details class="upload-disclosure"><summary>Importar fotografías al inventario</summary><mat-card class="upload-card">
     <div>
       <p class="eyebrow">Importar</p>
       <strong>Subida a pendientes</strong>
@@ -52,7 +52,7 @@
         <mat-progress-bar [mode]="uploadPhase() === 'processing' ? 'indeterminate' : 'determinate'" [value]="uploadProgress()" />
       </div>
     }
-  </mat-card>
+  </mat-card></details>
 
   <section class="stats-grid" aria-label="Estado de bandeja">
     @for (option of statusOptions; track option.value) {

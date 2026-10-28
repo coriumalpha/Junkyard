@@ -164,6 +164,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
 
         modelBuilder.Entity<InventoryAction>(entity =>
         {
+            entity.HasQueryFilter(action => !action.IsDeleted);
             entity.ToTable(tb => tb.HasCheckConstraint("CK_InventoryActions_Priority", "\"Priority\" BETWEEN 1 AND 5"));
             entity.Property(x => x.Title).HasMaxLength(180).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(1000);

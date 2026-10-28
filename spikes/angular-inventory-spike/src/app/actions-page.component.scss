@@ -247,3 +247,5 @@
     justify-content: flex-start;
   }
 }
+
+.create-panel[hidden]{display:none}.actions-grid{display:block!important}.actions-grid>.panel{border:0!important;border-radius:0!important;background:transparent!important;padding:16px 0!important}.actions-header{background:none!important;border:0!important;padding:0!important}.task-toolbar{display:flex;justify-content:space-between;align-items:center;gap:20px;border-bottom:1px solid var(--app-border);padding:20px 0}.task-toolbar button[aria-pressed=true]{color:var(--app-accent);border-bottom:2px solid var(--app-accent)}.action-row{border-radius:0!important;background:none!important;border:0!important;border-bottom:1px solid var(--app-border)!important}.action-buttons{flex-wrap:wrap}@media(max-width:700px){.task-toolbar{display:block}.task-toolbar mat-form-field{width:100%;margin-top:14px}.action-row{grid-template-columns:36px minmax(0,1fr)!important}.action-buttons{grid-column:2}}

@@ -1,0 +1,104 @@
+<div class="editor-workspace">
+ <nav class="editor-sections" aria-label="Datos del objeto">
+  @for(tab of sections;track tab.key){<button type="button" [class.active]="section()===tab.key" [attr.aria-pressed]="section()===tab.key" (click)="section.set(tab.key)"><mat-icon>{{tab.icon}}</mat-icon><span><strong>{{tab.label}}</strong><small>{{tab.hint}}</small></span></button>}
+  <p class="editor-context">Un solo borrador.<br>Cambiar de sección conserva lo escrito. Guardar aplica toda la ficha.</p>
+ </nav>
+ <div class="editor-body">
+  <section [hidden]="section()!=='general'"><h2>Lo esencial</h2><p class="section-intro">Identifica el objeto y dónde encontrarlo. Puedes completar el resto después.</p><div class="editor-grid">
+
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre *</mat-label>
+          <input matInput [ngModel]="value.name" (ngModelChange)="patch.emit({ name: $event })" />
+        </mat-form-field>
+
+
+
+        <app-searchable-select
+          label="Contenedor"
+          [value]="value.boxId"
+          [options]="boxes"
+          noneLabel="Sin caja"
+          placeholder="Buscar contenedor..."
+          (valueChange)="patch.emit({ boxId: $any($event) })" />
+
+        <mat-form-field appearance="outline">
+          <mat-label>Cantidad</mat-label>
+          <input matInput type="number" [ngModel]="value.quantity" (ngModelChange)="patch.emit({ quantity: +$event })" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Unidad</mat-label>
+          <input matInput [ngModel]="value.unit" (ngModelChange)="patch.emit({ unit: $event })" />
+        </mat-form-field>
+
+        <app-description-editor class="wide" [value]="value.notes" [markdown]="value.descriptionMarkdown ?? false" (valueChange)="patch.emit({ notes: $event })" (markdownChange)="patch.emit({ descriptionMarkdown: $event })" />@if(!photoCapture){<details class="wide advanced-identity"><summary>Código de inventario</summary>        <mat-form-field appearance="outline">
+          <mat-label>IT público</mat-label>
+          <input matInput [ngModel]="value.code" (ngModelChange)="patch.emit({ code: $event })" placeholder="Vacío = automático" />
+        </mat-form-field><p>Déjalo vacío al crear para asignarlo automáticamente.</p></details>}</div></section>
+  <section [hidden]="section()!=='classification'"><h2>Clasificación y propiedades</h2><p class="section-intro">La clase determina los campos específicos. Las etiquetas ayudan a encontrarlo.</p><div class="editor-grid">        <app-tag-picker
+          label="Tags"
+          [value]="value.tagIds"
+          [tags]="options.tags"
+          (valueChange)="patch.emit({ tagIds: $any($event) })" />
+
+        @if (allowCreateTag) { <button mat-button type="button" (click)="createTag.emit()">Crear etiqueta</button> }
+        <app-searchable-select
+          label="Clase"
+          [value]="value.itemClassId"
+          [options]="classOptions"
+          noneLabel="Sin clase"
+          placeholder="Buscar clase..."
+          (valueChange)="classChange.emit($event)" />
+
+        @if (value.itemClassId && subtypeOptions.length) {
+          <app-searchable-select
+            label="Subtipo"
+            [value]="value.itemSubtypeId"
+            [options]="subtypeOptions"
+            noneLabel="Sin subtipo"
+            placeholder="Buscar subtipo..."
+            (valueChange)="subtypeChange.emit($event)" />
+        } @else {
+          <div class="classification-note">
+            <span>{{ classLabel || 'Sin clase' }}</span>
+          </div>
+        }
+
+        <app-item-property-fields
+          class="wide"
+          [fields]="fields"
+          [values]="value.propertyValues ?? []"
+          (valuesChange)="patch.emit({propertyValues: $event})" />
+
+</div></section>
+  <section [hidden]="section()!=='placement'"><h2>Estado y control</h2><p class="section-intro">Condición, seguimiento y reglas de existencias.</p><div class="editor-grid">@if(!photoCapture){        <mat-form-field appearance="outline">
+          <mat-label>Mínimo</mat-label>
+          <input matInput type="number" [ngModel]="value.minQuantity" (ngModelChange)="patch.emit({ minQuantity: $event === '' ? null : +$event })" />
+        </mat-form-field>
+
+        <app-searchable-select
+          label="Estado"
+          [value]="value.condition"
+          [options]="conditions"
+          noneLabel="Sin estado"
+          placeholder="Buscar estado..."
+          (valueChange)="patch.emit({ condition: $any($event) ?? '' })" />
+
+        <mat-form-field appearance="outline">
+          <mat-label>Retención</mat-label>
+          <input matInput [ngModel]="value.retention" (ngModelChange)="patch.emit({ retention: $event })" />
+        </mat-form-field>
+
+}        <div class="toggle-row wide">
+@if(!photoCapture){          <mat-slide-toggle [checked]="value.consumable" (change)="patch.emit({ consumable: $event.checked })">Consumible</mat-slide-toggle>}
+          <mat-slide-toggle [checked]="value.isQuarantined" (change)="patch.emit({ isQuarantined: $event.checked })">En cuarentena</mat-slide-toggle>
+          <mat-slide-toggle [checked]="value.needsReview" (change)="patch.emit({ needsReview: $event.checked })">Pendiente de completar</mat-slide-toggle>
+@if(!photoCapture){          <mat-slide-toggle [checked]="value.sentimental" (change)="patch.emit({ sentimental: $event.checked })">Sentimental</mat-slide-toggle>}
+@if(!photoCapture){          <mat-slide-toggle [checked]="value.obsolete" (change)="patch.emit({ obsolete: $event.checked })">Obsoleto</mat-slide-toggle>}
+        </div>
+</div></section>
+  <section [hidden]="section()!=='relations'"><h2>Relaciones</h2><p class="section-intro">Vincula componentes, accesorios u objetos relacionados sin cambiar su ubicación.</p><app-related-items-picker class="wide" [selfId]="selfId" [value]="value.relatedItemIds ?? []" (valueChange)="patch.emit({ relatedItemIds: $event })" />
+
+</section>
+ </div>
+</div>

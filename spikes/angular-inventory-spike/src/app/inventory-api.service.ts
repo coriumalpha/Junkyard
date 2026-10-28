@@ -719,6 +719,7 @@ export interface PhotoReviewPhoto {
 }
 
 export interface PhotoReviewCreateItem {
+  propertyValues?: ItemPropertyValue[];
   descriptionMarkdown?: boolean;
   relatedItemIds?: number[];
   ids: number[];
@@ -1072,6 +1073,10 @@ export class InventoryApiService {
 
   updateAction(id: number, input: InventoryActionUpdate): Observable<InventoryAction> {
     return this.http.put<InventoryAction>(`/api/actions/${id}`, input);
+  }
+
+  deleteActivity(id: number, comment = false): Observable<void> {
+    return this.http.delete<void>(`/api/${comment ? 'comments' : 'actions'}/${id}`);
   }
 
   updateComment(id: number, input: InventoryActionUpdate): Observable<InventoryAction> {

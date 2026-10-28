@@ -479,6 +479,10 @@ The SPA talks to the ASP.NET Core backend/API.
 
 ---
 
+## Access and production UI
+
+Junkyard has its own single-owner account, secure session cookies and CSRF protection. Production UI runs as a compiled Angular release behind the existing HTTPS reverse proxy, not the Angular development server. See [access, deployment and recovery](docs/ACCESS.md).
+
 ## Runtime data and persistence
 
 Inside the container, Junkyard stores mutable runtime state under `/data`.
@@ -550,7 +554,7 @@ The following are deliberately ignored by `.gitignore` and `.dockerignore`:
 - uploaded photos and `wwwroot/uploads/`
 - imports, exports, backups, logs and `.env` files
 
-If you expose Junkyard outside a trusted local network, put authentication and TLS in front of it before entering real inventory data.
+Keep the built-in authentication enabled and place the origin behind a trusted HTTPS reverse proxy. API, uploads and exports require a session. See docs/ACCESS.md.
 
 ---
 
