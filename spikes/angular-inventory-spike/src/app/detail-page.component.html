@@ -14,11 +14,11 @@
             Restaurar
           </button>
         } @else {
-          <button mat-flat-button type="button" (click)="startItemEdit()" [disabled]="editingItem() || saving()">
+          <button mat-flat-button type="button" (click)="startItemEdit()" [disabled]="editingItem() || saving() || placementOpen()">
             <mat-icon>edit</mat-icon>
             Editar
           </button>
-          <button mat-stroked-button type="button" class="danger-action" (click)="archiveCurrentItem()" [disabled]="saving() || editingItem()">
+          <button mat-stroked-button type="button" class="danger-action" (click)="archiveCurrentItem()" [disabled]="saving() || editingItem() || placementOpen()">
             <mat-icon>archive</mat-icon>
             Archivar
           </button>
@@ -193,11 +193,13 @@
           }
         </mat-chip-set>
         <section class="item-location" aria-label="Ubicación del ítem">
-          <h2>Ubicación</h2>
+          <h2>Contenedor de pertenencia</h2>
           <app-hierarchy-trail [nodes]="itemHierarchyNodes()" [compact]="true" />
         </section>
+        <app-item-placement [item]="item()!" [options]="options()"
+          (updated)="item.set($event)" (dirtyChange)="placementDirty.set($event)" (editingChange)="placementOpen.set($event)" />
         <section class="item-description" aria-label="Descripción del ítem">
-        <div class="section-head"><h2>Descripción</h2>@if (!item()!.archived) { <button mat-button type="button" (click)="startItemEdit('description')">{{ item()!.notes ? 'Editar' : 'Añadir' }}</button> }</div>
+        <div class="section-head"><h2>Descripción</h2>@if (!item()!.archived) { <button mat-button type="button" [disabled]="placementOpen()" (click)="startItemEdit('description')">{{ item()!.notes ? 'Editar' : 'Añadir' }}</button> }</div>
         @if (item()!.notes) {
           <app-description-view [text]="item()!.notes!" [markdown]="item()!.descriptionMarkdown" />
         } @else {
@@ -739,6 +741,18 @@
           </button>
         </div>
       </div>
+      @if (box()!.visitingItems.length) {
+        <details class="visiting-items" open>
+          <summary>Temporalmente aquí ({{ box()!.visitingItems.length }})</summary>
+          <div class="item-list">
+            @for(visitor of box()!.visitingItems;track visitor.id){
+              <app-entity-mini-card [title]="visitor.name" [subtitle]="'Pertenece a ' + (visitor.boxPath || 'ningún contenedor')"
+                [imageUrl]="assetUrl(visitor.coverUrl)" [rotationDegrees]="visitor.rotationDegrees"
+                [placeholder]="firstLetter(visitor.name)" [routerLink]="['/item',visitor.id]" />
+            }
+          </div>
+        </details>
+      }
       @if (boxItemsView() === 'table') {
         <div class="items-table" role="table">
           <div class="items-table-head" role="row">
@@ -750,7 +764,7 @@
           @for (item of sortedBoxItems(); track item.id) {
             <a class="items-table-row" [routerLink]="['/item', item.id]" role="row">
               <span>{{ item.code | inventoryCode }}</span>
-              <strong>{{ item.name }}</strong>
+              <strong>{{ item.name }}@if(item.currentPlacement){<small class="item-away">Fuera · {{ item.currentPlacement.destination }}</small>}</strong>
               <span>{{ tagSummary(item) }}</span>
               <span>{{ item.quantityLabel }}</span>
             </a>
@@ -764,6 +778,7 @@
             <app-entity-mini-card
               [title]="item.name"
               [subtitle]="(item.code | inventoryCode) + ' · ' + tagSummary(item) + ' · ' + item.quantityLabel"
+              [meta]="item.currentPlacement ? 'Fuera · ' + item.currentPlacement.destination : null"
               [imageUrl]="assetUrl(item.coverUrl)"
               [rotationDegrees]="item.rotationDegrees"
               [placeholder]="firstLetter(item.name)"

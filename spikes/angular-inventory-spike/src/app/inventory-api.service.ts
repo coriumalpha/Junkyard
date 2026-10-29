@@ -18,6 +18,7 @@ export interface InventoryQueryState {
   onlyUntagged: boolean;
   onlyQuarantined: boolean;
   onlyNeedsReview: boolean;
+  onlyAway: boolean;
   layout: InventoryLayoutMode;
   view: InventoryViewMode;
 }
@@ -310,6 +311,7 @@ export interface InventoryGroup {
 }
 
 export interface InventoryItem {
+  currentPlacement: ItemPlacement | null;
   id: number;
   code: string;
   name: string;
@@ -490,9 +492,27 @@ export interface InventoryAction {
   completedAt: string | null;
 }
 
+export interface ItemPlacementEvent {
+  id: number; kind: 'created' | 'updated' | 'returned'; at: string;
+  destination: string; notes: string | null; expectedReturnDate: string | null; startedAt: string;
+}
+export interface ItemPlacement {
+  id: number; destinationType: 'text' | 'location' | 'box'; destination: string;
+  locationId: number | null; destinationBoxId: number | null; destinationBoxCode: string | null;
+  currentLocationId: number | null; notes: string | null; expectedReturnDate: string | null;
+  startedAt: string; returnedAt: string | null; version: number; events: ItemPlacementEvent[];
+}
+export interface ItemPlacementInput {
+  destinationType: 'text' | 'location' | 'box'; destination: string;
+  locationId: number | null; destinationBoxId: number | null; notes: string;
+  expectedReturnDate: string | null; startedAt: string; version: number | null;
+}
+
 export interface RelatedItem { id: number; code: string; name: string; archived: boolean; }
 
 export interface InventoryItemDetail {
+  currentPlacement: ItemPlacement | null;
+  placementHistory: ItemPlacement[];
   descriptionMarkdown: boolean;
   relatedItems: RelatedItem[];
   propertyFields: ItemPropertyField[];
@@ -583,6 +603,7 @@ export interface PhotoReturnToInboxResponse<TDetail> {
 }
 
 export interface InventoryBoxDetail {
+  visitingItems: InventoryItem[];
   id: number;
   code: string;
   name: string;
@@ -927,9 +948,20 @@ export class InventoryApiService {
       params = params.set('onlyNeedsReview', 'true');
     }
 
+    if (state.onlyAway) params = params.set('onlyAway', 'true');
     params = params.set('view', state.view);
 
     return this.http.get<InventoryLiveResponse>('/api/inventory/live', { params });
+  }
+
+  startPlacement(id: number, input: ItemPlacementInput): Observable<InventoryItemDetail> {
+    return this.http.post<InventoryItemDetail>(`/api/items/${id}/placements`, input);
+  }
+  updatePlacement(id: number, placementId: number, input: ItemPlacementInput): Observable<InventoryItemDetail> {
+    return this.http.put<InventoryItemDetail>(`/api/items/${id}/placements/${placementId}`, input);
+  }
+  returnPlacement(id: number, placementId: number, version: number): Observable<InventoryItemDetail> {
+    return this.http.post<InventoryItemDetail>(`/api/items/${id}/placements/${placementId}/return`, {version});
   }
 
   fetchOptions(): Observable<InventoryOptionsResponse> {

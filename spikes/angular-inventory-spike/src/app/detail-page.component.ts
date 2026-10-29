@@ -1,3 +1,4 @@
+import { ItemPlacementComponent } from './item-placement.component';
 import { FittedPhotoComponent } from './fitted-photo.component';
 import { A11yModule } from '@angular/cdk/a11y';
 import {ItemEditorComponent} from './item-editor.component';
@@ -38,7 +39,7 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
 @Component({
   selector: 'app-detail-page',
   standalone: true,
-  imports: [FittedPhotoComponent, A11yModule, ItemEditorComponent,
+  imports: [ItemPlacementComponent, FittedPhotoComponent, A11yModule, ItemEditorComponent,
      DescriptionViewComponent, ItemPropertyFieldsComponent,
     CommonModule,
     FormsModule,
@@ -64,6 +65,8 @@ type BoxItemSortKey = 'code' | 'name' | 'tags' | 'quantity';
   styleUrl: './detail-page.component.scss'
 })
 export class DetailPageComponent {
+  protected readonly placementDirty = signal(false);
+  protected readonly placementOpen = signal(false);
   protected readonly editSection = signal('general');
   protected readonly editSections = [
     {key:'general',label:'Identidad y descripción'}, {key:'classification',label:'Clasificación y propiedades'},
@@ -72,7 +75,7 @@ export class DetailPageComponent {
   private editBaseline = '';
   private boxEditBaseline='';
   public hasUnsavedChanges(): boolean {
-    return (this.editingItem() && JSON.stringify(this.itemForm()) !== this.editBaseline) || (this.editingBox() && JSON.stringify(this.boxForm())!==this.boxEditBaseline);
+    return this.placementDirty() || (this.editingItem() && JSON.stringify(this.itemForm()) !== this.editBaseline) || (this.editingBox() && JSON.stringify(this.boxForm())!==this.boxEditBaseline);
   }
   @HostListener('window:beforeunload', ['$event'])
   public warnBeforeUnload(event: BeforeUnloadEvent): void {
@@ -239,6 +242,8 @@ export class DetailPageComponent {
         this.kind.set(kind);
         this.loading.set(true);
         this.error.set(null);
+        this.placementDirty.set(false);
+        this.placementOpen.set(false);
         this.item.set(null);
         this.box.set(null);
         this.activePhotoIndex.set(0);

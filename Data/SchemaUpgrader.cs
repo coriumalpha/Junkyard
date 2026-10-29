@@ -21,6 +21,41 @@ public static class SchemaUpgrader
         AddColumn(db, "Items", "ArchivedAt", "TEXT NULL");
         AddColumn(db, "Items", "Code", "TEXT NULL");
         EnsureNullableItemBoxId(db);
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "ItemPlacements" (
+                "Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                "ItemId" INTEGER NOT NULL REFERENCES "Items"("Id") ON DELETE CASCADE,
+                "Destination" TEXT NOT NULL,
+                "DestinationType" TEXT NOT NULL DEFAULT 'text',
+                "LocationId" INTEGER NULL REFERENCES "Locations"("Id") ON DELETE SET NULL,
+                "DestinationBoxId" INTEGER NULL REFERENCES "Boxes"("Id") ON DELETE SET NULL,
+                "Version" INTEGER NOT NULL DEFAULT 1,
+                "Notes" TEXT NULL,
+                "ExpectedReturnDate" TEXT NULL,
+                "StartedAt" TEXT NOT NULL,
+                "ReturnedAt" TEXT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_ItemPlacements_ItemId" ON "ItemPlacements" ("ItemId") WHERE "ReturnedAt" IS NULL;
+            """);
+        AddColumn(db, "ItemPlacements", "DestinationType", "TEXT NOT NULL DEFAULT 'text'");
+        AddColumn(db, "ItemPlacements", "LocationId", "INTEGER NULL REFERENCES Locations(Id) ON DELETE SET NULL");
+        AddColumn(db, "ItemPlacements", "DestinationBoxId", "INTEGER NULL REFERENCES Boxes(Id) ON DELETE SET NULL");
+        AddColumn(db, "ItemPlacements", "Version", "INTEGER NOT NULL DEFAULT 1");
+        db.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_ItemPlacements_LocationId" ON "ItemPlacements" ("LocationId");
+            CREATE INDEX IF NOT EXISTS "IX_ItemPlacements_DestinationBoxId" ON "ItemPlacements" ("DestinationBoxId");
+            CREATE TABLE IF NOT EXISTS "ItemPlacementEvent" (
+                "Id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                "ItemPlacementId" INTEGER NOT NULL REFERENCES "ItemPlacements"("Id") ON DELETE CASCADE,
+                "Kind" TEXT NOT NULL,
+                "At" TEXT NOT NULL,
+                "Destination" TEXT NOT NULL,
+                "Notes" TEXT NULL,
+                "ExpectedReturnDate" TEXT NULL,
+                "StartedAt" TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_ItemPlacementEvent_ItemPlacementId" ON "ItemPlacementEvent" ("ItemPlacementId");
+            """);
         EnsureTags(db);
         EnsureItemConditions(db);
         EnsureItemClassifications(db);

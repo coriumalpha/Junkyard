@@ -60,6 +60,7 @@ const DEFAULT_STATE: InventoryQueryState = {
   onlyUntagged: false,
   onlyQuarantined: false,
   onlyNeedsReview: false,
+  onlyAway: false,
   layout: 'grouped',
   view: 'grouped'
 };
@@ -178,7 +179,7 @@ export class InventoryPageComponent {
   protected readonly shouldAutoExpandGroups = computed(() => {
     const state = this.state();
     return state.layout === 'grouped'
-      && Boolean(state.q.trim() || state.category.trim() || state.tagIds.length || state.boxIds.length || state.locationId !== null || state.onlyConsumable || state.onlyOrphans || state.onlyUntagged || state.onlyQuarantined || state.onlyNeedsReview);
+      && Boolean(state.q.trim() || state.category.trim() || state.tagIds.length || state.boxIds.length || state.locationId !== null || state.onlyConsumable || state.onlyOrphans || state.onlyUntagged || state.onlyQuarantined || state.onlyNeedsReview || state.onlyAway);
   });
   protected readonly filteredContainers = computed(() => {
     const state = this.state();
@@ -330,6 +331,8 @@ export class InventoryPageComponent {
   protected setOnlyQuarantined(value: boolean): void {
     this.navigate({ onlyQuarantined: value });
   }
+
+  protected setOnlyAway(value: boolean): void { this.navigate({onlyAway: value}); }
 
   protected setOnlyNeedsReview(value: boolean): void {
     this.navigate({ onlyNeedsReview: value });
@@ -545,6 +548,7 @@ export class InventoryPageComponent {
       summary.push('pendiente de completar');
     }
 
+    if (state.onlyAway) summary.push('fuera temporalmente');
     summary.push(this.layoutLabel(state.layout));
     return summary;
   }
@@ -803,6 +807,7 @@ export class InventoryPageComponent {
       params['onlyQuarantined'] = 'true';
     }
 
+    if (state.onlyAway) params['onlyAway'] = 'true';
     if (state.onlyNeedsReview) {
       params['onlyNeedsReview'] = 'true';
     }
@@ -838,6 +843,7 @@ export class InventoryPageComponent {
       onlyUntagged: params.get('onlyUntagged') === 'true',
       onlyQuarantined: params.get('onlyQuarantined') === 'true',
       onlyNeedsReview: params.get('onlyNeedsReview') === 'true',
+      onlyAway: params.get('onlyAway') === 'true',
       layout,
       view: this.deriveBackendView(layout)
     };

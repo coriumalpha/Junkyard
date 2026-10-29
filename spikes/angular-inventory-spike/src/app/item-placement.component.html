@@ -1,0 +1,90 @@
+<section class="placement" aria-label="Desplazamiento temporal">
+  @if (!editing) {
+    @if (item.currentPlacement; as active) {
+      <div class="current-place">
+        <mat-icon aria-hidden="true">near_me</mat-icon>
+        <div>
+          <span class="place-label">Ahora · Fuera temporalmente</span>
+          @if(active.destinationBoxCode){
+            <a class="destination" [routerLink]="['/boxes',active.destinationBoxCode]">{{ active.destination }}</a>
+          } @else if(active.locationId){
+            <a class="destination" routerLink="/inventory" [queryParams]="{locationId:active.locationId,layout:'flat'}">{{ active.destination }}</a>
+          } @else {<strong class="destination">{{ active.destination }}</strong>}
+          <p class="dates">Desde {{ active.startedAt | date:'dd/MM/yyyy HH:mm' }}
+            @if(active.expectedReturnDate){ · Retorno previsto: {{ active.expectedReturnDate | date:'dd/MM/yyyy' }}
+              @if(overdue(active.expectedReturnDate)){<span class="overdue"> · Fecha superada</span>}}
+          </p>
+          @if(active.notes){<p class="notes">{{ active.notes }}</p>}
+        </div>
+      </div>
+      @if(confirmingReturn){
+        <div class="return-confirm" role="group" aria-label="Confirmar devolución">
+          <p>¿Ha vuelto {{ item.box ? 'a ' + item.box.name : 'a su ubicación habitual' }}?</p>
+          <button mat-flat-button type="button" (click)="returnItem()" [disabled]="busy">Confirmar devolución</button>
+          <button mat-button type="button" (click)="confirmingReturn=false" [disabled]="busy">Cancelar</button>
+        </div>
+      } @else {
+        <div class="placement-actions">
+          <button mat-button type="button" (click)="open()">Modificar</button>
+          <button mat-button type="button" (click)="confirmingReturn=true;error='';message=''">Registrar devolución</button>
+        </div>
+      }
+    } @else if(!item.archived) {
+      <button mat-button type="button" class="start-placement" (click)="open()"><mat-icon>near_me</mat-icon>Desplazar temporalmente</button>
+    }
+  } @else {
+    <form class="placement-form" (ngSubmit)="save()">
+      <div class="form-head"><h3>{{ item.currentPlacement ? 'Modificar desplazamiento' : 'Registrar salida temporal' }}</h3></div>
+      <p class="help">Su contenedor de pertenencia no cambia. Al devolverlo, se recupera la ubicación que muestra arriba.</p>
+      <fieldset [disabled]="busy">
+        <label>Tipo de destino
+          <select name="destinationType" [(ngModel)]="form.destinationType" (ngModelChange)="changed()">
+            <option value="text">Texto libre</option><option value="location">Ubicación existente</option><option value="box">Otro contenedor</option>
+          </select>
+        </label>
+        @switch(form.destinationType){
+          @case('text'){
+            <label>Destino<input name="destination" [(ngModel)]="form.destination" (ngModelChange)="changed()" required maxlength="160" placeholder="Por ejemplo, Escritorio" /></label>
+          }
+          @case('location'){
+            <app-searchable-select [disabled]="busy" label="Ubicación" [options]="locationOptions" [value]="form.locationId" (valueChange)="form.locationId=$any($event);changed()" noneLabel="Selecciona ubicación" />
+          }
+          @case('box'){
+            <app-searchable-select [disabled]="busy" label="Contenedor de destino" [options]="boxOptions" [value]="form.destinationBoxId" (valueChange)="form.destinationBoxId=$any($event);changed()" noneLabel="Selecciona contenedor" />
+          }
+        }
+        <div class="date-fields">
+          <label>Salida<input type="datetime-local" name="startedAt" [(ngModel)]="form.startedAt" (ngModelChange)="changed()" required /></label>
+          <label>Retorno previsto <small>opcional</small><input type="date" name="expectedReturnDate" [(ngModel)]="form.expectedReturnDate" (ngModelChange)="changed()" /></label>
+        </div>
+        <label>Observaciones <small>opcionales</small><textarea name="notes" rows="2" maxlength="1000" [(ngModel)]="form.notes" (ngModelChange)="changed()"></textarea></label>
+      </fieldset>
+      <div class="placement-actions">
+        <button mat-flat-button type="submit" [disabled]="busy">{{ busy ? 'Guardando…' : (item.currentPlacement ? 'Guardar cambios' : 'Registrar salida') }}</button>
+        <button mat-button type="button" (click)="cancel()" [disabled]="busy">Cancelar</button>
+      </div>
+    </form>
+  }
+  @if(error){<p class="placement-error" role="alert">{{ error }}</p>}
+  @if(message){<p class="placement-message" role="status">{{ message }}</p>}
+  @if(item.placementHistory.length && !editing){
+    <details class="placement-history">
+      <summary>Historial de desplazamientos ({{ item.placementHistory.length }})</summary>
+      <ol>
+        @for(stay of item.placementHistory;track stay.id){
+          <li><strong>{{ stay.destination }}</strong><p class="dates">{{ stay.startedAt | date:'dd/MM/yyyy HH:mm' }} → {{ stay.returnedAt ? (stay.returnedAt | date:'dd/MM/yyyy HH:mm') : 'En curso' }}</p>
+            @if(stay.events.length){<details><summary>Ver registros ({{ stay.events.length }})</summary>
+              <ul>@for(event of stay.events;track event.id){
+                <li><span>{{ event.kind==='created'?'Salida registrada':event.kind==='returned'?'Devolución':'Modificación' }} · {{ event.at | date:'dd/MM/yyyy HH:mm' }}</span>
+                  <p>{{ event.destination }}</p>
+                  <p class="dates">Salida: {{ event.startedAt | date:'dd/MM/yyyy HH:mm' }}@if(event.expectedReturnDate){ · Previsto: {{ event.expectedReturnDate | date:'dd/MM/yyyy' }}}</p>
+                  @if(event.notes){<p class="notes">{{ event.notes }}</p>}
+                </li>
+              }</ul>
+            </details>}
+          </li>
+        }
+      </ol>
+    </details>
+  }
+</section>

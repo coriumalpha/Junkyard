@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace Inventario.Services;
 
-public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorage photoStorage)
+public sealed partial class InventoryLiveQueryService(InventoryDbContext db, PhotoStorage photoStorage)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -95,6 +95,9 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
     public async Task<InventoryItemDetailDto?> GetItemDetailAsync(int id, CancellationToken cancellationToken)
     {
         var item = await db.Items.IgnoreQueryFilters().AsNoTracking()
+            .Include(i => i.Placements).ThenInclude(p => p.Events)
+            .Include(i => i.Placements).ThenInclude(p => p.Location)
+            .Include(i => i.Placements).ThenInclude(p => p.DestinationBox)
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
             .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
             .Include(i => i.ItemClass)
@@ -162,7 +165,9 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.DescriptionMarkdown,
             await GetRelatedItemsAsync(item.Id, cancellationToken),
             await GetItemPropertyFieldsAsync(item, cancellationToken),
-            await GetRetainedPropertyValuesAsync(item, cancellationToken));
+            await GetRetainedPropertyValuesAsync(item, cancellationToken),
+            item.Placements.Where(p => p.ReturnedAt == null).Select(p => ToPlacementDto(p, locationLookup)).SingleOrDefault(),
+            item.Placements.OrderByDescending(p => p.StartedAt).ThenByDescending(p => p.Id).Select(p => ToPlacementDto(p, locationLookup)).ToList());
     }
 
     public async Task<ArchiveDto> GetArchiveAsync(CancellationToken cancellationToken)
@@ -344,6 +349,9 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (null, null);
         }
 
+        if (item.BoxId != (input.BoxId is > 0 ? input.BoxId : null)
+            && await db.ItemPlacements.AnyAsync(p => p.ItemId == id && p.ReturnedAt == null, cancellationToken))
+            return (null, "Registra la devolución antes de cambiar el contenedor de pertenencia.");
         var relationError = await ValidateRelatedItemsAsync(input.RelatedItemIds, id, cancellationToken);
         if (relationError is not null) return (null, relationError);
         var name = (input.Name ?? "").Trim();
@@ -549,6 +557,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             return (null, "No se encontró ningún ítem seleccionado.");
         }
 
+        if (hasMove && await db.ItemPlacements.AnyAsync(p => itemIds.Contains(p.ItemId) && p.ReturnedAt == null, cancellationToken))
+            return (null, "Hay ítems fuera temporalmente. Registra su devolución antes de cambiar su pertenencia.");
         foreach (var item in items)
         {
             if (hasMove)
@@ -961,6 +971,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             .Include(b => b.Location)
             .Include(b => b.ParentBox)
             .Include(b => b.ChildBoxes)
+            .Include(b => b.Items).ThenInclude(item => item.Placements.Where(p => p.ReturnedAt == null)).ThenInclude(p => p.Location)
+            .Include(b => b.Items).ThenInclude(item => item.Placements.Where(p => p.ReturnedAt == null)).ThenInclude(p => p.DestinationBox)
             .Include(b => b.Items).ThenInclude(item => item.ItemTags).ThenInclude(itemTag => itemTag.Tag)
             .FirstOrDefaultAsync(b => equivalentCodes.Contains(b.Code), cancellationToken);
 
@@ -976,7 +988,14 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             box.EffectiveLocationSourceLabel = location.SourceLabel;
         }
 
-        var itemIds = box.Items.Select(item => item.Id).ToList();
+        var visitingItems = await db.Items.AsNoTracking()
+            .Where(i => i.Placements.Any(p => p.ReturnedAt == null && p.DestinationBoxId == box.Id))
+            .Include(i => i.Box).ThenInclude(b => b!.Location)
+            .Include(i => i.ItemTags).ThenInclude(t => t.Tag)
+            .Include(i => i.Placements.Where(p => p.ReturnedAt == null)).ThenInclude(p => p.DestinationBox)
+            .OrderBy(i => i.Name).ToListAsync(cancellationToken);
+        var allItems = box.Items.Concat(visitingItems).ToList();
+        var itemIds = allItems.Select(item => item.Id).ToList();
         var itemPhotoCounts = itemIds.Count == 0
             ? new Dictionary<int, int>()
             : await db.Photos.AsNoTracking()
@@ -988,7 +1007,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         var photos = await EntityPhotosAsync(PhotoEntityType.Box, box.Id, box.CoverPhoto, cancellationToken);
         var linkedRows = await GetLinkedRowsAsync(InventoryActionLinkedEntityType.Box, box.Id, cancellationToken);
         var filenames = photos.Select(photo => photo.Filename)
-            .Concat(box.Items.Select(item => item.CoverPhoto).Where(filename => !string.IsNullOrWhiteSpace(filename)).Select(filename => filename!))
+            .Concat(allItems.Select(item => item.CoverPhoto).Where(filename => !string.IsNullOrWhiteSpace(filename)).Select(filename => filename!))
             .Distinct()
             .ToList();
         var photoStates = await PhotoStorage.LoadViewStatesAsync(db, filenames, cancellationToken);
@@ -1018,7 +1037,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             linkedRows.Actions,
             linkedRows.Comments,
             box.CreatedAt,
-            box.UpdatedAt);
+            box.UpdatedAt,
+            visitingItems.Select(item => ToItemDto(item, locationLookup, itemPhotoCounts, photoStates)).ToList());
     }
 
     public async Task<(InventoryBoxDetailDto? Box, string? Error)> UpdateBoxAsync(
@@ -1173,6 +1193,10 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         {
             return (null, null);
         }
+
+        var memberIds = box.Items.Select(i => i.Id).ToList();
+        if (await db.ItemPlacements.AnyAsync(p => p.ReturnedAt == null && (p.DestinationBoxId == id || memberIds.Contains(p.ItemId)), cancellationToken))
+            return (null, "Este contenedor está vinculado a desplazamientos activos. Registra la devolución o cambia el destino antes de archivarlo.");
 
         var targetBoxId = input.TargetBoxId is > 0 ? input.TargetBoxId : null;
         if (targetBoxId == box.Id)
@@ -2093,6 +2117,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         bool onlyUntagged,
         bool onlyQuarantined,
         bool onlyNeedsReview,
+        bool onlyAway,
         string? view,
         CancellationToken cancellationToken)
     {
@@ -2106,6 +2131,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         Box? selectedBox = null;
         var selectedBoxIds = new List<int>();
         var query = db.Items.AsNoTracking()
+            .Include(i => i.Placements.Where(p => p.ReturnedAt == null)).ThenInclude(p => p.Location)
+            .Include(i => i.Placements.Where(p => p.ReturnedAt == null)).ThenInclude(p => p.DestinationBox)
             .Include(i => i.Box)!.ThenInclude(b => b!.Location)
             .Include(i => i.Box)!.ThenInclude(b => b!.ParentBox)
             .Include(i => i.ItemClass)
@@ -2206,7 +2233,9 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 .Where(entry => entry.Value.LocationId == selectedLocationId)
                 .Select(entry => entry.Key)
                 .ToList();
-            query = query.Where(i => i.BoxId != null && locationBoxIds.Contains(i.BoxId.Value));
+            query = query.Where(i => i.Placements.Any(p => p.ReturnedAt == null &&
+                (p.LocationId == selectedLocationId || (p.DestinationBoxId != null && locationBoxIds.Contains(p.DestinationBoxId.Value))))
+                || (!i.Placements.Any(p => p.ReturnedAt == null) && i.BoxId != null && locationBoxIds.Contains(i.BoxId.Value)));
         }
 
         if (onlyConsumable)
@@ -2228,6 +2257,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         {
             query = query.Where(i => i.IsQuarantined);
         }
+
+        if (onlyAway) query = query.Where(i => i.Placements.Any(p => p.ReturnedAt == null));
 
         if (onlyNeedsReview)
         {
@@ -2381,6 +2412,9 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
         var locationName = item.Box is not null && locationLookup.TryGetValue(item.Box.Id, out var location)
             ? location.LocationName
             : item.Box?.Location?.Name;
+        var placement = item.Placements.FirstOrDefault(p => p.ReturnedAt == null);
+        var currentPlacement = placement is null ? null : ToPlacementDto(placement, locationLookup);
+        locationName = currentPlacement?.Destination ?? locationName;
         return new InventoryItemDto(
             item.Id,
             item.Code,
@@ -2410,7 +2444,8 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
             item.NeedsReview,
             item.MinQuantity != null && item.Quantity <= item.MinQuantity,
             item.Sentimental,
-            item.Obsolete);
+            item.Obsolete,
+            currentPlacement);
     }
 
     private static int ScoreItemSearch(Item item, string query)
@@ -2431,6 +2466,7 @@ public sealed class InventoryLiveQueryService(InventoryDbContext db, PhotoStorag
                 (string.Join(' ', item.ItemTags.Select(itemTag => itemTag.Tag.Name)), 55),
                 (item.ItemClass?.Name, 45),
                 (item.ItemSubtype?.Name, 45),
+                (item.Placements.FirstOrDefault(p => p.ReturnedAt == null)?.Destination, 65),
                 (item.Notes, 30),
                 (item.Unit, 10)
             ]);
@@ -3550,7 +3586,17 @@ public record InventoryItemDetailDto(
     bool DescriptionMarkdown,
     List<RelatedItemDto> RelatedItems,
     List<ItemPropertyFieldDto> PropertyFields,
-    List<ItemPropertyFieldDto> RetainedPropertyValues);
+    List<ItemPropertyFieldDto> RetainedPropertyValues,
+    ItemPlacementDto? CurrentPlacement,
+    List<ItemPlacementDto> PlacementHistory);
+
+public record ItemPlacementInput(string? DestinationType, string? Destination, int? LocationId, int? DestinationBoxId,
+    string? Notes, DateOnly? ExpectedReturnDate, DateTimeOffset? StartedAt, int? Version);
+public record ItemPlacementVersionInput(int Version);
+public record ItemPlacementEventDto(int Id, string Kind, DateTime At, string Destination, string? Notes, DateOnly? ExpectedReturnDate, DateTime StartedAt);
+public record ItemPlacementDto(int Id, string DestinationType, string Destination, int? LocationId, int? DestinationBoxId,
+    string? DestinationBoxCode, int? CurrentLocationId, string? Notes, DateOnly? ExpectedReturnDate,
+    DateTime StartedAt, DateTime? ReturnedAt, int Version, List<ItemPlacementEventDto> Events);
 
 public record RelatedItemDto(int Id, string Code, string Name, bool Archived);
 
@@ -3616,7 +3662,8 @@ public record InventoryBoxDetailDto(
     List<InventoryActionDto> Actions,
     List<InventoryActionDto> Comments,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    List<InventoryItemDto> VisitingItems);
 
 public record InventoryBoxUpdateDto(
     string? Code,
@@ -3874,7 +3921,8 @@ public record InventoryItemDto(
     bool NeedsReview,
     bool LowStock,
     bool Sentimental,
-    bool Obsolete);
+    bool Obsolete,
+    ItemPlacementDto? CurrentPlacement);
 
 public record InventoryHierarchyNodeDto(
     string Label,

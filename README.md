@@ -563,6 +563,7 @@ Keep the built-in authentication enabled and place the origin behind a trusted H
 Available documentation:
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Temporary item placements](docs/TEMPORARY-PLACEMENTS.md)
 - [Item classification](docs/ITEM-CLASSIFICATION.md)
 - [Item properties by class and subtype](docs/ITEM-PROPERTIES.md)
 - [AI item suggestions](docs/AI-ITEM-SUGGESTIONS.md)

@@ -102,6 +102,7 @@ export class ActionsPageComponent {
       onlyUntagged: false,
       onlyQuarantined: false,
       onlyNeedsReview: false,
+      onlyAway: false,
       layout: 'flat',
       view: 'flat'
     }).pipe(

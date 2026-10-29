@@ -30,6 +30,7 @@ public class Item
     public DateTime? ArchivedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public List<ItemPlacement> Placements { get; set; } = [];
     public List<ItemTag> ItemTags { get; set; } = [];
     public List<ItemPropertyValue> PropertyValues { get; set; } = [];
 

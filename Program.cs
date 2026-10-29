@@ -249,6 +249,7 @@ app.MapGet("/api/inventory/live", async (
         string.Equals(query["onlyUntagged"], "true", StringComparison.OrdinalIgnoreCase),
         string.Equals(query["onlyQuarantined"], "true", StringComparison.OrdinalIgnoreCase),
         string.Equals(query["onlyNeedsReview"], "true", StringComparison.OrdinalIgnoreCase),
+        string.Equals(query["onlyAway"], "true", StringComparison.OrdinalIgnoreCase),
         query["view"].ToString(),
         cancellationToken);
 
@@ -679,6 +680,8 @@ app.MapDelete("/api/locations/{id:int}", async (
     InventoryDbContext db,
     CancellationToken cancellationToken) =>
 {
+    if (await db.ItemPlacements.AnyAsync(p => p.ReturnedAt == null && p.LocationId == id, cancellationToken))
+        return Results.BadRequest(new { error = "Hay ítems desplazados a esta ubicación. Cambia su destino o registra la devolución antes de eliminarla." });
     var location = await db.Locations
         .Include(candidate => candidate.Boxes)
         .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
@@ -751,6 +754,21 @@ app.MapPut("/api/items/{id:int}", async (
     }
 
     return item is null ? Results.NotFound() : Results.Json(item);
+});
+app.MapPost("/api/items/{id:int}/placements", async (int id, ItemPlacementInput input, InventoryLiveQueryService service, CancellationToken ct) =>
+{
+    var (item, error) = await service.StartPlacementAsync(id, input, ct);
+    return error is not null ? Results.BadRequest(new { error }) : item is null ? Results.NotFound() : Results.Json(item);
+});
+app.MapPut("/api/items/{id:int}/placements/{placementId:int}", async (int id, int placementId, ItemPlacementInput input, InventoryLiveQueryService service, CancellationToken ct) =>
+{
+    var (item, error) = await service.UpdatePlacementAsync(id, placementId, input, ct);
+    return error is not null ? Results.BadRequest(new { error }) : item is null ? Results.NotFound() : Results.Json(item);
+});
+app.MapPost("/api/items/{id:int}/placements/{placementId:int}/return", async (int id, int placementId, ItemPlacementVersionInput input, InventoryLiveQueryService service, CancellationToken ct) =>
+{
+    var (item, error) = await service.ReturnPlacementAsync(id, placementId, input.Version, ct);
+    return error is not null ? Results.Conflict(new { error }) : item is null ? Results.NotFound() : Results.Json(item);
 });
 app.MapPost("/api/items/{id:int}/archive", async (
     int id,

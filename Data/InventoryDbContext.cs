@@ -7,6 +7,7 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
 {
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Box> Boxes => Set<Box>();
+    public DbSet<ItemPlacement> ItemPlacements => Set<ItemPlacement>();
     public DbSet<Item> Items => Set<Item>();
     public DbSet<ItemRelation> ItemRelations => Set<ItemRelation>();
     public DbSet<ItemClass> ItemClasses => Set<ItemClass>();
@@ -25,6 +26,17 @@ public class InventoryDbContext(DbContextOptions<InventoryDbContext> options) : 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ItemPlacement>(entity =>
+        {
+            entity.Property(x => x.Destination).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.DestinationBox).WithMany().HasForeignKey(x => x.DestinationBoxId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasMany(x => x.Events).WithOne().HasForeignKey(x => x.ItemPlacementId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<Item>().WithMany(x => x.Placements).HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.ItemId).IsUnique().HasFilter("\"ReturnedAt\" IS NULL");
+        });
         modelBuilder.Entity<Location>(entity =>
         {
             entity.Property(x => x.Name).HasMaxLength(120).IsRequired();

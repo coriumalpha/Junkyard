@@ -167,6 +167,9 @@
             En cuarentena
           </mat-slide-toggle>
 
+          <mat-slide-toggle [checked]="state().onlyAway" (change)="setOnlyAway($event.checked)">
+            Fuera temporalmente
+          </mat-slide-toggle>
           <mat-slide-toggle [checked]="state().onlyNeedsReview" (change)="setOnlyNeedsReview($event.checked)">
             Pendiente de completar
           </mat-slide-toggle>
@@ -462,7 +465,10 @@
                             @if (item.consumable) {
                               <span class="badge cool">Consumible</span>
                             }
-                            @if (item.isQuarantined) {
+                            @if (item.currentPlacement) {
+                        <span class="badge away-badge" [title]="'Ahora: ' + item.currentPlacement.destination">Fuera · {{ item.currentPlacement.destination }}</span>
+                      }
+                      @if (item.isQuarantined) {
                               <span class="badge warm">Cuarentena</span>
                             }
                             @if (item.needsReview) {
@@ -566,7 +572,10 @@
 
                   <div class="item-badges">
                     <span [class]="badgeClass(item)">{{ item.needsReview ? 'Pendiente' : (item.consumable ? 'Consumible' : 'No consumible') }}</span>
-                    @if (item.isQuarantined) {
+                    @if (item.currentPlacement) {
+                        <span class="badge away-badge" [title]="'Ahora: ' + item.currentPlacement.destination">Fuera · {{ item.currentPlacement.destination }}</span>
+                      }
+                      @if (item.isQuarantined) {
                       <span class="badge warm">Cuarentena</span>
                     }
                     @if (item.lowStock) {
@@ -626,6 +635,9 @@
                       }
                       @if (item.consumable) {
                         <span class="badge cool">Consumible</span>
+                      }
+                      @if (item.currentPlacement) {
+                        <span class="badge away-badge" [title]="'Ahora: ' + item.currentPlacement.destination">Fuera · {{ item.currentPlacement.destination }}</span>
                       }
                       @if (item.isQuarantined) {
                         <span class="badge warm">Cuarentena</span>
@@ -701,6 +713,7 @@
 
                   <div class="table-cell">
                     <span>{{ item.boxPath || 'Sin caja' }}</span>
+                    @if(item.currentPlacement){<small class="away-badge">Ahora: {{ item.currentPlacement.destination }}</small>}
                   </div>
 
                   <div class="table-cell">
